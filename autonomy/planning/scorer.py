@@ -8,14 +8,20 @@ C_collision   soft collision risk: max over objects and time of
               Gaussian prediction lying inside the ego collision band.
               Non-zero even for candidates that pass the hard collision
               check, so the planner prefers routes clear of uncertain predictions.
-C_clearance   exp(-(min_clearance - safety_margin) / clearance_scale)   (1 at the margin)
+C_clearance   exp(-min(min_clearance - margin, saturation) / clearance_scale)  (1 at the margin,
+              flat beyond margin + saturation so 'far enough' is not rewarded further)
 C_smoothness  0.5 * mean|v^2 kappa| / a_lat_max + 0.5 * mean|a| / a_max
 C_curvature   max|kappa| / kappa_max
-C_progress    1 - (s_end - s0) / (target_speed * horizon)     (0 when target_speed == 0)
+C_progress    1 - (s_end - s0) / (target_speed * horizon)     (0 when target_speed == 0);
+              its weight is multiplied by min(1 + gain * t_standstill, max_factor) while the
+              ego stands still, so a feasible bypass eventually beats freezing
 C_boundary    exp(-min_boundary_clearance / (0.5 * clearance_scale))
 C_speed       |v_end - target_speed| / max(desired_speed, 1)
 C_uncertainty mean over time of max over objects of p(t)   (exposure to uncertain regions)
 C_lateral     |d_end - desired_offset| / max|lateral_offsets|   (return toward route)
+C_blocked     1 - t_meet / route_lookahead if the continuation from the end state meets an
+              object within the look-ahead (0 otherwise): postponing a head-on meeting by
+              slowing down is not a solution; a clear continuation is
 
 Weights come from PlanningConfig.weights. Individual components and weighted
 components are stored on the candidate for explanation and telemetry.
@@ -44,7 +50,7 @@ class TrajectoryScorer:
         self.d_max = max(max(abs(o) for o in cfg.lateral_offsets_m), 0.5)
 
     def score(self, cand: CandidateTrajectory, check: CheckResult, policy: SpeedPolicy,
-              desired_offset: float, s0: float, s_end: float) -> float:
+              desired_offset: float, s0: float, s_end: float, standstill_s: float = 0.0) -> float:
         tr = cand.trajectory
         rel_t = tr.t - tr.t[0]
         p = self.params
@@ -62,7 +68,8 @@ class TrajectoryScorer:
             c["collision"] = 0.0
             c["uncertainty"] = 0.0
 
-        c["clearance"] = float(math.exp(-max(cand.min_clearance - self.margin, 0.0) / self.cfg.clearance_scale_m)) \
+        gap_c = min(max(cand.min_clearance - self.margin, 0.0), self.cfg.clearance_saturation_m)
+        c["clearance"] = float(math.exp(-gap_c / self.cfg.clearance_scale_m)) \
             if math.isfinite(cand.min_clearance) else 0.0
         a_lat = np.abs(tr.velocity ** 2 * tr.curvature)
         a_max = max(p.max_acceleration, p.max_deceleration)
@@ -75,8 +82,13 @@ class TrajectoryScorer:
             if math.isfinite(cand.min_boundary_clearance) else 0.0
         c["speed"] = float(abs(cand.target_speed - policy.target_speed) / self.desired_speed)
         c["lateral"] = float(abs(cand.lateral_offset_end - desired_offset) / self.d_max)
+        c["blocked"] = 0.0 if cand.route_block_time is None else \
+            float(np.clip(1.0 - cand.route_block_time / self.cfg.route_lookahead_s, 0.0, 1.0))
 
-        w = self.cfg.weights.as_dict()
+        w = dict(self.cfg.weights.as_dict())
+        if standstill_s > 0.0:
+            w["progress"] *= min(1.0 + self.cfg.standstill_progress_gain * standstill_s,
+                                 self.cfg.standstill_progress_max_factor)
         cand.costs = c
         cand.weighted_costs = {k: w[k] * c[k] for k in c}
         cand.total_cost = float(sum(cand.weighted_costs.values()))

@@ -104,24 +104,35 @@ def polygon_distance(corners_a: np.ndarray, corners_b: np.ndarray) -> np.ndarray
 
 
 def box_sequence_distance(ax: np.ndarray, ay: np.ndarray, ayaw: np.ndarray, alen: float, awid: float,
-                          bx: np.ndarray, by: np.ndarray, byaw: np.ndarray, blen: float, bwid: float) -> np.ndarray:
-    """Exact distance between paired boxes A_i and B_i for i in range(N) -> (N,).
+                          bx: np.ndarray, by: np.ndarray, byaw: np.ndarray, blen: float, bwid: float,
+                          exact_within: float = 3.0) -> np.ndarray:
+    """Distance between paired boxes A_i and B_i for i in range(N) -> (N,).
 
-    Zero when the footprints overlap. Fully vectorised: one call per
-    (candidate, object) pair covers the whole prediction horizon.
+    Exact (0 when overlapping) whenever the pair could be within `exact_within`
+    metres of contact, i.e. centre distance <= r_a + r_b + exact_within with r the
+    half-diagonals. Farther pairs return the conservative lower bound
+    centre_distance - r_a - r_b (never above the true distance), which is all the
+    margin tests and the saturating clearance cost need. Fully vectorised.
     """
     ax, ay, ayaw = (np.atleast_1d(np.asarray(v, dtype=float)) for v in (ax, ay, ayaw))
     bx, by, byaw = (np.atleast_1d(np.asarray(v, dtype=float)) for v in (bx, by, byaw))
-    ca = box_corners(ax, ay, ayaw, alen, awid)
-    cb = box_corners(bx, by, byaw, blen, bwid)
-    return polygon_distance(ca, cb)
+    ra = 0.5 * math.hypot(alen, awid)
+    rb = 0.5 * math.hypot(blen, bwid)
+    centre = np.hypot(ax - bx, ay - by)
+    out = centre - ra - rb
+    near = out <= exact_within
+    if np.any(near):
+        ca = box_corners(ax[near], ay[near], ayaw[near], alen, awid)
+        cb = box_corners(bx[near], by[near], byaw[near], blen, bwid)
+        out[near] = polygon_distance(ca, cb)
+    return out
 
 
 def box_distance(a: OrientedBox, b: OrientedBox) -> float:
-    """Scalar convenience wrapper."""
+    """Scalar convenience wrapper (always exact)."""
     return float(box_sequence_distance(
         np.array([a.cx]), np.array([a.cy]), np.array([a.yaw]), a.length, a.width,
-        np.array([b.cx]), np.array([b.cy]), np.array([b.yaw]), b.length, b.width,
+        np.array([b.cx]), np.array([b.cy]), np.array([b.yaw]), b.length, b.width, exact_within=math.inf,
     )[0])
 
 

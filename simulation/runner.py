@@ -26,7 +26,8 @@ import numpy as np
 
 from autonomy.behavior.state_machine import BehaviorStateMachine
 from autonomy.control.tracker import TrajectoryTracker
-from autonomy.core.config import AutonomyConfig, ObjectProfiles, load_vehicle_parameters
+from autonomy.core.config import AutonomyConfig, ObjectProfiles, PerceptionConfig, load_vehicle_parameters
+from autonomy.perception.tracker import SensorFusionTracker, TrackerConfig
 from autonomy.core.geometry import box_corners
 from autonomy.core.types import (BehaviorDecision, ObjectPrediction, PlannerOutput, RiskSummary,
                                  SafetyStatus, SimulationMetrics, SimulationState, VehicleParameters,
@@ -40,6 +41,7 @@ from autonomy.telemetry.telemetry import (ConsoleSink, CsvSummarySink, InMemoryS
                                           TelemetryFrame, TelemetryPublisher)
 from autonomy.vehicle.models import KinematicBicycleModel, VehicleModel
 from simulation.scenarios.loader import Scenario, load_scenario
+from simulation.sensors.models import SensorSuite
 
 
 @dataclass
@@ -52,7 +54,7 @@ class RunResult:
 class Simulation:
     def __init__(self, scenario: Scenario, cfg: AutonomyConfig, params: VehicleParameters,
                  profiles: ObjectProfiles, publisher: Optional[TelemetryPublisher] = None,
-                 vehicle: Optional[VehicleModel] = None):
+                 vehicle: Optional[VehicleModel] = None, perception: Optional[PerceptionConfig] = None):
         self.sc = scenario
         self.cfg = cfg
         self.params = params
@@ -60,6 +62,16 @@ class Simulation:
         self.road = scenario.world.road
         self.dt = cfg.simulation.dt_s
         self.publisher = publisher or TelemetryPublisher()
+
+        # perception: ground truth (Stage 1 baseline) or simulated sensors -> tracker/fusion
+        self.perception = perception or PerceptionConfig(mode="ground_truth")
+        self.sensors: Optional[SensorSuite] = None
+        self.fusion: Optional[SensorFusionTracker] = None
+        if self.perception.mode == "sensors":
+            self.sensors = SensorSuite.from_config(self.perception.sensors, scenario.seed)
+            self.fusion = SensorFusionTracker(TrackerConfig(**self.perception.tracker), profiles)
+        self.object_provider = self.fusion if self.fusion is not None else self.world.object_provider
+        self.last_detections = []
 
         self.ego: VehicleState = scenario.ego.initial_state
         self.vehicle = vehicle or KinematicBicycleModel(params)
@@ -87,7 +99,12 @@ class Simulation:
     def step(self) -> SimulationState:
         t = self.time
         dt = self.dt
-        objects = self.world.object_provider.get_object_states(t)
+        truth = self.world.object_provider.get_object_states(t)
+        if self.fusion is not None:
+            self.last_detections = self.sensors.sense(self.world.agents, self.ego, t)
+            self.fusion.ingest(self.last_detections, t, self.ego)
+            self.metrics.m.detections_total += len(self.last_detections)
+        objects = self.object_provider.get_object_states(t)      # what the autonomy stack sees
 
         planning_cycle = self.plan is None or t >= self.next_plan_time - 1e-9
         if planning_cycle:
@@ -95,10 +112,14 @@ class Simulation:
             ref = self.plan.selected.trajectory if self.plan else None
             self.risk = self.risk_engine.evaluate(self.ego, ref, objects, self.predictions, self.road)
             had_feasible = self.plan.feasible_count > 0 if self.plan else True
-            self.decision = self.behavior.decide(self.risk, self.ego, t, planner_feasible=had_feasible)
+            standstill = self.plan.standstill_s if self.plan else 0.0
+            self.decision = self.behavior.decide(self.risk, self.ego, t, planner_feasible=had_feasible,
+                                                 standstill_s=standstill)
             self.plan = self.planner.plan(self.ego, self.decision, self.predictions, t)
             self.next_plan_time = t + self.cfg.planning.period_s
             self.metrics.on_plan(self.plan, self.decision, self.risk, self.predictions, objects, t)
+            if self.fusion is not None:
+                self.metrics.on_perception(objects, truth, self.fusion.mean_latency_s(), 0)
 
         nominal = self.tracker.track(self.ego, self.plan.selected.trajectory, t, dt)
         control, self.safety_status = self.safety.check(nominal, self.risk, self.plan, self.ego, t)
@@ -112,7 +133,7 @@ class Simulation:
                               np.array([self.ego.y + self.params.footprint_center_offset * math.sin(self.ego.yaw)]),
                               np.array([self.ego.yaw]), self.params.length, self.params.width)
         inside = bool(self.road.footprint_inside(corners, 0.0)[0])
-        self.metrics.update(self.ego, objects, self.safety_status, inside, dt)
+        self.metrics.update(self.ego, truth, self.safety_status, inside, dt)   # collisions/clearance vs TRUTH
 
         self._check_termination()
         frame = TelemetryFrame(
@@ -123,6 +144,7 @@ class Simulation:
             tracker_debug=self.tracker.last_debug.to_dict() if self.tracker.last_debug else None,
             safety=self.safety_status, road=self.road.to_dict(), metrics=self.metrics.m,
             agents=self.world.to_dict()["agents"],
+            detections=self.last_detections, perception_mode=self.perception.mode,
         )
         self.publisher.publish(frame)
         return SimulationState(self.time, self.step_index, self.ego, objects, self.predictions,
@@ -149,10 +171,16 @@ class Simulation:
 
 # ---------------------------------------------------------------------- #
 def run_scenario(name: str, log_dir: Path | str | None = "logs", console: bool = True,
-                 keep_frames: bool = True, cfg: AutonomyConfig | None = None) -> RunResult:
+                 keep_frames: bool = True, cfg: AutonomyConfig | None = None,
+                 perception: PerceptionConfig | str | None = None) -> RunResult:
+    """perception: a PerceptionConfig, a mode string ('ground_truth' / 'sensors'), or None for config/sensors.yaml."""
     cfg = cfg or AutonomyConfig.load()
     params = load_vehicle_parameters()
     profiles = ObjectProfiles.load()
+    if perception is None:
+        perception = PerceptionConfig.load()
+    elif isinstance(perception, str):
+        perception = PerceptionConfig.load().with_mode(perception)
     scenario = load_scenario(name, profiles)
     memory = InMemorySink()
     publisher = TelemetryPublisher([memory] if keep_frames else [])
@@ -162,6 +190,6 @@ def run_scenario(name: str, log_dir: Path | str | None = "logs", console: bool =
         publisher.add(CsvSummarySink(log_dir / f"{scenario.name.lower()}_summary.csv"))
     if console:
         publisher.add(ConsoleSink())
-    sim = Simulation(scenario, cfg, params, profiles, publisher)
+    sim = Simulation(scenario, cfg, params, profiles, publisher, perception=perception)
     metrics = sim.run()
     return RunResult(metrics, memory.frames, scenario.name)

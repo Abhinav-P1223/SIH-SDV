@@ -1,10 +1,11 @@
 # SUDDEN_PEDESTRIAN_DART
 # Same unmarked corridor. A pedestrian waits at the right edge and darts into
-# the ego path at 2.5 m/s when the ego is 22 m away. At 10 m/s that is ~2 s to
+# the ego path at 2.5 m/s when the ego is 19 m away. At 10 m/s that is ~1.9 s to
 # impact: too late for a comfortable plan, so this scenario exercises the
 # independent safety supervisor (emergency braking) and the
 # EMERGENCY_BRAKE -> STOPPED -> CAUTION -> CRUISE recovery path.
-# (At a 14 m trigger the collision is physically unavoidable: braking distance
+# (With ground-truth objects 17 m suffices; with the sensor + tracker pipeline the reaction distance grows
+# and 19 m is the survivable threshold. At 25 m the planner alone handles it; at 14 m the collision is unavoidable: braking distance
 # from 10 m/s at 8 m/s^2 is 6.3 m plus ~1 s of detection at 10 m/s. Measured
 # and documented in STAGE1_RESULTS.md, not tuned away.)
 # Nothing about the ego reaction is scripted.
@@ -38,7 +39,7 @@ agents:
     speed_mps: 0.0
     behavior: CROSSING
     params:
-      trigger_distance_m: 22.0
+      trigger_distance_m: 19.0
       crossing_speed_mps: 2.5
       acceleration_mps2: 4.0
       crossing_distance_m: 7.5      # clears the road on the far side

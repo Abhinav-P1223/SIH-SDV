@@ -62,9 +62,11 @@ class RiskLevelsConfig:
 @dataclass
 class RiskConfig:
     safety_margin_m: float = 0.5
+    uncertainty_margin_gain: float = 1.0
     time_constant_s: float = 2.0
     ttc_high_s: float = 3.0
     ttc_critical_s: float = 1.2
+    margin_grace_s: float = 0.3          # inside-margin (no overlap) is not a hit before this: current pose
     levels: RiskLevelsConfig = field(default_factory=RiskLevelsConfig)
 
     def __post_init__(self) -> None:
@@ -83,6 +85,7 @@ class BehaviorConfig:
     stopped_speed_mps: float = 0.3
     caution_exit_score: float = 0.1
     avoid_exit_score: float = 0.25
+    standstill_to_stopped_s: float = 1.0
 
 
 @dataclass
@@ -96,6 +99,7 @@ class CostWeights:
     speed: float = 1.5
     uncertainty: float = 1.0
     lateral: float = 1.2
+    blocked: float = 3.0
 
     def as_dict(self) -> dict[str, float]:
         return {f.name: getattr(self, f.name) for f in fields(self)}
@@ -113,9 +117,19 @@ class PlanningConfig:
     comfortable_deceleration_mps2: float = 3.0
     max_lateral_acceleration_mps2: float = 3.5
     safety_margin_m: float = 0.5
+    uncertainty_margin_gain: float = 1.0      # margin += gain * measured position std-dev of the object
     boundary_margin_m: float = 0.25
     boundary_margin_grace_s: float = 0.5
     clearance_scale_m: float = 2.0
+    clearance_saturation_m: float = 1.5       # clearance beyond margin+this costs nothing more
+    standstill_speed_mps: float = 0.5
+    standstill_progress_gain: float = 0.5     # progress weight grows by this per second at standstill
+    standstill_progress_max_factor: float = 6.0
+    terminal_exposure_horizon_s: float = 7.0   # end pose must not be hit by CV-extrapolated objects before this
+    route_lookahead_s: float = 15.0            # continuation checked this far for the graded 'blocked' cost
+    stop_standoff_m: float = 5.0               # a near-stop end state behind a blocked route keeps this gap
+    stop_standoff_speed_mps: float = 1.0
+    collision_margin_grace_s: float = 0.3      # inside-margin (not overlap) tolerated this long: current pose
     weights: CostWeights = field(default_factory=CostWeights)
 
     def __post_init__(self) -> None:
@@ -138,6 +152,7 @@ class StanleyConfig:
     heading_gain: float = 1.0
     lookahead_time_s: float = 0.4
     min_lookahead_m: float = 1.5
+    max_lateral_acceleration_mps2: float = 4.0   # |delta| <= atan(L * a_max / v^2): the tracker cannot exceed comfort
 
 
 @dataclass
@@ -200,6 +215,35 @@ class AutonomyConfig:
 
 # --------------------------------------------------------------------------- #
 @dataclass
+class PerceptionConfig:
+    """Loaded from config/sensors.yaml. mode: ground_truth | sensors."""
+    mode: str = "ground_truth"
+    tracker: dict[str, Any] = field(default_factory=dict)
+    sensors: dict[str, Any] = field(default_factory=dict)
+
+    @staticmethod
+    def load(path: Path | str | None = None) -> "PerceptionConfig":
+        path = Path(path) if path else DEFAULT_CONFIG_DIR / "sensors.yaml"
+        data = load_yaml(path)
+        per = data.get("perception", {})
+        mode = str(per.get("mode", "ground_truth"))
+        if mode not in ("ground_truth", "sensors"):
+            raise ValueError(f"perception.mode must be ground_truth or sensors, got {mode}")
+        return PerceptionConfig(mode=mode, tracker=dict(per.get("tracker", {})), sensors=dict(data.get("sensors", {})))
+
+    def with_mode(self, mode: str) -> "PerceptionConfig":
+        return PerceptionConfig(mode, dict(self.tracker), {k: dict(v) for k, v in self.sensors.items()})
+
+    def without(self, *sensor_names: str) -> "PerceptionConfig":
+        """Ablation helper: same config with the named sensors disabled."""
+        sensors = {k: dict(v) for k, v in self.sensors.items()}
+        for n in sensor_names:
+            if n in sensors:
+                sensors[n]["enabled"] = False
+        return PerceptionConfig(self.mode, dict(self.tracker), sensors)
+
+
+@dataclass
 class ObjectProfile:
     length_m: float
     width_m: float
@@ -207,6 +251,8 @@ class ObjectProfile:
     sigma_vel_mps: float
     sigma_acc_mps2: float
     risk_weight: float
+    lateral_factor: float = 1.0
+    static_factor: float = 1.0
 
 
 class ObjectProfiles:

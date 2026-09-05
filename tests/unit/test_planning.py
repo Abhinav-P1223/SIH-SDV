@@ -168,7 +168,8 @@ def test_planner_prefers_route_when_clear(cfg, params, road):
     assert out.selected.lateral_offset_end == pytest.approx(1.75)
     assert out.selected.target_speed == pytest.approx(10.0)
     assert out.feasible_count > 0 and set(out.selected.costs) == {
-        "collision", "uncertainty", "clearance", "smoothness", "curvature", "progress", "boundary", "speed", "lateral"}
+        "collision", "uncertainty", "clearance", "smoothness", "curvature", "progress", "boundary", "speed",
+        "lateral", "blocked"}
 
 
 def test_planner_rejects_colliding_candidates_and_explains(cfg, params, road, profiles):

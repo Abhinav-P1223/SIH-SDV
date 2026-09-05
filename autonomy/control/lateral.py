@@ -5,6 +5,7 @@
     theta_e = heading error = yaw_path(look-ahead) - yaw_vehicle  (wrapped)
     delta_ff= atan(L * kappa_path(look-ahead))        kinematic curvature feed-forward
     delta   = heading_gain * theta_e + atan( k * e / (k_soft + v) ) + delta_ff
+    delta   = clip(delta, -delta_lat, delta_lat)   with delta_lat = atan(L * a_lat_max / v^2)
     delta   = clip(delta, -delta_max, delta_max)
 
 The look-ahead point sits max(lookahead_time_s * v, min_lookahead_m) along the
@@ -71,5 +72,8 @@ class StanleyController(LateralController):
         delta_ff = math.atan(self.params.wheelbase * float(traj.curvature[j]))
 
         delta = self.cfg.heading_gain * theta_e + math.atan2(self.cfg.k_gain * e, self.cfg.k_soft + v) + delta_ff
+        if v > 1.0:
+            delta_lat = math.atan(self.params.wheelbase * self.cfg.max_lateral_acceleration_mps2 / (v * v))
+            delta = max(-delta_lat, min(delta_lat, delta))
         delta = max(-self.params.max_steering_angle, min(self.params.max_steering_angle, delta))
         return delta, LateralDebug(j, float(traj.x[j]), float(traj.y[j]), e, theta_e, delta)

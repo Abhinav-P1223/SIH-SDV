@@ -1,0 +1,57 @@
+# Simulated sensor suite mounted on the ego (positions relative to the CG, metres, along heading).
+# Every noise term is drawn from the scenario-seeded generator, so runs are reproducible.
+# perception.mode selects what feeds the autonomy stack:
+#   ground_truth : simulator objects with zero covariance (Stage 1 baseline)
+#   sensors      : camera + LiDAR + radar detections -> tracker/fusion -> ObjectState list
+perception:
+  mode: sensors
+  tracker:
+    process_noise_accel_mps2: 2.5      # CV model process noise (acceleration std-dev): darting pedestrians
+    gate_chi2: 9.21                    # Mahalanobis gate, 99 % for 2 dof
+    confirm_hits: 3                    # detections before a track is published
+    max_misses: 6                      # consecutive missed cycles before deletion
+    max_age_s: 1.0                     # delete if not updated for this long
+    init_velocity_std_mps: 3.0
+    min_speed_for_heading_mps: 0.5     # below this, heading comes from LiDAR extent / last value
+    class_confidence_floor: 0.35       # below this the type is reported as UNKNOWN
+
+sensors:
+  camera:
+    enabled: true
+    mount_x_m: 1.5
+    rate_hz: 20.0
+    latency_s: 0.08
+    fov_deg: 100.0
+    range_m: 60.0
+    bearing_std_deg: 1.0
+    range_std_frac: 0.04               # range std = frac * range + range_std_min
+    range_std_min_m: 0.3
+    dropout_prob: 0.05
+    class_accuracy: 0.9                # probability the reported class is correct
+    occlusion: true
+  lidar:
+    enabled: true
+    mount_x_m: 0.0
+    rate_hz: 10.0
+    latency_s: 0.05
+    fov_deg: 360.0
+    range_m: 80.0
+    position_std_m: 0.10
+    extent_std_m: 0.20
+    heading_std_deg: 6.0
+    dropout_prob: 0.02
+    occlusion: true
+  radar:
+    enabled: true
+    mount_x_m: 2.0
+    rate_hz: 20.0
+    latency_s: 0.03
+    fov_deg: 60.0
+    range_m: 120.0
+    range_std_m: 0.3
+    bearing_std_deg: 2.5
+    radial_speed_std_mps: 0.2
+    dropout_prob: 0.05
+    min_rcs_size_m: 0.5                # objects smaller than this (e.g. thin pedestrians) may be missed
+    small_object_dropout_prob: 0.35
+    occlusion: false                   # radar sees partially through gaps; simplified

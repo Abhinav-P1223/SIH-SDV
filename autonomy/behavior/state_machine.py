@@ -46,6 +46,7 @@ class DecisionContext:
     desired_speed: float
     planner_feasible: bool          # did the last planning cycle find any feasible trajectory
     time_in_state: float
+    standstill_s: float = 0.0       # seconds the ego has been stationary under planner control
 
     @property
     def worst(self):
@@ -82,6 +83,13 @@ def g_emergency(c: DecisionContext) -> Optional[str]:
 def g_stopped(c: DecisionContext) -> Optional[str]:
     if c.ego.longitudinal_velocity < c.cfg.stopped_speed_mps:
         return f"Vehicle brought to a halt; holding while the planner looks for a clear path. {c.describe_worst()}."
+    return None
+
+
+def g_planner_standstill(c: DecisionContext) -> Optional[str]:
+    if c.ego.longitudinal_velocity < c.cfg.stopped_speed_mps and c.standstill_s >= c.cfg.standstill_to_stopped_s:
+        return (f"Stationary for {c.standstill_s:.1f} s while avoiding {c.risk.worst_object_id}; "
+                f"searching for a clear path.")
     return None
 
 
@@ -169,6 +177,7 @@ S = BehaviorState
 TRANSITIONS: list[tuple[tuple[BehaviorState, ...], BehaviorState, Guard]] = [
     (tuple(s for s in ALL if s not in (S.EMERGENCY_BRAKE, S.STOPPED)), S.EMERGENCY_BRAKE, g_emergency),
     ((S.EMERGENCY_BRAKE,), S.STOPPED, g_stopped),
+    ((S.AVOID, S.CAUTION), S.STOPPED, g_planner_standstill),
     ((S.EMERGENCY_BRAKE,), S.CAUTION, g_eb_release),
     ((S.STOPPED,), S.AVOID, g_stopped_to_avoid),
     ((S.STOPPED,), S.CAUTION, g_stopped_release),
@@ -192,9 +201,9 @@ class BehaviorStateMachine:
         self.transition_count = 0
 
     def decide(self, risk: RiskSummary, ego: VehicleState, now: float,
-               planner_feasible: bool = True) -> BehaviorDecision:
+               planner_feasible: bool = True, standstill_s: float = 0.0) -> BehaviorDecision:
         ctx = DecisionContext(risk, ego, self.cfg, self.desired_speed, planner_feasible,
-                              now - self.entered_at)
+                              now - self.entered_at, standstill_s)
         previous = self.state
         reason = self.last_reason
         for from_states, to_state, guard in TRANSITIONS:

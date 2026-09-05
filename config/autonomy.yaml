@@ -14,9 +14,11 @@ prediction:
 
 risk:
   safety_margin_m: 0.5            # footprint inflation used for intersection / TTC
+  uncertainty_margin_gain: 1.0    # margin grows with the object's measured position std-dev
   time_constant_s: 2.0            # tau in risk_score = w * max_t p(t) exp(-t/tau)
   ttc_high_s: 3.0                 # TTC below this contributes HIGH
   ttc_critical_s: 1.2             # TTC below this is CRITICAL
+  margin_grace_s: 0.3             # being inside the margin (no overlap) before this is the current pose, not a hit
   levels:                         # risk_score thresholds (after type weighting)
     low: 0.05
     medium: 0.20
@@ -34,6 +36,7 @@ behavior:
   # Exit thresholds are deliberately lower than entry thresholds (hysteresis)
   caution_exit_score: 0.10
   avoid_exit_score: 0.25
+  standstill_to_stopped_s: 1.0   # a planner-induced standstill this long is reported as STOPPED
 
 planning:
   frequency_hz: 10.0
@@ -42,24 +45,42 @@ planning:
   lateral_offsets_m: [-2.5, -2.0, -1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 1.5, 2.0, 2.5]
   speed_fractions: [1.0, 0.8, 0.6, 0.4, 0.2, 0.0]   # of the behaviour target speed
   lateral_transition_time_s: 2.0  # time to reach d_end at current speed
-  min_lateral_transition_length_m: 10.0
+  min_lateral_transition_length_m: 6.0   # short enough to bypass from a crawl; curvature check guards feasibility
   comfortable_deceleration_mps2: 3.0
   max_lateral_acceleration_mps2: 3.5
   safety_margin_m: 0.5            # collision margin between ego footprint and objects
+  uncertainty_margin_gain: 1.0    # margin grows by gain x the object's own measured position std-dev (fusion covariance)
   boundary_margin_m: 0.25         # footprint must stay this far inside the corridor
   boundary_margin_grace_s: 0.5    # margin (not corridor edge) is enforced only after this time; the
                                   # current pose is not the planner's choice
-  clearance_scale_m: 1.0          # clearance cost = exp(-(clearance - margin) / scale)
+  clearance_scale_m: 0.7          # clearance cost = exp(-(clearance - margin) / scale)
+  clearance_saturation_m: 2.0     # clearance beyond margin + this is "enough": cost floor reached
+  # anti-freeze: when the ego has been stationary the progress weight grows with waiting time so a
+  # feasible bypass eventually outweighs the comfort of standing still
+  standstill_speed_mps: 0.5
+  standstill_progress_gain: 0.5   # +50 % progress weight per second at standstill
+  standstill_progress_max_factor: 6.0
+  # do not stop where you will be hit: a candidate whose terminal pose is struck by a constant-velocity
+  # extrapolation of any object before this horizon is rejected (TERMINAL_STATE_EXPOSED). If every
+  # candidate is exposed the cheapest is still selected (degraded), never nothing.
+  terminal_exposure_horizon_s: 7.0
+  stop_standoff_m: 5.0            # do not come to rest closer than this to any object (now or predicted): room
+                                  # to steer around it from standstill (no reversing in Stage 1)
+  stop_standoff_speed_mps: 1.0
+  route_lookahead_s: 15.0         # continuation from the end state is checked this far; a meeting inside
+                                  # the window adds the graded 'blocked' cost (1 - t_meet / lookahead)
+  collision_margin_grace_s: 0.3   # being inside the margin (no overlap) is tolerated this long: the current pose is a given
   weights:
     collision: 6.0
-    clearance: 2.0
+    clearance: 1.5
     smoothness: 0.8
     curvature: 0.5
     progress: 2.5
     boundary: 1.0
     speed: 1.5
     uncertainty: 1.0
-    lateral: 1.2                  # deviation from desired lateral offset (return to route)
+    lateral: 1.0                  # deviation from desired lateral offset (return to route)
+    blocked: 3.0                  # route ahead of the end state meets an object within route_lookahead_s
 
 control:
   stanley:
@@ -68,6 +89,7 @@ control:
     heading_gain: 1.0
     lookahead_time_s: 0.4         # heading / curvature taken this far ahead along the path
     min_lookahead_m: 1.5
+    max_lateral_acceleration_mps2: 4.0   # steering command capped so v^2 * kappa stays below this
   pid:
     kp: 1.5
     ki: 0.15

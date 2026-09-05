@@ -8,7 +8,7 @@ Two ego motions are evaluated against every object's predicted footprint:
    a threat to the mission is seen even after the planner has slowed down.
    With no road model it degrades to constant heading.
 
-2. PHYSICAL motion — the corridor at the CURRENT speed. Only its earliest
+2. PHYSICAL motion — constant velocity along the CURRENT heading and speed. Only its earliest
    overlap time is kept (`min_ttc_current_speed`); it drives the independent
    safety supervisor and the CRITICAL escalation. A stopped ego has infinite
    physical TTC, which is what lets the STOPPED state release cleanly.
@@ -55,8 +55,18 @@ def kinematic_ttc(distance: float, closing_speed: float) -> float:
     return max(distance, 0.0) / closing_speed
 
 
-def first_overlap_time(rel_times: np.ndarray, distances: np.ndarray, margin: float) -> float:
-    hits = np.nonzero(distances <= margin)[0]
+def first_overlap_time(rel_times: np.ndarray, distances: np.ndarray, margin: float,
+                       grace_s: float = 0.0, closing_eps: float = 0.05) -> float:
+    """Earliest time the footprints come within `margin` while CLOSING, or truly overlap.
+
+    Standing (or driving) alongside an object at a constant sub-margin distance is
+    not a time-to-collision; only a distance that shrinks below the margin relative
+    to now, or an actual overlap, counts. Inside the grace window only overlap counts.
+    """
+    d0 = float(distances[0])
+    closing = distances < d0 - closing_eps
+    hit = (distances <= 0.0) | ((distances <= margin) & closing & (rel_times >= grace_s))
+    hits = np.nonzero(hit)[0]
     return float(rel_times[hits[0]]) if hits.size else math.inf
 
 
@@ -113,8 +123,9 @@ class RiskEngine:
         fx, fy = self._footprint_centres(nx, ny, nyaw)
         assessments = [self._assess(pred, rel, fx, fy, nyaw, ego_vx, ego_vy) for pred in predictions]
 
-        # physical TTC at the current speed (independent safety view), per object
-        cx, cy, cyaw = nominal_motion(ego, times, road)
+        # physical TTC: constant velocity along the CURRENT heading (what happens if control froze now);
+        # deliberately not the corridor offset, so a swerve in progress is not mistaken for a head-on threat
+        cx, cy, cyaw = nominal_motion(ego, times, None)
         cfx, cfy = self._footprint_centres(cx, cy, cyaw)
         phys = [self._ttc_only(pred, rel, cfx, cfy, cyaw) for pred in predictions]
         physical_ttc = min(phys)
@@ -175,22 +186,23 @@ class RiskEngine:
                   fx: np.ndarray, fy: np.ndarray, eyaw: np.ndarray) -> float:
         p = self.params
         dist = box_sequence_distance(fx, fy, eyaw, p.length, p.width,
-                                     pred.x, pred.y, pred.heading, pred.length, pred.width)
-        return first_overlap_time(rel, dist, self.cfg.safety_margin_m)
+                                     pred.x, pred.y, pred.heading, pred.length, pred.width, exact_within=math.inf)
+        margin = self.cfg.safety_margin_m + self.cfg.uncertainty_margin_gain * pred.meas_sigma
+        return first_overlap_time(rel, dist, margin, self.cfg.margin_grace_s)
 
     def _assess(self, pred: ObjectPrediction, rel: np.ndarray,
                 fx: np.ndarray, fy: np.ndarray, eyaw: np.ndarray,
                 ego_vx: float, ego_vy: float) -> RiskAssessment:
         p = self.params
         dist = box_sequence_distance(fx, fy, eyaw, p.length, p.width,
-                                     pred.x, pred.y, pred.heading, pred.length, pred.width)
-        margin = self.cfg.safety_margin_m
-        sigma = pred.sigma()
+                                     pred.x, pred.y, pred.heading, pred.length, pred.width, exact_within=math.inf)
+        margin = self.cfg.safety_margin_m + self.cfg.uncertainty_margin_gain * pred.meas_sigma
+        sigma = pred.sigma_toward(fx, fy)
         band = p.width + max(pred.width, pred.length) + 2.0 * margin
         prob = band_collision_probability(dist, sigma, margin, band)
         discounted = prob * np.exp(-rel / self.cfg.time_constant_s)
         k_min = int(np.argmin(dist))
-        ttc = first_overlap_time(rel, dist, margin)
+        ttc = first_overlap_time(rel, dist, margin, self.cfg.margin_grace_s)
 
         vx = float(pred.vx[0]); vy = float(pred.vy[0])
         rvx, rvy = vx - ego_vx, vy - ego_vy

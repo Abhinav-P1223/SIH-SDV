@@ -44,7 +44,7 @@ class SweepCell:
 
 DEFAULT_GRID = {
     "SUDDEN_CATTLE_CROSSING": {"crossing_speed_mps": [0.6, 1.0, 1.4], "trigger_distance_m": [25.0, 35.0]},
-    "SUDDEN_PEDESTRIAN_DART": {"trigger_distance_m": [18.0, 22.0, 26.0]},
+    "SUDDEN_PEDESTRIAN_DART": {"trigger_distance_m": [16.0, 18.0, 22.0]},
 }
 
 

@@ -40,11 +40,15 @@ def test_box_sequence_distance_vectorised_matches_scalar():
     n = 25
     ax = np.linspace(0, 20, n); ay = np.zeros(n); ayaw = np.linspace(0, 0.3, n)
     bx = np.full(n, 10.0); by = np.linspace(-3, 3, n); byaw = np.full(n, 1.2)
-    vec = box_sequence_distance(ax, ay, ayaw, 4.2, 1.8, bx, by, byaw, 2.0, 0.7)
+    exact = box_sequence_distance(ax, ay, ayaw, 4.2, 1.8, bx, by, byaw, 2.0, 0.7, exact_within=math.inf)
+    fast = box_sequence_distance(ax, ay, ayaw, 4.2, 1.8, bx, by, byaw, 2.0, 0.7)          # default shortcut
     for i in range(n):
         s = box_distance(OrientedBox(ax[i], ay[i], ayaw[i], 4.2, 1.8),
                          OrientedBox(bx[i], by[i], byaw[i], 2.0, 0.7))
-        assert vec[i] == pytest.approx(s, abs=1e-9)
+        assert exact[i] == pytest.approx(s, abs=1e-9)
+        assert fast[i] <= s + 1e-9                          # the shortcut never overestimates
+        if s <= 3.0:
+            assert fast[i] == pytest.approx(s, abs=1e-9)    # and is exact where it matters
 
 
 def test_points_in_polygon():

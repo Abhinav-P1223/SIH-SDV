@@ -38,6 +38,8 @@ class TelemetryFrame:
     road: dict[str, Any]
     metrics: SimulationMetrics
     agents: list[dict[str, Any]]
+    detections: list[Any] = None            # Detection objects delivered this step (sensors mode)
+    perception_mode: str = "ground_truth"
 
     def to_dict(self, full: bool = True, candidate_stride: int = 2) -> dict[str, Any]:
         d: dict[str, Any] = {
@@ -54,8 +56,10 @@ class TelemetryFrame:
             "tracker": self.tracker_debug,
             "metrics": self.metrics.to_dict(),
             "agents": self.agents,
+            "perception_mode": self.perception_mode,
         }
         if full:
+            d["detections"] = [x.to_dict() for x in (self.detections or [])]
             d["predictions"] = [p.to_dict() for p in self.predictions]
             d["plan"] = self.plan.to_dict(candidate_stride) if self.plan else None
             d["road"] = self.road

@@ -19,7 +19,9 @@ MERGING            : trigger_distance_m (25), target_heading_rad (0.0),
                      acceleration_mps2 (1.0), follow_road (False) - when True and a
                      road model is available the target heading is the corridor
                      heading at the agent's position (the agent joins the flow and
-                     then follows the road, also through curves)
+                     then follows the road, also through curves);
+                     yield_gap_m (None) - gap acceptance: waits while the ego is
+                     closer than this behind it along the corridor
 ERRATIC            : heading_sigma_rad (0.35), speed_sigma_mps (0.5),
                      change_interval_s (1.0), max_speed_mps (3.0)
 """
@@ -110,6 +112,23 @@ class MergingBehavior(AgentBehavior):
         if agent.phase == "APPROACH":
             d_ego = math.hypot(agent.x - ego_xy[0], agent.y - ego_xy[1])
             if d_ego <= trigger_d:
+                # gap acceptance: with yield_gap_m set, do not pull out while the ego is closer than that
+                # behind us along the corridor (a reactive agent; Indian traffic still often does not yield)
+                yield_gap = p.get("yield_gap_m")
+                if yield_gap is not None and road is not None:
+                    s_a, _, _ = road.project(agent.x, agent.y)
+                    s_e, _, _ = road.project(ego_xy[0], ego_xy[1])
+                    if 0.0 < s_a - s_e < yield_gap:
+                        agent.phase = "WAITING"
+                    else:
+                        agent.phase = "MERGING"
+                else:
+                    agent.phase = "MERGING"
+        if agent.phase == "WAITING":
+            agent.speed = max(0.0, agent.speed - acc * dt)
+            s_a, _, _ = road.project(agent.x, agent.y)
+            s_e, _, _ = road.project(ego_xy[0], ego_xy[1])
+            if not (0.0 < s_a - s_e < p.get("yield_gap_m", 0.0)):
                 agent.phase = "MERGING"
         if agent.phase == "MERGING":
             err = float(wrap_angle(target_heading - agent.heading))

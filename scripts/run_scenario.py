@@ -20,10 +20,12 @@ def main() -> int:
     ap.add_argument("scenario", nargs="?", default="SUDDEN_CATTLE_CROSSING")
     ap.add_argument("--quiet", action="store_true", help="suppress per-cycle console output")
     ap.add_argument("--no-logs", action="store_true", help="do not write logs/*.jsonl and *.csv")
+    ap.add_argument("--perception", choices=["ground_truth", "sensors"], default=None,
+                    help="override perception.mode from config/sensors.yaml")
     args = ap.parse_args()
 
     result = run_scenario(args.scenario, log_dir=None if args.no_logs else "logs",
-                          console=not args.quiet, keep_frames=False)
+                          console=not args.quiet, keep_frames=False, perception=args.perception)
     m = result.metrics
     print("\n=== METRICS:", result.scenario_name, "===")
     print(json.dumps(m.to_dict(), indent=2))

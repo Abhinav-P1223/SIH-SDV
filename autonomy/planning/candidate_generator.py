@@ -4,7 +4,10 @@ For each lateral end offset d_end and each terminal speed v_end a candidate is
 built from two decoupled profiles:
 
 Lateral, as a function of arc length sigma = s - s0 over a transition length
-S = max(v0 * T_lat, S_min):
+S = max(v0 * T_lat, S_min, S_kappa), with S_kappa = sqrt(5.77 |d_end - d0| / (0.9 kappa_max))
+the shortest length at which the quintic's peak curvature stays inside the
+steering limit, so a wide shift from a crawl is generated feasibly instead of
+being generated too sharp and rejected:
 
     d(sigma) = quintic polynomial with
         d(0) = d0, d'(0) = tan(theta_rel), d''(0) = kappa_ego,
@@ -105,7 +108,9 @@ class CandidateGenerator:
               decel: float, now: float, label: str) -> CandidateTrajectory:
         v0 = ego.longitudinal_velocity
         v, s_rel, acc = self.speed_profile(v0, v_end, decel)
-        S = max(v0 * self.cfg.lateral_transition_time_s, self.cfg.min_lateral_transition_length_m)
+        shift = abs(d_end - fr.d0)
+        s_kappa = math.sqrt(5.77 * shift / (0.9 * self.params.max_curvature)) if shift > 1e-6 else 0.0
+        S = max(v0 * self.cfg.lateral_transition_time_s, self.cfg.min_lateral_transition_length_m, s_kappa)
         kappa0 = math.tan(ego.steering_angle) / self.params.wheelbase
         c = quintic_coefficients(fr.d0, math.tan(fr.heading_rel), kappa0, d_end, 0.0, 0.0, S)
         sigma = np.minimum(s_rel, S)

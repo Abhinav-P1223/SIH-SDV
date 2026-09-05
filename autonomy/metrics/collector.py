@@ -118,6 +118,31 @@ class MetricsCollector:
         self._speeds.append(state.longitudinal_velocity)
         m.emergency_brake_activations = safety.activation_count
 
+    def on_perception(self, tracks: list[ObjectState], truth: list[ObjectState], latency_s: Optional[float],
+                      n_detections: int) -> None:
+        """Sensors mode: compare published tracks with simulator truth (evaluation only)."""
+        m = self.m
+        m.detections_total += n_detections
+        if latency_s is not None:
+            m.perception_latency_ms = latency_s * 1000.0
+        self._track_counts = getattr(self, "_track_counts", [])
+        self._track_counts.append(len(tracks))
+        m.track_count_mean = float(np.mean(self._track_counts))
+        if not tracks or not truth:
+            return
+        pe = getattr(self, "_pos_err", [])
+        ve = getattr(self, "_vel_err", [])
+        for tr in tracks:
+            best = min(truth, key=lambda o: math.hypot(o.x - tr.x, o.y - tr.y))
+            d = math.hypot(best.x - tr.x, best.y - tr.y)
+            if d < 3.0:
+                pe.append(d)
+                ve.append(math.hypot(best.vx - tr.vx, best.vy - tr.vy))
+        self._pos_err, self._vel_err = pe, ve
+        if pe:
+            m.tracking_position_error_m = float(np.mean(pe))
+            m.tracking_velocity_error_mps = float(np.mean(ve))
+
     def finalize(self, completed: bool, now: float, reason: str) -> SimulationMetrics:
         m = self.m
         m.scenario_completed = completed

@@ -8,6 +8,17 @@ Hard rejections, in this order, each recorded with a reason:
                                 closer than boundary_margin after boundary_margin_grace_s
     PREDICTED_COLLISION         footprint distance to any predicted object <= safety_margin
                                 at the same time index
+    TERMINAL_STATE_EXPOSED      continuing from the candidate's END state (along the corridor at the
+                                terminal speed; frozen in place for a stop) collides with a
+                                constant-velocity extrapolation of an object before
+                                terminal_exposure_horizon_s. This rejects both "stop where you will
+                                be hit" and "creep toward a blocked route" candidates, so a bypass
+                                is preferred over myopic waiting. Candidates rejected only for this
+                                remain scorable (degraded tier) so the planner never returns nothing.
+    Within the first `collision_margin_grace_s` a candidate is rejected only for actual overlap,
+    not for being inside the margin: the current pose is not the planner's choice. Beyond it,
+    being inside the margin is a hit only while the distance is still shrinking relative to now
+    (sliding past at the clearance the ego already has is allowed; actual overlap never is).
 
 All candidates share the same time grid, so the checker evaluates them in one
 batched pass: every footprint of every candidate is stacked into a single
@@ -64,7 +75,9 @@ class CollisionChecker:
         results = [CheckResult() for _ in cands]
         alive = np.ones(C, dtype=bool)
 
-        # 1. curvature / steering limit
+        grace = rel_t < cfg.collision_margin_grace_s          # the current state is not the planner's choice
+
+        # 1. curvature / steering limit (hard steering saturation is never excused)
         bad = K > p.max_curvature * (1.0 + 1e-6)
         for i in np.nonzero(bad.any(axis=1))[0]:
             k = int(np.argmax(K[i]))
@@ -72,11 +85,11 @@ class CollisionChecker:
                          f"|kappa|={K[i, k]:.3f} > {p.max_curvature:.3f} 1/m at +{rel_t[i, k]:.1f}s")
             alive[i] = False
 
-        # 2. lateral acceleration
+        # 2. lateral acceleration (comfort limit; excused during the grace window, the ego is already turning)
         a_lat = V ** 2 * K
-        bad = (a_lat > cfg.max_lateral_acceleration_mps2) & alive[:, None]
+        bad = (a_lat > cfg.max_lateral_acceleration_mps2) & alive[:, None] & ~grace
         for i in np.nonzero(bad.any(axis=1))[0]:
-            k = int(np.argmax(a_lat[i]))
+            k = int(np.argmax(np.where(~grace[i], a_lat[i], -1.0)))
             self._reject(cands[i], RejectionReason.LATERAL_ACCEL,
                          f"v^2*kappa={a_lat[i, k]:.2f} > {cfg.max_lateral_acceleration_mps2:.2f} m/s^2 at +{rel_t[i, k]:.1f}s")
             alive[i] = False
@@ -125,8 +138,23 @@ class CollisionChecker:
                 oh = np.interp(T, pred.times, np.unwrap(pred.heading)).ravel()
                 dist[j] = box_sequence_distance(FX, FY, FYAW, p.length, p.width,
                                                 ox, oy, oh, pred.length, pred.width).reshape(C, N)
-                sig[j] = np.interp(T, pred.times, pred.sigma())
-            hit = dist <= cfg.safety_margin_m                                   # (M,C,N)
+                # directional sigma: interpolate the covariance onto the candidate grid, then project
+                Pxx = np.interp(T, pred.times, pred.covariances[:, 0, 0]).ravel()
+                Pyy = np.interp(T, pred.times, pred.covariances[:, 1, 1]).ravel()
+                Pxy = np.interp(T, pred.times, pred.covariances[:, 0, 1]).ravel()
+                ux, uy = FX - ox, FY - oy
+                nrm = np.hypot(ux, uy)
+                nrm = np.where(nrm > 1e-9, nrm, 1.0)
+                ux, uy = ux / nrm, uy / nrm
+                sig[j] = np.sqrt(np.maximum(Pxx * ux * ux + 2 * Pxy * ux * uy + Pyy * uy * uy, 1e-12)).reshape(C, N)
+            # inside the margin counts as a hit, except during the grace window where only overlap does
+            margin_ok = rel_t >= cfg.collision_margin_grace_s                      # (C,N)
+            margins = np.array([cfg.safety_margin_m + cfg.uncertainty_margin_gain * pr.meas_sigma for pr in predictions])
+            # inside-margin counts as a hit only when CLOSING relative to the current distance (or overlapping):
+            # a candidate that slides past an object at the clearance the ego already has is not a collision
+            d0 = dist[:, :, :1]                                                    # (M,C,1) current distance
+            closing = dist < d0 - 0.05
+            hit = (dist <= 0.0) | ((dist <= margins[:, None, None]) & closing & margin_ok[None, :, :])   # (M,C,N)
             for i in range(C):
                 results[i].distances = dist[:, i, :]
                 results[i].sigmas = sig[:, i, :]
@@ -139,9 +167,84 @@ class CollisionChecker:
                     j = int(np.argmax(hit[:, i, k]))
                     cands[i].collision_time = float(rel_t[i, k])
                     self._reject(cands[i], RejectionReason.COLLISION,
-                                 f"distance {dist[j, i, k]:.2f} m <= margin {cfg.safety_margin_m:.2f} m "
+                                 f"distance {dist[j, i, k]:.2f} m <= margin {margins[j]:.2f} m "
                                  f"to {predictions[j].object_id} at +{rel_t[i, k]:.1f}s")
                     alive[i] = False
+
+            # 4b. standoff for near-stop candidates: do not come to rest closer than stop_standoff_m to any
+            #     predicted object (room to manoeuvre later; no reversing in Stage 1). Scorable degraded tier.
+            # measured against each object's predicted position at the end AND its current position: a crossing
+            # animal may stop where it is, so the ego must not come to rest right at its current spot either
+            if predictions:
+                ex0 = FX.reshape(C, N)[:, -1]; ey0 = FY.reshape(C, N)[:, -1]; eyaw0 = YAW[:, -1]
+                d_now = np.stack([box_sequence_distance(ex0, ey0, eyaw0, p.length, p.width,
+                                                        np.full(C, pr.x[0]), np.full(C, pr.y[0]), np.full(C, pr.heading[0]),
+                                                        pr.length, pr.width) for pr in predictions])       # (M,C)
+            for i in range(C):
+                if alive[i] and cands[i].target_speed < cfg.stop_standoff_speed_mps and predictions:
+                    d_end_all = np.minimum(dist[:, i, -1], d_now[:, i])
+                    j = int(np.argmin(d_end_all))
+                    if d_end_all[j] < cfg.stop_standoff_m:
+                        self._reject(cands[i], RejectionReason.TERMINAL_EXPOSURE,
+                                     f"would come to rest {d_end_all[j]:.1f} m from {predictions[j].object_id} "
+                                     f"(< standoff {cfg.stop_standoff_m:.1f} m)")
+                        cands[i].margin_only = True
+                        alive[i] = False
+
+            # 5. terminal exposure: continue each surviving candidate beyond the horizon along the corridor
+            #    at its terminal speed (frozen for a stop) and extrapolate objects at constant velocity
+            T_end = float(rel_t[0, -1])
+            if cfg.route_lookahead_s > T_end + 1e-9 and alive.any():
+                ext_dt = 2.0 * cfg.dt_s                                                       # coarser beyond the horizon
+                ext = np.arange(T_end + ext_dt, cfg.route_lookahead_s + 1e-9, ext_dt)               # (E,)
+                idx = np.nonzero(alive)[0]
+                E = len(ext)
+                if all(cands[i].trajectory.s is not None for i in idx):
+                    s_end = np.array([cands[i].trajectory.s[-1] for i in idx])
+                    d_end = np.array([cands[i].trajectory.d[-1] for i in idx])
+                    v_end = np.array([cands[i].trajectory.velocity[-1] for i in idx])
+                    s_ext = (s_end[:, None] + v_end[:, None] * (ext - T_end)[None, :]).ravel()
+                    d_ext = np.repeat(d_end, E)
+                    cx, cy, ch = self.road.to_cartesian(s_ext, d_ext)
+                    ex = cx + off * np.cos(ch)
+                    ey = cy + off * np.sin(ch)
+                    eyaw = ch
+                else:
+                    ex = np.repeat(FX.reshape(C, N)[idx, -1], E)
+                    ey = np.repeat(FY.reshape(C, N)[idx, -1], E)
+                    eyaw = np.repeat(YAW[idx, -1], E)
+                t_abs = (T[idx, 0][:, None] + ext[None, :]).ravel()
+                for j, pred in enumerate(predictions):
+                    dt_ext = t_abs - pred.times[-1]
+                    ox = pred.x[-1] + pred.vx[-1] * dt_ext
+                    oy = pred.y[-1] + pred.vy[-1] * dt_ext
+                    oh = np.full_like(ox, pred.heading[-1])
+                    dist_ext = box_sequence_distance(ex, ey, eyaw, p.length, p.width,
+                                                     ox, oy, oh, pred.length, pred.width).reshape(len(idx), E)
+                    hit_ext = dist_ext <= margins[j]
+                    for r, i in enumerate(idx):
+                        c = cands[i]
+                        if not hit_ext[r].any():
+                            continue
+                        k = int(np.argmax(hit_ext[r]))
+                        t_meet = float(ext[k])
+                        if c.route_block_time is None or t_meet < c.route_block_time:
+                            c.route_block_time = t_meet
+                        if not alive[i]:
+                            continue
+                        if t_meet <= cfg.terminal_exposure_horizon_s:
+                            self._reject(c, RejectionReason.TERMINAL_EXPOSURE,
+                                         f"continuing at {c.target_speed:.1f} m/s from the end state meets "
+                                         f"{pred.object_id} at +{t_meet:.1f}s")
+                            c.margin_only = True          # scorable in the degraded tier
+                            alive[i] = False
+                        elif c.target_speed < cfg.stop_standoff_speed_mps and dist_ext[r, 0] < cfg.stop_standoff_m:
+                            # stopping behind a blocked route: keep room to manoeuvre around the blocker later
+                            self._reject(c, RejectionReason.TERMINAL_EXPOSURE,
+                                         f"would stop {dist_ext[r, 0]:.1f} m behind {pred.object_id} "
+                                         f"(< standoff {cfg.stop_standoff_m:.1f} m) with the route blocked")
+                            c.margin_only = True
+                            alive[i] = False
         return results
 
     def _corridor_clearance(self, cands: list[CandidateTrajectory], C: int, N: int) -> np.ndarray:

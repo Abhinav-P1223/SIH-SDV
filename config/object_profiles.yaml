@@ -5,6 +5,10 @@
 # sigma_vel_mps  : velocity uncertainty -> linear growth of position std-dev
 # sigma_acc_mps2 : acceleration uncertainty -> quadratic growth
 # risk_weight    : multiplies collision probability into risk_score
+# lateral_factor : ratio of lateral (across-heading) to longitudinal uncertainty growth.
+#                  Road-following vehicles mostly deviate along their heading; pedestrians
+#                  and cattle can go anywhere.
+# static_factor  : scales uncertainty growth when the object is (near) stationary.
 defaults:
   length_m: 1.0
   width_m: 1.0
@@ -12,15 +16,17 @@ defaults:
   sigma_vel_mps: 0.4
   sigma_acc_mps2: 0.3
   risk_weight: 1.0
+  lateral_factor: 0.6
+  static_factor: 0.4
 
 profiles:
-  PEDESTRIAN:    {length_m: 0.6,  width_m: 0.6,  sigma_pos0_m: 0.2, sigma_vel_mps: 0.6, sigma_acc_mps2: 0.4, risk_weight: 1.6}
-  BICYCLE:       {length_m: 1.8,  width_m: 0.6,  sigma_pos0_m: 0.2, sigma_vel_mps: 0.6, sigma_acc_mps2: 0.4, risk_weight: 1.4}
-  MOTORCYCLE:    {length_m: 2.0,  width_m: 0.8,  sigma_pos0_m: 0.2, sigma_vel_mps: 0.8, sigma_acc_mps2: 0.6, risk_weight: 1.4}
-  AUTO_RICKSHAW: {length_m: 2.6,  width_m: 1.4,  sigma_pos0_m: 0.2, sigma_vel_mps: 0.7, sigma_acc_mps2: 0.5, risk_weight: 1.1}
-  CAR:           {length_m: 4.3,  width_m: 1.8,  sigma_pos0_m: 0.2, sigma_vel_mps: 0.5, sigma_acc_mps2: 0.4, risk_weight: 1.0}
-  BUS:           {length_m: 11.0, width_m: 2.5,  sigma_pos0_m: 0.2, sigma_vel_mps: 0.4, sigma_acc_mps2: 0.3, risk_weight: 1.0}
-  TRUCK:         {length_m: 9.0,  width_m: 2.5,  sigma_pos0_m: 0.2, sigma_vel_mps: 0.4, sigma_acc_mps2: 0.3, risk_weight: 1.0}
-  PUSHCART:      {length_m: 2.0,  width_m: 1.0,  sigma_pos0_m: 0.2, sigma_vel_mps: 0.4, sigma_acc_mps2: 0.3, risk_weight: 1.2}
-  CATTLE:        {length_m: 2.0,  width_m: 0.7,  sigma_pos0_m: 0.3, sigma_vel_mps: 0.5, sigma_acc_mps2: 0.3, risk_weight: 1.4}
-  UNKNOWN:       {length_m: 1.0,  width_m: 1.0,  sigma_pos0_m: 0.3, sigma_vel_mps: 0.6, sigma_acc_mps2: 0.4, risk_weight: 1.2}
+  PEDESTRIAN:    {length_m: 0.6,  width_m: 0.6,  sigma_pos0_m: 0.2, sigma_vel_mps: 0.6, sigma_acc_mps2: 0.4, risk_weight: 1.6, lateral_factor: 1.0, static_factor: 0.6}
+  BICYCLE:       {length_m: 1.8,  width_m: 0.6,  sigma_pos0_m: 0.2, sigma_vel_mps: 0.6, sigma_acc_mps2: 0.4, risk_weight: 1.4, lateral_factor: 0.6, static_factor: 0.5}
+  MOTORCYCLE:    {length_m: 2.0,  width_m: 0.8,  sigma_pos0_m: 0.2, sigma_vel_mps: 0.8, sigma_acc_mps2: 0.6, risk_weight: 1.4, lateral_factor: 0.45, static_factor: 0.5}
+  AUTO_RICKSHAW: {length_m: 2.6,  width_m: 1.4,  sigma_pos0_m: 0.2, sigma_vel_mps: 0.7, sigma_acc_mps2: 0.5, risk_weight: 1.1, lateral_factor: 0.45, static_factor: 0.4}
+  CAR:           {length_m: 4.3,  width_m: 1.8,  sigma_pos0_m: 0.2, sigma_vel_mps: 0.5, sigma_acc_mps2: 0.4, risk_weight: 1.0, lateral_factor: 0.35, static_factor: 0.3}
+  BUS:           {length_m: 11.0, width_m: 2.5,  sigma_pos0_m: 0.2, sigma_vel_mps: 0.4, sigma_acc_mps2: 0.3, risk_weight: 1.0, lateral_factor: 0.3, static_factor: 0.3}
+  TRUCK:         {length_m: 9.0,  width_m: 2.5,  sigma_pos0_m: 0.2, sigma_vel_mps: 0.4, sigma_acc_mps2: 0.3, risk_weight: 1.0, lateral_factor: 0.3, static_factor: 0.3}
+  PUSHCART:      {length_m: 2.0,  width_m: 1.0,  sigma_pos0_m: 0.2, sigma_vel_mps: 0.4, sigma_acc_mps2: 0.3, risk_weight: 1.2, lateral_factor: 0.7, static_factor: 0.3}
+  CATTLE:        {length_m: 2.0,  width_m: 0.7,  sigma_pos0_m: 0.3, sigma_vel_mps: 0.5, sigma_acc_mps2: 0.3, risk_weight: 1.4, lateral_factor: 1.0, static_factor: 0.5}
+  UNKNOWN:       {length_m: 1.0,  width_m: 1.0,  sigma_pos0_m: 0.3, sigma_vel_mps: 0.6, sigma_acc_mps2: 0.4, risk_weight: 1.2, lateral_factor: 1.0, static_factor: 0.6}

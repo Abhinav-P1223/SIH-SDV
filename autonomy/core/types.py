@@ -62,6 +62,7 @@ class RejectionReason(str, Enum):
     LATERAL_ACCEL = "LATERAL_ACCELERATION_LIMIT"
     BOUNDARY = "OUTSIDE_DRIVABLE_SPACE"
     COLLISION = "PREDICTED_COLLISION"
+    TERMINAL_EXPOSURE = "TERMINAL_STATE_EXPOSED"   # the end pose is struck within the extended horizon
 
 
 # --------------------------------------------------------------------------- #
@@ -149,6 +150,53 @@ class ControlCommand:
 
 
 # --------------------------------------------------------------------------- #
+# Sensors / detections (input contract of perception & fusion)
+# --------------------------------------------------------------------------- #
+class SensorType(str, Enum):
+    CAMERA = "CAMERA"
+    LIDAR = "LIDAR"
+    RADAR = "RADAR"
+
+
+@dataclass
+class Detection:
+    """One measurement of one object by one sensor, already in the WORLD frame.
+
+    Which fields are populated depends on the sensor:
+      CAMERA : x, y (range-dominated covariance), object_type + class_confidence
+      LIDAR  : x, y (tight covariance), length, width, heading
+      RADAR  : x, y (bearing-dominated covariance), radial_speed (+ its std-dev)
+    `truth_id` is carried for evaluation ONLY and must never be read by the
+    autonomy stack (the tracker asserts it does not).
+    """
+    sensor: SensorType
+    timestamp: float                     # measurement time (arrival = timestamp + latency)
+    x: float
+    y: float
+    covariance: np.ndarray               # 2x2 positional covariance (m^2)
+    object_type: Optional[ObjectType] = None
+    class_confidence: float = 0.0
+    length: Optional[float] = None
+    width: Optional[float] = None
+    heading: Optional[float] = None
+    radial_speed: Optional[float] = None   # toward the sensor is negative
+    radial_speed_std: float = 0.0
+    sensor_x: float = 0.0                # sensor position at measurement time (for radial geometry)
+    sensor_y: float = 0.0
+    truth_id: str = ""                   # evaluation only
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "sensor": self.sensor.value, "t": self.timestamp, "x": self.x, "y": self.y,
+            "cov": np.asarray(self.covariance).tolist(),
+            "type": self.object_type.value if self.object_type else None,
+            "class_confidence": self.class_confidence,
+            "length": self.length, "width": self.width, "heading": self.heading,
+            "radial_speed": self.radial_speed,
+        }
+
+
+# --------------------------------------------------------------------------- #
 # Objects / prediction
 # --------------------------------------------------------------------------- #
 @dataclass
@@ -206,10 +254,28 @@ class ObjectPrediction:
     length: float
     width: float
     risk_weight: float = 1.0
+    meas_sigma: float = 0.0        # std-dev of the tracked object's OWN position estimate (0 for ground truth)
 
     def sigma(self) -> np.ndarray:
-        """Isotropic positional std-dev per time step, sqrt(max eigenvalue)."""
-        return np.sqrt(np.maximum(self.covariances[:, 0, 0], self.covariances[:, 1, 1]))
+        """Largest positional std-dev per time step (sqrt of the larger eigenvalue)."""
+        a, b, c = self.covariances[:, 0, 0], self.covariances[:, 1, 1], self.covariances[:, 0, 1]
+        lam = 0.5 * (a + b) + np.sqrt(np.maximum(0.25 * (a - b) ** 2 + c ** 2, 0.0))
+        return np.sqrt(np.maximum(lam, 0.0))
+
+    def sigma_toward(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
+        """Std-dev of the predicted position along the direction from each predicted mean to (x, y).
+
+        This is the uncertainty that matters for a collision with a body at (x, y):
+        u^T P u with u the unit vector toward the body.
+        """
+        ux = np.asarray(x) - self.x
+        uy = np.asarray(y) - self.y
+        n = np.hypot(ux, uy)
+        n = np.where(n > 1e-9, n, 1.0)
+        ux, uy = ux / n, uy / n
+        P = self.covariances
+        var = P[:, 0, 0] * ux * ux + 2.0 * P[:, 0, 1] * ux * uy + P[:, 1, 1] * uy * uy
+        return np.sqrt(np.maximum(var, 1e-12))
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -298,6 +364,7 @@ class CandidateTrajectory:
     min_clearance: float = math.inf     # to any predicted object footprint (m)
     min_boundary_clearance: float = math.inf
     collision_time: Optional[float] = None
+    route_block_time: Optional[float] = None   # when the continuation beyond the horizon meets an object (s from now)
     fallback: bool = False
     margin_only: bool = False          # rejected solely for the boundary *margin*, still on the road
     degraded: bool = False             # selected although margin_only (no fully feasible candidate)
@@ -315,6 +382,7 @@ class CandidateTrajectory:
             "min_clearance": None if math.isinf(self.min_clearance) else self.min_clearance,
             "min_boundary_clearance": None if math.isinf(self.min_boundary_clearance) else self.min_boundary_clearance,
             "collision_time": self.collision_time,
+            "route_block_time": self.route_block_time,
             "fallback": self.fallback,
             "margin_only": self.margin_only,
             "degraded": self.degraded,
@@ -450,11 +518,13 @@ class PlannerOutput:
     rejected_count: int
     rejection_histogram: dict[str, int]
     frame_origin: tuple[float, float, float]     # (s0, d0, heading_rel) of ego in corridor frame
+    standstill_s: float = 0.0                    # how long the ego has been stationary (anti-freeze input)
 
     def to_dict(self, stride: int = 2) -> dict[str, Any]:
         return {
             "timestamp": self.timestamp,
             "latency_ms": self.latency_ms,
+            "standstill_s": self.standstill_s,
             "feasible_count": self.feasible_count,
             "rejected_count": self.rejected_count,
             "rejection_histogram": self.rejection_histogram,
@@ -506,6 +576,10 @@ class SimulationMetrics:
     scenario_success_rate: Optional[float] = None
     perception_latency_ms: Optional[float] = None
     prediction_error_m: Optional[float] = None
+    tracking_position_error_m: Optional[float] = None   # mean |track - truth| for matched tracks (sensors mode)
+    tracking_velocity_error_mps: Optional[float] = None
+    track_count_mean: Optional[float] = None
+    detections_total: int = 0
     termination_reason: str = ""
 
     def to_dict(self) -> dict[str, Any]:
