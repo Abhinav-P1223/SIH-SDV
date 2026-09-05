@@ -1,0 +1,1164 @@
+You are now acting as a SENIOR AUTONOMOUS-DRIVING RESEARCHER, ROBOTICS ENGINEER, AND SIH JUDGE.
+
+You are NOT a developer for this task.
+
+Your job is to critically audit our implementation for SIH26037:
+
+“Adaptive Path Planning and Collision Avoidance for Autonomous Vehicles on Unstructured Indian Roads.”
+
+Assume that a team claims:
+
+“We built a working multi-sensor autonomous-driving system capable of adaptive path planning and collision avoidance on unstructured Indian roads.”
+
+Your job is to determine whether that claim is actually true.
+
+Be skeptical.
+
+Do not give credit for features merely because their names, UI elements, comments, README, or architecture diagrams claim they exist.
+
+Verify implementation evidence.
+
+If something is simulated, explicitly identify it as simulated.
+
+If something is hard-coded, identify it.
+
+If something is decorative/UI-only, identify it.
+
+If something is genuinely implemented and functional, explain why.
+
+If something is missing, explain exactly why it matters to SIH26037.
+
+Do not be polite to the implementation.
+
+---
+
+# 1. FIRST: UNDERSTAND THE SIH REQUIREMENT
+
+Before reviewing the repository, establish a checklist from the SIH26037 problem statement.
+
+The system is expected to address:
+
+* unstructured Indian roads
+* missing lane markings
+* mixed traffic
+* pedestrians
+* motorcycles
+* bicycles
+* cars
+* buses
+* trucks
+* auto-rickshaws
+* pushcarts
+* animals/cattle
+* informal merging
+* sudden direction changes
+* wrong-way traffic
+* unexpected obstacles
+* short-term motion prediction
+* irregular/non-lane-based movement
+* multi-sensor perception
+* camera
+* LiDAR
+* radar
+* sensor fusion
+* collision-free path planning
+* real-time replanning
+* vehicle motion
+* closed-loop validation
+* realistic Indian scenarios
+
+Required scenario coverage should include:
+
+1. unmarked village road
+2. busy urban intersection without signals
+3. highway merge involving slow-moving vehicles
+4. dense market area with mixed traffic
+5. sudden cattle-crossing event
+
+The expected system should integrate perception, prediction, planning, decision logic and vehicle motion.
+
+---
+
+# 2. REPOSITORY FORENSICS
+
+Before judging the algorithms, inspect the entire repository.
+
+Determine:
+
+* programming languages
+* frameworks
+* simulation engine
+* MATLAB/Simulink usage
+* RoadRunner usage
+* ML frameworks
+* dependency list
+* executable entry points
+* configuration files
+* scenario files
+* datasets
+* trained models
+* tests
+* logs
+* telemetry
+* visualization
+* documentation
+
+Produce:
+
+REPOSITORY MAP
+
+with:
+
+module
+purpose
+technology
+implementation status
+evidence
+concerns
+
+Do not assume a module works simply because the folder exists.
+
+---
+
+# 3. CRITICAL QUESTION: IS THIS A REAL CLOSED LOOP?
+
+This is the most important test.
+
+Trace the actual execution path.
+
+Determine whether the system genuinely implements:
+
+WORLD
+↓
+SENSORS
+↓
+PERCEPTION
+↓
+FUSION
+↓
+TRACKING
+↓
+PREDICTION
+↓
+RISK
+↓
+DECISION
+↓
+PLANNING
+↓
+CONTROL
+↓
+VEHICLE DYNAMICS
+↓
+WORLD
+↓
+new sensor observations
+↓
+repeat
+
+Answer:
+
+1. Where is the world state generated?
+2. Where are sensor measurements generated?
+3. Where does perception happen?
+4. Where does sensor fusion happen?
+5. Where does tracking happen?
+6. Where does prediction happen?
+7. Where is collision risk calculated?
+8. Where does behavior decision happen?
+9. Where is the trajectory generated?
+10. Where is the trajectory selected?
+11. Where is steering generated?
+12. Where is acceleration/braking generated?
+13. Where does vehicle dynamics update position?
+14. Does that new position affect the next sensor observation?
+15. Does the next planning cycle use the new observation?
+
+If the vehicle follows a pre-scripted path regardless of perception/planning output, flag:
+
+CRITICAL FAILURE — OPEN-LOOP / SCRIPTED DEMO.
+
+---
+
+# 4. VEHICLE MODEL AUDIT
+
+Determine whether the ego vehicle is:
+
+A. a real vehicle dynamics model
+
+B. a kinematic bicycle model
+
+C. a point mass
+
+D. waypoint teleportation
+
+E. animation only
+
+Check:
+
+* x
+* y
+* yaw
+* velocity
+* acceleration
+* steering angle
+* yaw rate
+* lateral motion
+* wheelbase
+* vehicle dimensions
+* steering limits
+* steering rate
+* acceleration limits
+* braking limits
+
+Determine whether commands actually affect vehicle dynamics.
+
+Test whether:
+
+steering command
+→ changes steering state
+→ changes yaw
+→ changes position.
+
+Also test:
+
+brake command
+→ reduces velocity
+→ changes stopping distance.
+
+Identify unrealistic assumptions.
+
+---
+
+# 5. SENSOR AUDIT
+
+For Camera, LiDAR and Radar independently determine:
+
+* Does a real sensor simulation exist?
+* What measurements does it produce?
+* Are measurements noisy?
+* Is there sensor range?
+* Is there field of view?
+* Is occlusion considered?
+* Is latency considered?
+* Is sensor failure/dropout considered?
+* Does the autonomy stack consume sensor measurements?
+* Or is ground truth passed directly into the planner?
+
+CRITICAL TEST:
+
+Search for places where:
+
+ground_truth_object
+
+is passed directly to:
+
+planner
+risk engine
+controller
+
+without passing through perception/fusion.
+
+If this occurs, clearly report:
+
+GROUND-TRUTH LEAKAGE.
+
+---
+
+# 6. SENSOR FUSION AUDIT
+
+Determine whether Camera + LiDAR + Radar information is genuinely fused.
+
+Do NOT give credit merely because three sensor names appear in the UI.
+
+Trace:
+
+Camera measurement
+LiDAR measurement
+Radar measurement
+↓
+fusion algorithm
+↓
+fused object track
+
+Determine whether the fusion algorithm is:
+
+* nearest-neighbor
+* EKF
+* UKF
+* JPDA
+* learned fusion
+* other
+
+Check:
+
+position fusion
+velocity fusion
+confidence
+covariance/uncertainty
+track identity
+
+Ask:
+
+“If I remove the camera, does the fused state change?”
+
+“If I remove LiDAR, does the system still operate?”
+
+“If I remove radar velocity, does prediction degrade?”
+
+If all three sensors simply generate identical ground-truth values, flag that.
+
+---
+
+# 7. OBJECT DETECTION / PERCEPTION AUDIT
+
+Determine:
+
+* what objects can actually be detected
+* what model performs detection
+* whether the model is pretrained
+* whether it was fine-tuned
+* dataset used
+* classes trained
+* inference pipeline
+* confidence thresholds
+* false-positive handling
+* false-negative handling
+
+Pay special attention to Indian-road objects:
+
+auto-rickshaw
+pushcart
+cattle
+pedestrian
+motorcycle
+
+Determine whether these are genuinely detected or merely generated by the simulator.
+
+If the system claims AI perception but the object class is manually supplied by the scenario generator, flag:
+
+FAKE PERCEPTION / GROUND-TRUTH CLASSIFICATION.
+
+---
+
+# 8. TRACKING AUDIT
+
+Determine whether detected objects maintain persistent identity across time.
+
+For example:
+
+frame 1:
+object ID 7
+
+frame 2:
+object ID 7
+
+frame 3:
+object ID 7
+
+Check:
+
+* data association
+* position history
+* velocity estimation
+* track lifecycle
+* object appearance/disappearance
+* noisy detections
+
+Determine whether prediction receives actual track history or merely scenario ground truth.
+
+---
+
+# 9. TRAJECTORY PREDICTION AUDIT
+
+This is a major SIH requirement.
+
+Determine exactly how future motion is predicted.
+
+Test:
+
+current state
++
+history
+↓
+future trajectory
+
+Check whether the system handles:
+
+constant motion
+pedestrian crossing
+motorcycle lateral movement
+auto-rickshaw merging
+cattle crossing
+sudden direction changes
+non-lane-based motion
+
+Determine whether prediction is:
+
+* constant velocity
+* constant acceleration
+* Kalman filter
+* LSTM
+* GRU
+* Transformer
+* other ML model
+* rule-based behavior model
+* hybrid
+
+Do NOT give extra credit simply because an ML model exists.
+
+Evaluate:
+
+prediction accuracy
+latency
+uncertainty
+robustness
+
+Determine whether prediction uncertainty increases appropriately with horizon.
+
+---
+
+# 10. COLLISION-RISK AUDIT
+
+Determine whether the system reasons about FUTURE collision risk.
+
+Check:
+
+distance
+relative velocity
+TTC
+trajectory intersection
+minimum predicted separation
+uncertainty
+vehicle footprint
+
+Critical question:
+
+Does the system detect a collision BEFORE it happens?
+
+or
+
+Does it react only after an obstacle enters the current path?
+
+Test scenarios where:
+
+current position is safe
+
+but
+
+future predicted trajectories intersect.
+
+The system should recognize the future conflict.
+
+---
+
+# 11. PLANNER AUDIT
+
+This is one of the most important judging areas.
+
+Determine what planner is actually implemented.
+
+Possible categories:
+
+* waypoint following
+* A*
+* D*
+* RRT
+* RRT*
+* lattice planner
+* Frenet planner
+* sampling-based planner
+* MPC
+* optimization-based planner
+* custom trajectory planner
+* other
+
+Determine whether the planner is genuinely adaptive.
+
+Check whether it generates multiple candidate trajectories.
+
+For example:
+
+candidate A
+candidate B
+candidate C
+candidate D
+
+Then:
+
+collision checking
++
+cost evaluation
+↓
+best feasible trajectory
+
+Verify that unsafe candidates are rejected.
+
+---
+
+# 12. UNSTRUCTURED ROAD TEST
+
+This is a CRITICAL SIH26037 test.
+
+Remove lane markings completely.
+
+Ask:
+
+Can the planner still navigate?
+
+If it cannot operate without lane centerlines, identify this as a major failure.
+
+Determine whether planning is based on:
+
+lane centerline
+
+OR
+
+drivable space / road boundaries / obstacles / goal direction.
+
+The latter is preferred for this problem.
+
+---
+
+# 13. ADAPTIVITY TEST
+
+Do not merely inspect code.
+
+Run or simulate perturbations.
+
+Change:
+
+obstacle position
+obstacle velocity
+pedestrian direction
+cattle direction
+vehicle speed
+road width
+traffic density
+initial ego position
+
+Observe whether the chosen trajectory changes.
+
+If changing the obstacle has no effect on the selected trajectory, flag:
+
+NON-ADAPTIVE / PRE-SCRIPTED BEHAVIOR.
+
+---
+
+# 14. REAL-TIME REPLANNING TEST
+
+Determine:
+
+planning frequency
+planning latency
+replanning trigger
+number of replans
+
+Inject a moving obstacle after the vehicle has already started driving.
+
+Determine:
+
+Does the system detect the new obstacle?
+
+Does prediction update?
+
+Does risk update?
+
+Does the planner regenerate trajectories?
+
+Does the controller switch to the new trajectory?
+
+Does the vehicle actually change its motion?
+
+If not, flag the failure.
+
+---
+
+# 15. CONTROLLER AUDIT
+
+Determine whether the controller actually tracks the planned trajectory.
+
+Check:
+
+lateral controller
+longitudinal controller
+
+Determine whether the controller receives:
+
+current vehicle state
+
+*
+
+target trajectory
+
+and outputs:
+
+steering
++
+acceleration/brake.
+
+Determine whether the vehicle can deviate from the trajectory due to dynamics.
+
+A planner that directly sets:
+
+x = planned_x
+y = planned_y
+
+is NOT acceptable as vehicle control.
+
+Flag this explicitly.
+
+---
+
+# 16. SAFETY SUPERVISOR
+
+Check whether an independent safety mechanism exists.
+
+Test:
+
+TTC becomes critically low.
+
+Does the system:
+
+override normal planning?
+
+apply braking?
+
+stop?
+
+reject unsafe control?
+
+Determine whether safety logic is independent of the normal planner.
+
+---
+
+# 17. INDIAN ROAD BEHAVIOR AUDIT
+
+Do not accept generic autonomous-driving assumptions.
+
+Test:
+
+NO LANES
+UNSIGNALIZED INTERSECTION
+WRONG-WAY VEHICLE
+AUTO-RICKSHAW MERGE
+PEDESTRIAN CROSSING
+MOTORCYCLE FILTERING
+PUSHCART
+CATTLE
+SUDDEN OBSTACLE
+
+Determine whether the system models behavior specific to these situations.
+
+Identify any assumptions that are unrealistic for Indian mixed traffic.
+
+---
+
+# 18. FIVE REQUIRED SCENARIOS
+
+Run or inspect all five required scenarios.
+
+For EACH scenario produce:
+
+Scenario
+Initial conditions
+Traffic configuration
+Hazard
+Prediction
+Decision
+Planning response
+Vehicle response
+Collision result
+Completion result
+Replanning count
+Minimum clearance
+Minimum TTC
+Planning latency
+
+Required scenarios:
+
+1. Village road
+2. Unsignalized urban intersection
+3. Highway merge
+4. Dense market
+5. Cattle crossing
+
+Do not accept five screenshots of essentially the same scenario.
+
+---
+
+# 19. FAILURE / STRESS TESTING
+
+Try to break the system.
+
+At minimum test:
+
+multiple obstacles
+two simultaneous moving obstacles
+sudden pedestrian crossing
+sudden cattle crossing
+wrong-way motorcycle
+auto-rickshaw cutting in
+blocked road
+narrow road
+high traffic density
+sensor noise
+sensor dropout
+delayed measurements
+high-speed approach
+no safe trajectory
+
+Record:
+
+PASS
+FAIL
+DEGRADED
+
+Do not hide failures.
+
+Explain what the system does when no safe trajectory exists.
+
+---
+
+# 20. METRICS AUDIT
+
+Verify that reported metrics are actually computed.
+
+Required/important:
+
+scenario completion rate
+collision rate
+minimum clearance
+replanning latency
+planning frequency
+path smoothness
+trajectory curvature
+TTC
+prediction error
+control error
+emergency braking count
+
+For each metric determine:
+
+* formula
+* source data
+* sampling frequency
+* aggregation method
+* whether reproducible
+
+CRITICAL:
+
+Never trust numbers displayed in a UI.
+
+Trace every number back to its calculation.
+
+---
+
+# 21. MATLAB / SIMULINK AUDIT
+
+Determine whether MATLAB/Simulink is genuinely part of the technical solution.
+
+Check:
+
+* MATLAB scripts
+* Simulink models
+* Stateflow charts
+* RoadRunner scenes
+* Automated Driving Toolbox
+* Navigation Toolbox
+* Deep Learning Toolbox
+* vehicle dynamics models
+
+Determine what each MathWorks component actually contributes.
+
+If MATLAB exists only in screenshots or documentation, flag:
+
+DECORATIVE MATLAB INTEGRATION.
+
+If a Python simulator is used as the actual authoritative simulation, explicitly explain the consequences for SIH26037.
+
+---
+
+# 22. UI AUDIT
+
+Treat the UI as secondary.
+
+Determine whether every major visualization corresponds to actual backend state.
+
+For every displayed:
+
+speed
+TTC
+risk
+prediction
+trajectory
+object
+replanning latency
+decision
+
+trace it to the actual simulation state.
+
+Look for fake:
+
+* progress bars
+* random metrics
+* hard-coded TTC
+* hard-coded object counts
+* pre-recorded trajectory
+* fake prediction cones
+* fake planner explanations
+
+The UI must visualize the autonomy stack, not simulate it.
+
+---
+
+# 23. EXPLAINABILITY AUDIT
+
+For every avoidance maneuver ask:
+
+WHY DID THE VEHICLE DO THAT?
+
+The system should be able to explain:
+
+hazard detected
+predicted conflict
+risk/TTC
+candidate trajectories
+rejected alternatives
+selected trajectory
+control response
+
+Example:
+
+“Cattle trajectory predicted to intersect ego trajectory in 1.8 s. Right candidate provides 2.4 m additional clearance while remaining within road boundaries. Vehicle reduced speed to 18 km/h and executed rightward trajectory.”
+
+Verify that this explanation is generated from actual values.
+
+---
+
+# 24. REPRODUCIBILITY AUDIT
+
+Determine whether another engineer can:
+
+clone/install
+↓
+run simulation
+↓
+run scenario
+↓
+obtain metrics
+↓
+reproduce result.
+
+Check:
+
+installation instructions
+dependency versions
+configuration
+random seeds
+dataset availability
+model availability
+scenario availability
+
+Identify anything that only works on the developer's machine.
+
+---
+
+# 25. CODE QUALITY AUDIT
+
+Inspect for:
+
+giant files
+hard-coded parameters
+magic numbers
+global state
+tight coupling
+duplicated logic
+dead code
+unused ML models
+unused sensors
+fake interfaces
+missing tests
+poor error handling
+
+Give special attention to whether:
+
+perception
+
+fusion
+
+prediction
+
+planning
+
+control
+
+vehicle dynamics
+
+are actually independent modules.
+
+---
+
+# 26. SECURITY / SAFETY OF CLAIMS
+
+Identify exaggerated claims.
+
+Examples:
+
+“real-time AI”
+
+“multi-sensor fusion”
+
+“autonomous driving”
+
+“collision-free”
+
+“high accuracy”
+
+“production ready”
+
+These claims must be supported by measurements.
+
+Replace unsupported claims with technically accurate statements.
+
+---
+
+# 27. DEMO AUTHENTICITY TEST
+
+Assume the team is giving a 5-minute live demo.
+
+Determine what a skeptical judge could ask to expose a scripted demo.
+
+Create at least 15 hostile judge questions such as:
+
+“What happens if the pedestrian changes direction now?”
+
+“What happens if radar fails?”
+
+“What happens if the lane markings disappear?”
+
+“Why did you choose this trajectory?”
+
+“Show me the rejected trajectories.”
+
+“Is this object detected or injected as ground truth?”
+
+“Where is sensor fusion?”
+
+“Where does the steering command originate?”
+
+“Is the car actually simulated dynamically?”
+
+“Show me the prediction error.”
+
+“Why MATLAB?”
+
+“What happens when no safe path exists?”
+
+“Can you reproduce this result?”
+
+For each question provide:
+
+EXPECTED ANSWER
+EVIDENCE IN CODE
+DEMO ACTION
+RED FLAG IF UNABLE TO ANSWER
+
+---
+
+# 28. SCORING SYSTEM
+
+Score the implementation from 0–100.
+
+Use:
+
+### A. Problem Alignment — 15 points
+
+Does it actually solve SIH26037?
+
+### B. Closed-Loop Autonomy — 20 points
+
+Perception → prediction → planning → control → vehicle → feedback.
+
+### C. Adaptive Planning — 15 points
+
+Dynamic replanning and collision-free trajectory generation.
+
+### D. Multi-Sensor Perception/Fusion — 10 points
+
+Camera + LiDAR + Radar integration.
+
+### E. Prediction / Irregular Behavior — 10 points
+
+Short-term prediction for non-lane-based agents.
+
+### F. Indian-Road Realism — 10 points
+
+Unstructured roads and mixed traffic.
+
+### G. MATLAB/Simulink / MathWorks Integration — 5 points
+
+Genuine technical integration.
+
+### H. Validation / Metrics — 5 points
+
+Five scenarios and measurable performance.
+
+### I. Engineering Quality — 5 points
+
+Modularity, tests, reproducibility.
+
+### J. Demo / Explainability — 5 points
+
+Clear causal explanation and visual evidence.
+
+---
+
+# 29. AUTOMATIC PENALTIES
+
+Apply strong penalties for:
+
+PRE-SCRIPTED VEHICLE MOTION
+
+GROUND-TRUTH LEAKAGE
+
+FAKE SENSOR FUSION
+
+FAKE ML
+
+FAKE METRICS
+
+FAKE REAL-TIME CLAIM
+
+LANE-DEPENDENT PLANNING ON UNSTRUCTURED ROADS
+
+UI-ONLY IMPLEMENTATION
+
+HARDCODED SCENARIO LOGIC
+
+NO CLOSED LOOP
+
+If any of these are fundamental to the system, say:
+
+“THIS IS A DEMO SIMULATION, NOT A CREDIBLE AUTONOMOUS-DRIVING PROTOTYPE.”
+
+---
+
+# 30. FINAL REPORT
+
+Your final response MUST contain:
+
+## EXECUTIVE VERDICT
+
+One of:
+
+WINNING-CANDIDATE
+STRONG
+PROMISING
+AVERAGE
+WEAK
+DEMO-ONLY
+NON-COMPLIANT
+
+Explain why.
+
+## SCORE
+
+X / 100
+
+## REQUIREMENT MATRIX
+
+| SIH Requirement | Status | Evidence | Severity |
+| --------------- | ------ | -------- | -------- |
+
+Status must be:
+
+IMPLEMENTED
+PARTIAL
+SIMULATED
+HARDCODED
+MISSING
+UNVERIFIED
+
+## ARCHITECTURE VERDICT
+
+Explain whether the actual runtime architecture matches the claimed architecture.
+
+## CLOSED-LOOP VERDICT
+
+Explicitly trace the actual data flow.
+
+## SENSOR/FUSION VERDICT
+
+Explain exactly what is real vs simulated.
+
+## ML VERDICT
+
+Explain:
+
+model
+dataset
+training/fine-tuning
+inference
+limitations
+whether ML is genuinely useful
+
+## PLANNING VERDICT
+
+Explain planner algorithm and whether it is truly adaptive.
+
+## VEHICLE CONTROL VERDICT
+
+Explain whether steering/braking actually causes vehicle motion through a dynamics model.
+
+## FIVE-SCENARIO VERDICT
+
+Score each scenario separately.
+
+## FAILURE TEST RESULTS
+
+List every failure discovered.
+
+## TOP 10 TECHNICAL WEAKNESSES
+
+Rank by severity.
+
+## TOP 10 IMPROVEMENTS
+
+Rank by:
+
+impact
+implementation difficulty
+SIH judging value
+
+## JUDGE QUESTIONS
+
+Give the 15 hardest questions judges could ask.
+
+## WINNING DEMO
+
+Design a 5-minute demonstration that proves the system is real rather than scripted.
+
+## CLAIMS WE SHOULD NOT MAKE
+
+Identify anything in our README/presentation/demo that would be technically dishonest or difficult to defend.
+
+## FINAL RECOMMENDATION
+
+Tell us exactly:
+
+WHAT MUST BE FIXED
+
+WHAT SHOULD BE ADDED
+
+WHAT CAN BE IGNORED
+
+WHAT SHOULD BE DEMONSTRATED
+
+WHAT SHOULD BE REMOVED
+
+Do not optimize for making the team feel good.
+
+Optimize for exposing weaknesses BEFORE the SIH judges expose them.
+
+If you cannot verify something from the repository, mark it UNVERIFIED rather than assuming it works.
