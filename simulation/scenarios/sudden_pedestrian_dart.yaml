@@ -1,0 +1,45 @@
+# SUDDEN_PEDESTRIAN_DART
+# Same unmarked corridor. A pedestrian waits at the right edge and darts into
+# the ego path at 2.5 m/s when the ego is 22 m away. At 10 m/s that is ~2 s to
+# impact: too late for a comfortable plan, so this scenario exercises the
+# independent safety supervisor (emergency braking) and the
+# EMERGENCY_BRAKE -> STOPPED -> CAUTION -> CRUISE recovery path.
+# (At a 14 m trigger the collision is physically unavoidable: braking distance
+# from 10 m/s at 8 m/s^2 is 6.3 m plus ~1 s of detection at 10 m/s. Measured
+# and documented in STAGE1_RESULTS.md, not tuned away.)
+# Nothing about the ego reaction is scripted.
+name: SUDDEN_PEDESTRIAN_DART
+description: Pedestrian darts from the right edge into the ego path at very short range.
+seed: 7
+
+road:
+  lane_markings: NONE
+  reference:      [[-20.0, 0.0], [160.0, 0.0]]
+  left_boundary:  [[-20.0, 3.5], [160.0, 3.5]]
+  right_boundary: [[-20.0, -3.5], [160.0, -3.5]]
+
+ego:
+  x: 0.0
+  y: 1.75
+  yaw_deg: 0.0
+  speed_mps: 10.0
+  desired_speed_mps: 10.0
+  desired_lateral_offset_m: 1.75
+
+goal:
+  s_m: 120.0
+
+agents:
+  - id: ped_1
+    type: PEDESTRIAN
+    x: 50.0
+    y: -3.0
+    heading_deg: 90.0         # darting toward +y (into the ego half)
+    speed_mps: 0.0
+    behavior: CROSSING
+    params:
+      trigger_distance_m: 22.0
+      crossing_speed_mps: 2.5
+      acceleration_mps2: 4.0
+      crossing_distance_m: 7.5      # clears the road on the far side
+      stop_after: true

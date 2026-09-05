@@ -85,8 +85,20 @@ def test_head_on_static_object_produces_finite_ttc_and_high_risk(cfg, profiles, 
     assert a.ttc_kinematic == pytest.approx(a.distance / 10.0)
     assert 2.4 < a.ttc < 3.0
     assert a.trajectory_intersection
-    assert a.risk_level.value >= RiskLevel.HIGH.value
+    assert a.risk_level == RiskLevel.HIGH          # CRITICAL is reserved for the physical view
     assert summary.min_ttc == a.ttc
+    assert summary.min_ttc_current_speed == pytest.approx(a.ttc)   # current speed == route speed here
+
+
+def test_critical_only_from_physical_ttc(cfg, profiles, params):
+    o = obj("c", 12.0, 0.0, 0.0, 0.0, heading=math.pi / 2)
+    preds = ConstantVelocityPredictor(cfg.prediction, profiles).predict([o], 0.0)
+    engine = make_engine(cfg, params)
+    fast = engine.evaluate(VehicleState(0.0, 0.0, 0.0, 0.0, 10.0), None, [o], preds)
+    assert fast.max_level == RiskLevel.CRITICAL and fast.min_ttc_current_speed < cfg.risk.ttc_critical_s
+    stopped = engine.evaluate(VehicleState(0.0, 0.0, 0.0, 0.0, 0.0), None, [o], preds)
+    assert stopped.max_level.value <= RiskLevel.HIGH.value
+    assert stopped.min_ttc_current_speed == math.inf
 
 
 def test_far_lateral_object_is_low_risk(cfg, profiles, params):

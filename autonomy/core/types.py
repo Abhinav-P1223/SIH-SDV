@@ -328,7 +328,7 @@ class RiskAssessment:
     distance: float                    # current footprint-to-footprint distance (m)
     relative_speed: float              # |v_obj - v_ego| (m/s)
     closing_speed: float               # rate at which the gap shrinks (m/s, >0 closing)
-    ttc: float                         # earliest predicted overlap time from now (s), inf if none
+    ttc: float                         # earliest predicted overlap time along the ROUTE view (s), inf if none
     ttc_kinematic: float               # distance / closing_speed, inf if not closing
     min_predicted_distance: float
     time_of_min_distance: float        # relative to now (s)
@@ -338,12 +338,13 @@ class RiskAssessment:
     risk_level: RiskLevel
     uncertainty: float                 # sigma at time_of_min_distance (m)
     risk_weight: float
+    ttc_physical: float = math.inf     # earliest overlap along the corridor at CURRENT speed (s)
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
         d["object_type"] = self.object_type.value
         d["risk_level"] = self.risk_level.name
-        for k in ("ttc", "ttc_kinematic", "min_predicted_distance", "distance"):
+        for k in ("ttc", "ttc_kinematic", "ttc_physical", "min_predicted_distance", "distance"):
             if math.isinf(d[k]):
                 d[k] = None
         return d

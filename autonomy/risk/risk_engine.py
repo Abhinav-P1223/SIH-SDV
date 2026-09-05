@@ -23,7 +23,12 @@ Per object, from the distance series d(t) and uncertainty sigma(t):
     ttc_kinematic  = d(0) / closing_speed                             (inf if not closing)
     p(t)           = band_collision_probability(d, sigma, margin, W)  (1 when intersecting)
     risk_score     = w_type * max_t [ p(t) * exp(-t / tau) ]
-    risk_level     = thresholds on risk_score, escalated by TTC thresholds
+    risk_level     = thresholds on risk_score, escalated to HIGH by the route TTC.
+                     CRITICAL is reserved for the PHYSICAL view: it means the
+                     vehicle, at its current speed, overlaps the object within
+                     ttc_critical_s. A route-view score alone never yields
+                     CRITICAL, so a stopped vehicle facing an obstacle is HIGH,
+                     not an emergency.
 
 A `RiskSummary` aggregates the worst object and identifies a *lead object*
 (traffic ahead in the ego's lateral band) for the FOLLOW state.
@@ -108,10 +113,15 @@ class RiskEngine:
         fx, fy = self._footprint_centres(nx, ny, nyaw)
         assessments = [self._assess(pred, rel, fx, fy, nyaw, ego_vx, ego_vy) for pred in predictions]
 
-        # physical TTC at the current speed (independent safety view)
+        # physical TTC at the current speed (independent safety view), per object
         cx, cy, cyaw = nominal_motion(ego, times, road)
         cfx, cfy = self._footprint_centres(cx, cy, cyaw)
-        physical_ttc = min(self._ttc_only(pred, rel, cfx, cfy, cyaw) for pred in predictions)
+        phys = [self._ttc_only(pred, rel, cfx, cfy, cyaw) for pred in predictions]
+        physical_ttc = min(phys)
+        for a, t_phys in zip(assessments, phys):
+            a.ttc_physical = t_phys
+            if t_phys < self.cfg.ttc_critical_s:
+                a.risk_level = RiskLevel.CRITICAL
 
         worst = max(assessments, key=lambda a: (a.risk_level.value, a.risk_score))
         summary = RiskSummary(
@@ -124,8 +134,6 @@ class RiskEngine:
             any_intersection=any(a.trajectory_intersection for a in assessments),
             min_ttc_current_speed=physical_ttc,
         )
-        if physical_ttc < self.cfg.ttc_critical_s:
-            summary.max_level = RiskLevel.CRITICAL
 
         if ego_trajectory is not None and len(ego_trajectory) >= 2:
             px, py, pyaw = trajectory_motion(ego_trajectory, times)
@@ -210,9 +218,9 @@ class RiskEngine:
             level = RiskLevel.LOW
         else:
             level = RiskLevel.NONE
-        if ttc < self.cfg.ttc_critical_s:
-            level = RiskLevel.CRITICAL
-        elif ttc < self.cfg.ttc_high_s and level.value < RiskLevel.HIGH.value:
+        if level == RiskLevel.CRITICAL:
+            level = RiskLevel.HIGH                     # CRITICAL is reserved for the physical view
+        if ttc < self.cfg.ttc_high_s and level.value < RiskLevel.HIGH.value:
             level = RiskLevel.HIGH
         return level
 

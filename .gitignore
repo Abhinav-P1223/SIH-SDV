@@ -8,5 +8,7 @@ dist/
 logs/*
 !logs/.gitignore
 *.png
-*.mp4
 *.gif
+*.mp4
+!docs/img/*.png
+!docs/img/*.gif

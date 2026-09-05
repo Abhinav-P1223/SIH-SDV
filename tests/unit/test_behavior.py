@@ -13,11 +13,13 @@ def cfg():
     return AutonomyConfig.load().behavior
 
 
-def risk(level, score, ttc=math.inf, intersection=False, lead=None, lead_speed=0.0, lead_gap=math.inf):
+def risk(level, score, ttc=math.inf, intersection=False, lead=None, lead_speed=0.0, lead_gap=math.inf,
+         ttc_phys=None):
     a = RiskAssessment("obj", ObjectType.CATTLE, 20.0, 5.0, 5.0, ttc, ttc, 1.0, 2.0,
                        intersection, 0.5, score, level, 1.0, 1.4)
     s = RiskSummary([a], level, score, ttc, 1.0, "obj", intersection)
     s.lead_object_id, s.lead_speed, s.lead_gap = lead, lead_speed, lead_gap
+    s.min_ttc_current_speed = ttc if ttc_phys is None else ttc_phys
     return s
 
 
@@ -71,18 +73,35 @@ def test_hysteresis_on_exit_thresholds(cfg):
 def test_stopped_and_release(cfg):
     fsm = BehaviorStateMachine(cfg, 10.0)
     fsm.decide(risk(RiskLevel.CRITICAL, 0.9, ttc=0.5, intersection=True), ego(), 0.0)
+    assert fsm.state == BehaviorState.EMERGENCY_BRAKE
     d = fsm.decide(risk(RiskLevel.HIGH, 0.5, ttc=1.5, intersection=True), ego(0.0), 1.0)
-    assert d.state == BehaviorState.STOPPED and d.speed_policy.force_stop
+    assert d.state == BehaviorState.STOPPED
+    # stationary: never re-enters EMERGENCY_BRAKE, planner may search at caution speed
+    d = fsm.decide(risk(RiskLevel.HIGH, 0.9, ttc=0.5, intersection=True), ego(0.0), 1.5)
+    assert d.state == BehaviorState.STOPPED and not d.speed_policy.force_stop
+    assert d.speed_policy.allow_lateral_avoidance
     d = fsm.decide(risk(RiskLevel.NONE, 0.0), ego(0.0), 2.0)
     assert d.state == BehaviorState.CAUTION
     d = fsm.decide(risk(RiskLevel.NONE, 0.0), ego(0.0), 3.0)
     assert d.state == BehaviorState.CRUISE
 
 
-def test_no_feasible_plan_forces_emergency(cfg):
+def test_stopped_moves_off_into_avoid_when_planner_finds_a_path(cfg):
+    fsm = BehaviorStateMachine(cfg, 10.0)
+    fsm.decide(risk(RiskLevel.CRITICAL, 0.9, ttc=0.5, intersection=True), ego(), 0.0)
+    fsm.decide(risk(RiskLevel.HIGH, 0.5, ttc=1.5, intersection=True), ego(0.0), 1.0)
+    assert fsm.state == BehaviorState.STOPPED
+    d = fsm.decide(risk(RiskLevel.HIGH, 0.5, ttc=1.5, intersection=True), ego(1.0), 2.0)
+    assert d.state == BehaviorState.AVOID
+
+
+def test_no_feasible_plan_forces_emergency_only_while_moving(cfg):
     fsm = BehaviorStateMachine(cfg, 10.0)
     d = fsm.decide(RiskSummary.empty(), ego(), 0.0, planner_feasible=False)
     assert d.state == BehaviorState.EMERGENCY_BRAKE and "no feasible" in d.reason
+    fsm2 = BehaviorStateMachine(cfg, 10.0)
+    d = fsm2.decide(RiskSummary.empty(), ego(0.0), 0.0, planner_feasible=False)
+    assert d.state == BehaviorState.CRUISE
 
 
 def test_follow_policy_matches_lead(cfg):

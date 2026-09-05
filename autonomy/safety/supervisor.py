@@ -39,19 +39,19 @@ class SafetySupervisor:
         self.activations: list[Activation] = []
         self.current_reason = ""
 
-    def _trigger(self, risk: RiskSummary, plan: Optional[PlannerOutput]) -> Optional[str]:
-        if plan is not None and plan.selected.fallback:
+    def _trigger(self, risk: RiskSummary, plan: Optional[PlannerOutput], ego: VehicleState) -> Optional[str]:
+        if plan is not None and plan.selected.fallback and ego.longitudinal_velocity > 0.05:
             return "planner returned fallback stop (no feasible trajectory)"
         if risk.min_ttc_current_speed < self.cfg.ttc_critical_s:
             return (f"physical TTC {risk.min_ttc_current_speed:.2f} s < {self.cfg.ttc_critical_s:.2f} s "
                     f"to {risk.worst_object_id}")
-        if risk.max_level == RiskLevel.CRITICAL:
-            return f"critical risk {risk.max_score:.2f} from {risk.worst_object_id}"
+        if risk.max_level == RiskLevel.CRITICAL and ego.longitudinal_velocity > 0.05:
+            return f"critical risk level from {risk.worst_object_id}"
         return None
 
     def check(self, command: ControlCommand, risk: RiskSummary, plan: Optional[PlannerOutput],
               ego: VehicleState, now: float) -> tuple[ControlCommand, SafetyStatus]:
-        reason = self._trigger(risk, plan)
+        reason = self._trigger(risk, plan, ego)
         if reason:
             if not self.active:
                 self.activations.append(Activation(now, reason))

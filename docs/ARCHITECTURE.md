@@ -142,28 +142,65 @@ sees predicted positions, covariances and per-object risk weights.
 
 ## 7. Risk model
 
-For each object and each prediction time `t_k` the ego footprint (along the
-ego reference trajectory: last selected plan, or constant-velocity projection)
-and the object footprint are compared using oriented-box distance.
+Three ego motions are compared against every object's predicted footprint
+(oriented-box distance at each prediction time `t_k`):
+
+| View | Ego motion | Used by |
+|---|---|---|
+| **route** | follow the corridor at the current lateral offset at the *desired* speed | behaviour levels CAUTION / AVOID, `RiskAssessment` list |
+| **physical** | follow the corridor at the *current* speed | `min_ttc_current_speed`; the only source of CRITICAL; safety supervisor |
+| **plan** | the currently selected trajectory | `plan_*` aggregates (is the chosen plan clear?) |
+
+The route view is what makes the behaviour layer see a threat *before* the
+planner has reacted and *while* it is reacting: "if I proceeded on my route at
+the desired speed, would I hit something?" The physical view is the honest
+"am I about to hit something right now" signal; a stopped vehicle has infinite
+physical TTC, so it can never be "emergency braked".
+
+Per object:
 
 * `min_predicted_distance`, `time_of_min_distance`
-* `trajectory_intersection` = any `t_k` with distance <= safety margin
-* `ttc` = earliest `t_k` with predicted overlap (inf if none). The classical
-  `closing_speed` based estimate is also reported.
-* `collision_probability(t)` = 1 if overlap, else `exp(-0.5 * (d(t)/sigma(t))^2)`
+* `trajectory_intersection` = any `t_k` with distance <= safety margin (route view)
+* `ttc` (route), `ttc_physical` (current speed), `ttc_kinematic` = d(0) / closing speed
+* `collision_probability(t)` = band probability (`autonomy/core/probability.py`):
+  `Phi((gap + W)/sigma) - Phi(gap/sigma)`, gap = max(d - margin, 0),
+  W = ego width + object size + 2 margin; 1 when footprints overlap. Unlike a
+  Gaussian density ratio it tends to 0 as uncertainty grows, so far-future
+  uncertainty does not freeze the planner.
 * `risk_score` = `w_type * max_t [ p(t) * exp(-t/tau) ]`
-* `risk_level` from configurable thresholds on `risk_score` and `ttc`.
+* `risk_level`: NONE/LOW/MEDIUM/HIGH from `risk_score` thresholds, escalated to
+  HIGH when the route TTC < `ttc_high_s`; CRITICAL only when the physical TTC
+  < `ttc_critical_s`.
 
-A `RiskSummary` aggregates the worst object, min TTC and max level.
+`RiskSummary` aggregates the worst object, min TTC per view, and a *lead
+object* (traffic ahead inside the ego's lateral band) for FOLLOW.
 
 ## 8. Behaviour state machine
 
 States: CRUISE, FOLLOW, CAUTION, AVOID, EMERGENCY_BRAKE, STOPPED.
-Transitions are declared in one table with guard functions over
-`RiskSummary` and ego speed, with minimum dwell time and separate entry/exit
-thresholds for hysteresis. Output is a `BehaviorDecision`:
-state, previous state, reason text, numeric triggers, speed policy
-(target speed cap and whether lateral avoidance candidates are enabled).
+Transitions are declared in one table (`behavior/state_machine.py:TRANSITIONS`)
+with guard functions over `RiskSummary`, ego speed and planner feasibility.
+Escalations are immediate; de-escalations respect `min_dwell_s` and lower exit
+thresholds (hysteresis).
+
+| Transition | Guard (summary) |
+|---|---|
+| any moving state -> EMERGENCY_BRAKE | physical TTC < critical, or planner has no feasible trajectory |
+| EMERGENCY_BRAKE -> STOPPED | vehicle stationary |
+| EMERGENCY_BRAKE -> CAUTION | no longer CRITICAL and planner feasible |
+| STOPPED -> AVOID / CAUTION | vehicle moves off on a clear plan / risk subsides |
+| CRUISE, FOLLOW, CAUTION -> AVOID | route intersection predicted and level >= HIGH |
+| AVOID -> CAUTION | no intersection and score < `avoid_exit_score` |
+| CRUISE, FOLLOW -> CAUTION | level >= MEDIUM |
+| CRUISE, CAUTION -> FOLLOW | slower lead object in the ego band |
+| CAUTION, FOLLOW -> CRUISE | score < `caution_exit_score`, no intersection |
+
+Speed policy per state: CRUISE desired speed; FOLLOW gap-controlled lead
+speed; CAUTION `caution_speed_factor`; AVOID `avoid_speed_factor` with lateral
+candidates enabled; EMERGENCY_BRAKE stop-only candidates; STOPPED caution
+speed with lateral candidates so the planner can find a way out while the
+zero-speed candidate remains available. Every `BehaviorDecision` carries a
+reason string and the numeric triggers.
 
 ## 9. Planner
 
@@ -177,10 +214,12 @@ state, previous state, reason text, numeric triggers, speed policy
      `a_accel_max` / comfortable deceleration, integrated to `s(t)`;
    * sample every `planning.dt_s` over `planning.horizon_s`, convert to
      Cartesian, compute yaw, curvature, acceleration.
-3. **Hard feasibility rejection** (recorded with reason):
-   `|kappa| > tan(delta_max)/L`, `v^2*|kappa| > a_lat_max`, footprint outside
-   corridor minus margin, predicted collision with any object (footprint
-   distance <= margin at the same time index).
+3. **Hard feasibility rejection** (recorded with reason, evaluated for all
+   candidates in one batched numpy pass): `|kappa| > tan(delta_max)/L`,
+   `v^2*|kappa| > a_lat_max`, footprint outside the corridor at any time or
+   closer than `boundary_margin_m` after `boundary_margin_grace_s` (the current
+   pose is not the planner's choice), predicted collision with any object
+   (footprint distance <= `safety_margin_m` at the same time index).
 4. **Scoring** of feasible candidates:
 
 ```
@@ -194,15 +233,22 @@ Each component is normalised to roughly [0, 1] and documented in
 an addition to the prompt's list and is what makes the vehicle return toward
 its route after an avoidance.
 
-5. **Selection**: minimum `J`. If no candidate is feasible the planner emits a
-   maximum-deceleration straight-line stop trajectory flagged `fallback=True`;
-   the safety supervisor treats this as an emergency.
+5. **Selection**: minimum `J` among feasible candidates. If none is feasible
+   but some are collision-free and on the road (only the boundary *margin* is
+   violated) the cheapest of those is selected and flagged `degraded=True`.
+   Otherwise the maximum-deceleration stop trajectory is returned flagged
+   `fallback=True`; behaviour and safety supervisor treat that as an emergency.
 
 ## 10. Controller
 
-* **Lateral — Stanley**: front-axle cross-track error `e` and heading error
-  `theta_e` against the nearest trajectory point;
-  `delta = theta_e + atan(k*e / (k_soft + v))`, clipped to `delta_max`.
+* **Lateral — Stanley with look-ahead and curvature feed-forward**: front-axle
+  cross-track error `e` at the nearest trajectory point, heading error
+  `theta_e` and path curvature `kappa` at a look-ahead point
+  `max(lookahead_time_s * v, min_lookahead_m)` ahead;
+  `delta = theta_e + atan(k*e / (k_soft + v)) + atan(L * kappa)`, clipped to
+  `delta_max`. Because the planner re-plans from the ego pose every cycle the
+  nearest point always has ~zero error; the look-ahead and feed-forward are
+  what bend the vehicle onto the path.
 * **Longitudinal — PID**: target speed from the trajectory at the current time
   offset plus the trajectory's feed-forward acceleration; output split into
   `acceleration >= 0` and `brake >= 0`.
@@ -211,10 +257,11 @@ its route after an avoidance.
 ## 11. Safety supervisor
 
 Runs after the tracker every dynamics step. Overrides to maximum braking
-(steering held) when `min_ttc < ttc_critical_s`, any risk level is CRITICAL,
-or the planner returned a fallback. Holds the override for
-`safety.hold_time_s` to avoid chattering. Every activation is recorded with
-time and reason and counted in metrics.
+(steering held) when the physical TTC `min_ttc_current_speed < ttc_critical_s`,
+the risk level is CRITICAL, or the planner returned a fallback, and the
+vehicle is moving. Holds the override for `safety.hold_time_s` to avoid
+chattering. Every activation is recorded with time and reason and counted in
+metrics. It does not depend on the planner's choices.
 
 ## 12. Simulation loop
 
@@ -246,8 +293,12 @@ Termination: goal reached, collision (configurable stop), or timeout.
 * `tests/integration`: planner + tracker + vehicle on an empty corridor
   converge to the reference with bounded error.
 * `tests/scenarios`: SUDDEN_CATTLE_CROSSING asserts `collisions == 0`,
-  `completed == True`, `min_clearance >= safety_margin`, and that the FSM left
-  CRUISE at least once and returned to it.
+  `completed == True`, `min_clearance >= safety_margin`, that the cattle really
+  crossed the ego band, that the FSM passed through AVOID and returned to
+  CRUISE, that candidates were rejected and scored, and that the ego was never
+  teleported (per-step displacement <= v_max*dt, actuator limits respected).
+  SUDDEN_PEDESTRIAN_DART additionally asserts that the safety supervisor fired
+  and that the EMERGENCY_BRAKE state was visited and recovered from.
 
 ## 14. Dependencies
 

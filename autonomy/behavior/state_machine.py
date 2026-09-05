@@ -2,6 +2,12 @@
 
 States: CRUISE, FOLLOW, CAUTION, AVOID, EMERGENCY_BRAKE, STOPPED.
 
+EMERGENCY_BRAKE is entered only while moving, on a CRITICAL physical TTC or
+when the planner has no feasible trajectory. STOPPED is entered only from
+EMERGENCY_BRAKE once the vehicle is stationary; in STOPPED the planner keeps
+searching for a clear path at caution speed, and the machine leaves STOPPED
+when the vehicle moves off or the risk subsides.
+
 All transitions live in one table (`TRANSITIONS`) as (from-states, to-state,
 guard). Guards are pure functions of a `DecisionContext` and return a reason
 string when they fire, otherwise None. The table is evaluated in order; the
@@ -64,16 +70,18 @@ Guard = Callable[[DecisionContext], Optional[str]]
 # Guards
 # --------------------------------------------------------------------------- #
 def g_emergency(c: DecisionContext) -> Optional[str]:
-    if not c.planner_feasible:
+    moving = c.ego.longitudinal_velocity >= c.cfg.stopped_speed_mps
+    if not c.planner_feasible and moving:
         return "Planner found no feasible collision-free trajectory; emergency braking."
-    if c.risk.max_level == RiskLevel.CRITICAL:
-        return f"Critical collision risk: {c.describe_worst()}."
+    if c.risk.max_level == RiskLevel.CRITICAL and moving:
+        return (f"Physical TTC {c.risk.min_ttc_current_speed:.2f} s at current speed "
+                f"{c.ego.longitudinal_velocity:.1f} m/s with {c.risk.worst_object_id}; emergency braking.")
     return None
 
 
 def g_stopped(c: DecisionContext) -> Optional[str]:
-    if c.ego.longitudinal_velocity < c.cfg.stopped_speed_mps and c.risk.max_level.value >= RiskLevel.MEDIUM.value:
-        return f"Vehicle stationary while risk persists: {c.describe_worst()}."
+    if c.ego.longitudinal_velocity < c.cfg.stopped_speed_mps:
+        return f"Vehicle brought to a halt; holding while the planner looks for a clear path. {c.describe_worst()}."
     return None
 
 
@@ -115,11 +123,19 @@ def g_avoid_release(c: DecisionContext) -> Optional[str]:
     return None
 
 
+def g_stopped_to_avoid(c: DecisionContext) -> Optional[str]:
+    moving = c.ego.longitudinal_velocity >= c.cfg.stopped_speed_mps
+    if moving and c.risk.any_intersection and c.risk.max_level.value >= RiskLevel.HIGH.value:
+        return f"Planner found a clear trajectory around {c.risk.worst_object_id}; moving off under avoidance."
+    return None
+
+
 def g_stopped_release(c: DecisionContext) -> Optional[str]:
-    if c.risk.max_level.value <= RiskLevel.LOW.value and c.planner_feasible:
+    moving = c.ego.longitudinal_velocity >= c.cfg.stopped_speed_mps
+    if c.risk.max_level.value <= RiskLevel.LOW.value:
         return f"Risk cleared while stopped (max risk {c.risk.max_score:.2f}); resuming."
-    if c.risk.max_level == RiskLevel.MEDIUM and not c.risk.any_intersection and c.planner_feasible:
-        return "Residual risk without intersection; proceeding with caution."
+    if moving or (c.risk.max_level == RiskLevel.MEDIUM and not c.risk.any_intersection):
+        return "Residual risk without an imminent threat; proceeding with caution."
     return None
 
 
@@ -134,9 +150,10 @@ S = BehaviorState
 
 # (from_states, to_state, guard). Order = priority.
 TRANSITIONS: list[tuple[tuple[BehaviorState, ...], BehaviorState, Guard]] = [
-    (tuple(s for s in ALL if s != S.EMERGENCY_BRAKE), S.EMERGENCY_BRAKE, g_emergency),
-    ((S.EMERGENCY_BRAKE, S.AVOID, S.CAUTION), S.STOPPED, g_stopped),
+    (tuple(s for s in ALL if s not in (S.EMERGENCY_BRAKE, S.STOPPED)), S.EMERGENCY_BRAKE, g_emergency),
+    ((S.EMERGENCY_BRAKE,), S.STOPPED, g_stopped),
     ((S.EMERGENCY_BRAKE,), S.CAUTION, g_eb_release),
+    ((S.STOPPED,), S.AVOID, g_stopped_to_avoid),
     ((S.STOPPED,), S.CAUTION, g_stopped_release),
     ((S.CRUISE, S.FOLLOW, S.CAUTION), S.AVOID, g_avoid),
     ((S.AVOID,), S.CAUTION, g_avoid_release),
@@ -208,4 +225,8 @@ class BehaviorStateMachine:
             return SpeedPolicy(v * c.caution_speed_factor, True, False)
         if state == BehaviorState.AVOID:
             return SpeedPolicy(v * c.avoid_speed_factor, True, False)
-        return SpeedPolicy(0.0, False, True)   # EMERGENCY_BRAKE, STOPPED
+        if state == BehaviorState.STOPPED:
+            # stationary but not in danger: let the planner search for a clear path at caution speed;
+            # the zero-speed candidate remains available if nothing is clear
+            return SpeedPolicy(v * c.caution_speed_factor, True, False)
+        return SpeedPolicy(0.0, False, True)   # EMERGENCY_BRAKE

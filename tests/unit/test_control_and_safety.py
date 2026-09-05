@@ -150,6 +150,11 @@ def test_safety_triggers_on_planner_fallback_and_critical_level(cfg):
     sup2 = SafetySupervisor(cfg.safety)
     _, st2 = sup2.check(nominal, summary(level=RiskLevel.CRITICAL, score=0.95), fake_plan(), ego, 0.0)
     assert st2.override_active and "critical" in st2.reason
+    # a stationary vehicle is never emergency-braked
+    sup3 = SafetySupervisor(cfg.safety)
+    _, st3 = sup3.check(nominal, summary(level=RiskLevel.CRITICAL, score=0.95), fake_plan(fallback=True),
+                        VehicleState(0.0, 0, 0, 0, 0.0), 0.0)
+    assert not st3.override_active
 
 
 def test_safety_does_not_trigger_when_clear(cfg):
