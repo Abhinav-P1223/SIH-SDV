@@ -46,7 +46,8 @@ planning:
   horizon_s: 4.0
   dt_s: 0.1
   lateral_step_m: 0.5             # end offsets = desired + k*step, every one that fits inside the corridor
-  lateral_cost_scale_m: 3.0       # lateral-deviation / consistency cost = |delta d| / this
+  lateral_cost_scale_m: 2.0       # lateral-deviation / consistency cost = |delta d| / this
+  crossing_lateral_speed_mps: 0.3 # objects moving across the corridor faster than this count as crossing
   exposure_sigma_cap_m: 1.5       # beyond-horizon (blocked / standoff) checks inflate objects by their measured
                                   # position std-dev (capped): a poorly localised far object slows us down instead of
                                   # flipping which side looks clear
@@ -58,6 +59,9 @@ planning:
   safety_margin_m: 0.5            # collision margin between ego footprint and objects
   uncertainty_margin_gain: 1.0    # margin grows by gain x the object's own measured position std-dev (fusion covariance)
   uncertainty_margin_max_m: 0.5   # ... capped: a far, bearing-uncertain track must not block every lateral option
+  tracking_margin_speed_gain_s: 0.02   # margin += 0.02 s x ego speed (0.2 m at 10 m/s): the controller does not track
+                                        # the plan perfectly, and the error grows with speed
+  tracking_margin_error_cap_m: 0.3     # margin += the cross-track error the controller currently has (capped)
   boundary_margin_m: 0.25         # footprint must stay this far inside the corridor
   boundary_margin_grace_s: 0.5    # margin (not corridor edge) is enforced only after this time; the
                                   # current pose is not the planner's choice
@@ -84,12 +88,15 @@ planning:
     smoothness: 0.8
     curvature: 0.5
     progress: 2.5
-    boundary: 1.0
+    boundary: 0.6                 # edge aversion must stay below route attraction inside the corridor
     speed: 1.5
     uncertainty: 1.0
     lateral: 1.0                  # deviation from desired lateral offset (return to route)
     blocked: 3.0                  # route ahead of the end state meets an object within route_lookahead_s
-    consistency: 1.0              # change of lateral end offset vs the previously selected plan (commit, do not dither)
+    front_pass: 1.5               # passing IN FRONT of a crossing object (on the side it is moving toward) instead of
+                                  # behind it; a driver lets the animal cross and passes where it came from
+    consistency: 0.3              # change of lateral end offset vs the previously selected plan: damps dithering but
+                                  # stays below `lateral` so the desired offset still wins in steady state
 
 control:
   stanley:

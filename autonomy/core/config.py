@@ -98,12 +98,13 @@ class CostWeights:
     smoothness: float = 0.8
     curvature: float = 0.5
     progress: float = 2.5
-    boundary: float = 1.0
+    boundary: float = 0.6
     speed: float = 1.5
     uncertainty: float = 1.0
     lateral: float = 1.2
     blocked: float = 3.0
-    consistency: float = 1.0
+    consistency: float = 0.3
+    front_pass: float = 1.5
 
     def as_dict(self) -> dict[str, float]:
         return {f.name: getattr(self, f.name) for f in fields(self)}
@@ -116,7 +117,8 @@ class PlanningConfig:
     dt_s: float = 0.1
     lateral_offsets_m: list[float] = field(default_factory=lambda: [-2.0, -1.0, 0.0, 1.0, 2.0])  # legacy (unused when lateral_step_m > 0)
     lateral_step_m: float = 0.5               # lattice of end offsets desired + k*step spanning the whole corridor
-    lateral_cost_scale_m: float = 3.0         # normalisation of the lateral-deviation and consistency costs
+    lateral_cost_scale_m: float = 2.0         # normalisation of the lateral-deviation and consistency costs
+    crossing_lateral_speed_mps: float = 0.3   # an object moving across the corridor faster than this is 'crossing'
     exposure_sigma_cap_m: float = 1.5         # beyond-horizon checks inflate objects by min(meas sigma, cap)
     speed_fractions: list[float] = field(default_factory=lambda: [1.0, 0.75, 0.5, 0.25, 0.0])
     lateral_transition_time_s: float = 2.0
@@ -126,6 +128,8 @@ class PlanningConfig:
     safety_margin_m: float = 0.5
     uncertainty_margin_gain: float = 1.0      # margin += gain * measured position std-dev of the object
     uncertainty_margin_max_m: float = 0.5     # cap: a far, bearing-uncertain track must not block all lateral options
+    tracking_margin_speed_gain_s: float = 0.02  # margin += gain * ego speed: anticipated controller tracking error
+    tracking_margin_error_cap_m: float = 0.3    # margin += min(|current cross-track error|, cap)
     boundary_margin_m: float = 0.25
     boundary_margin_grace_s: float = 0.5
     clearance_scale_m: float = 2.0

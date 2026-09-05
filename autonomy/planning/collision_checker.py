@@ -15,6 +15,9 @@ Hard rejections, in this order, each recorded with a reason:
                                 be hit" and "creep toward a blocked route" candidates, so a bypass
                                 is preferred over myopic waiting. Candidates rejected only for this
                                 remain scorable (degraded tier) so the planner never returns nothing.
+    A collision rejection that never involves actual footprint overlap (only the margin is
+    entered) keeps the candidate scorable in the planner's degraded tier: a tight pass is
+    preferred over a fallback stop that would itself be struck.
     Within the first `collision_margin_grace_s` a candidate is rejected only for actual overlap,
     not for being inside the margin: the current pose is not the planner's choice. Beyond it,
     being inside the margin is a hit only while the distance is still shrinking relative to now
@@ -46,6 +49,9 @@ class CheckResult:
     risk_weights: np.ndarray = field(default_factory=lambda: np.zeros(0))     # (M,)
     band_widths: np.ndarray = field(default_factory=lambda: np.zeros(0))      # (M,) max(object length, width)
     boundary_clearance: np.ndarray = field(default_factory=lambda: np.zeros(0))  # (N,)
+    obj_s: np.ndarray = field(default_factory=lambda: np.zeros(0))        # (M,) object arc length now
+    obj_d: np.ndarray = field(default_factory=lambda: np.zeros(0))        # (M,) object lateral offset now
+    obj_v_lat: np.ndarray = field(default_factory=lambda: np.zeros(0))    # (M,) object lateral velocity (+left)
 
 
 class CollisionChecker:
@@ -58,7 +64,7 @@ class CollisionChecker:
         return self.check_all([cand], predictions)[0]
 
     def check_all(self, cands: list[CandidateTrajectory],
-                  predictions: list[ObjectPrediction]) -> list[CheckResult]:
+                  predictions: list[ObjectPrediction], extra_margin: float = 0.0) -> list[CheckResult]:
         p = self.params
         cfg = self.cfg
         C = len(cands)
@@ -132,6 +138,11 @@ class CollisionChecker:
             sig = np.empty((M, C, N))
             w = np.array([pr.risk_weight for pr in predictions])
             bw = np.array([max(pr.length, pr.width) for pr in predictions])
+            obj_s = np.zeros(M); obj_d = np.zeros(M); obj_vl = np.zeros(M)
+            for j, pr in enumerate(predictions):
+                s_o, d_o, h_o = self.road.project(float(pr.x[0]), float(pr.y[0]))
+                obj_s[j], obj_d[j] = s_o, d_o
+                obj_vl[j] = -float(pr.vx[0]) * np.sin(h_o) + float(pr.vy[0]) * np.cos(h_o)
             for j, pred in enumerate(predictions):
                 ox = np.interp(T, pred.times, pred.x).ravel()
                 oy = np.interp(T, pred.times, pred.y).ravel()
@@ -149,7 +160,8 @@ class CollisionChecker:
                 sig[j] = np.sqrt(np.maximum(Pxx * ux * ux + 2 * Pxy * ux * uy + Pyy * uy * uy, 1e-12)).reshape(C, N)
             # inside the margin counts as a hit, except during the grace window where only overlap does
             margin_ok = rel_t >= cfg.collision_margin_grace_s                      # (C,N)
-            margins = np.array([cfg.safety_margin_m + min(cfg.uncertainty_margin_gain * pr.meas_sigma, cfg.uncertainty_margin_max_m)
+            margins = np.array([cfg.safety_margin_m + extra_margin
+                                + min(cfg.uncertainty_margin_gain * pr.meas_sigma, cfg.uncertainty_margin_max_m)
                                 for pr in predictions])
             # inside-margin counts as a hit only when CLOSING relative to the current distance (or overlapping):
             # a candidate that slides past an object at the clearance the ego already has is not a collision
@@ -161,6 +173,7 @@ class CollisionChecker:
                 results[i].sigmas = sig[:, i, :]
                 results[i].risk_weights = w
                 results[i].band_widths = bw
+                results[i].obj_s, results[i].obj_d, results[i].obj_v_lat = obj_s, obj_d, obj_vl
                 cands[i].min_clearance = float(dist[:, i, :].min())
                 if alive[i] and hit[:, i, :].any():
                     any_t = hit[:, i, :].any(axis=0)
@@ -170,6 +183,10 @@ class CollisionChecker:
                     self._reject(cands[i], RejectionReason.COLLISION,
                                  f"distance {dist[j, i, k]:.2f} m <= margin {margins[j]:.2f} m "
                                  f"to {predictions[j].object_id} at +{rel_t[i, k]:.1f}s")
+                    # inside the margin but never actually touching: still scorable in the degraded tier,
+                    # so a tight pass beats a stop that would itself be struck
+                    if not np.any(dist[:, i, :] <= 0.0):
+                        cands[i].margin_only = True
                     alive[i] = False
 
             # 4b. standoff for near-stop candidates: do not come to rest closer than stop_standoff_m to any

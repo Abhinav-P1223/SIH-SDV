@@ -43,7 +43,7 @@ class Planner:
         self.previous_offset: float | None = None
 
     def plan(self, ego: VehicleState, decision: BehaviorDecision,
-             predictions: list[ObjectPrediction], now: float) -> PlannerOutput:
+             predictions: list[ObjectPrediction], now: float, tracking_error: float = 0.0) -> PlannerOutput:
         t0 = time.perf_counter()
         policy = decision.speed_policy
         if ego.longitudinal_velocity < self.cfg.standstill_speed_mps and not policy.force_stop:
@@ -55,7 +55,9 @@ class Planner:
 
         feasible: list[CandidateTrajectory] = []
         squeezed: list[CandidateTrajectory] = []
-        checks = self.checker.check_all(candidates, predictions)
+        extra = (self.cfg.tracking_margin_speed_gain_s * max(ego.longitudinal_velocity, 0.0)
+                 + min(abs(tracking_error), self.cfg.tracking_margin_error_cap_m))
+        checks = self.checker.check_all(candidates, predictions, extra_margin=extra)
         for cand, check in zip(candidates, checks):
             if cand.feasible or cand.margin_only:
                 s_end, _, _ = self.road.project(float(cand.trajectory.x[-1]), float(cand.trajectory.y[-1]))

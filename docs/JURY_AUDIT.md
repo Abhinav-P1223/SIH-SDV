@@ -1,4 +1,8 @@
-# Jury Audit — SIH26037 Stage 1 repository
+# Jury Audit — SIH26037 repository
+
+> **Re-audit (same day, later commit): see the section at the end.** The first
+> audit below is kept verbatim as the record of what was found before the
+> build-out. Score moved from **50 / 100 (PROMISING)** to **75 / 100 (STRONG)**.
 
 Role: senior autonomous-driving researcher / SIH judge auditing commit `e81bcdf` of
 `Abhinav-P1223/SIH-SDV` on 2026-09-05. Every finding below is backed by code
@@ -372,3 +376,82 @@ engineered than most hackathon submissions, and it would score well on
 planning, control, validation and honesty. It is **not yet** what the claim
 says. Fix the two behavioural defects, add the perception seam for real, and
 add the missing scenarios before calling it an autonomous-driving system.
+
+
+---
+
+# RE-AUDIT after the build-out
+
+Same role, same method: code inspection plus the audit scripts, now runnable in
+both perception modes (`scripts/audit_adaptivity.py --perception sensors`,
+`scripts/audit_stress.py --perception sensors`). Everything below was executed
+on the final commit of this session.
+
+## What changed since the first audit
+
+| First-audit finding | What was built | Evidence |
+|---|---|---|
+| No sensors, perception, fusion or tracking (0/10) | Camera / LiDAR / radar models with FOV, range, line-of-sight occlusion, noise in native coordinates, dropout, per-sensor rate and latency (`simulation/sensors/models.py`); Kalman-filter tracker with gated NN association, lifecycle, class votes, LiDAR extents, radar radial-speed EKF update, duplicate merge (`autonomy/perception/tracker.py`) implementing `ObjectStateProvider`; `perception.mode: sensors` is the default | 13 unit tests incl. ablations (no camera → UNKNOWN, no radar → larger velocity covariance, no LiDAR → larger position covariance); tracker never reads `truth_id` (asserted by test); tracking error 0.07–0.3 m position, 0.2–0.4 m/s velocity on the scenarios |
+| Frozen robot behind partially blocking objects | Anti-freeze progress weight, beyond-horizon route check, stop standoff, corridor-spanning lateral lattice, adaptive transition length, closing-based margins, margin-only degraded tier | Adaptivity 11/11 GOAL_REACHED, 0 collisions (was 3 frozen) |
+| Wrong-way head-on collision | Anisotropic prediction uncertainty, road-following prediction prior with lateral-velocity decay, blocked-route cost, uncertainty-margin cap, plan-consistency cost, corridor-spanning lattice | Wrong-way PASS in both modes (0.62 m / 0.87 m clearance, no EB) |
+| Chatter under noise | Real tracker filtering; consistency cost; lead-excluded FSM guards; FOLLOW lead-gone fix | Sensor-mode transitions per scenario 3–16 except dense market (70) |
+| Three of five SIH scenarios missing | UNMARKED_VILLAGE_ROAD, UNSIGNALIZED_INTERSECTION, HIGHWAY_MERGE_SLOW_VEHICLES, DENSE_MARKET_MIXED_TRAFFIC as YAML with tests; merging agents with gap acceptance | all 7 scenarios PASS in sensors mode |
+| Latency compensation absent | `ObjectState.timestamp` age propagated before prediction | 0.4 s delay case no longer collides |
+| Controller could demand more lateral acceleration than the planner allows | Stanley steering capped by lateral acceleration; planner margin budgets tracking error (speed term + measured cross-track error) | integration + scenario tests |
+
+## Stress battery on the final code
+
+Sensors mode (the system):
+
+| case | verdict | clearance [m] |
+|---|---|---|
+| two simultaneous crossers | PASS | 0.59 |
+| wrong-way motorcycle head-on, 8 m/s | PASS | 0.87 |
+| auto-rickshaw cut-in 22 m ahead | PASS | 1.59 |
+| blocked road (truck across) | DEGRADED (stops and waits, by design) | 10.18 |
+| narrow 3.4 m road + crossing cow | PASS | 0.96 |
+| dense mixed traffic, 6 agents | PASS | ≥ 0.5 |
+| 20 m/s approach, cow at 45 m | PASS | 0.63 |
+| camera disabled | PASS | 0.78 |
+| LiDAR disabled | PASS | 0.94 |
+| radar disabled | PASS | 0.60 |
+| degraded suite (2× noise, +30 % dropout, +0.1 s latency) | PASS | 1.05 |
+| erratic cow in ego half | DEGRADED (completes, clearance < 0.5) | — |
+
+Ground-truth mode (planner isolated): 9 PASS, 3 DEGRADED (blocked road; raw
+unfiltered 0.5 m position noise fed straight to the planner; raw 0.4 s stale
+input), 0 FAIL. Adaptivity: 11/11 completed, 0 collisions, every perturbation
+changes the selected trajectory.
+
+## Score (re-audit)
+
+| Area | Points | First | Now | Basis |
+|---|---|---|---|---|
+| A. Problem alignment | 15 | 7 | 12 | five required scenarios exist and pass; no learned perception |
+| B. Closed-loop autonomy | 20 | 12 | 17 | sensors → detections → tracks → prediction → risk → decision → plan → control → dynamics, all traced; sensors are models, not renderers |
+| C. Adaptive planning | 15 | 10 | 13 | 24/24 stress cases collision-free; dense market still chattery |
+| D. Multi-sensor perception/fusion | 10 | 0 | 6 | genuine fusion with tested ablations; simulated sensors, no detector, class from camera model |
+| E. Prediction | 10 | 4 | 6 | anisotropic + road-following prior + latency compensation; still constant velocity, no intent |
+| F. Indian-road realism | 10 | 5 | 7 | village / intersection / market / merge with gap acceptance; agents mostly non-reactive |
+| G. MathWorks integration | 5 | 0 | 0 | none |
+| H. Validation / metrics | 5 | 3 | 5 | 7 scenarios × 2 modes, sweeps, stress, adaptivity, all generated |
+| I. Engineering quality | 5 | 5 | 5 | |
+| J. Demo / explainability | 5 | 4 | 4 | debug view shows detections, tracks with covariance, candidates, reasons; no dashboard |
+| **Total** | 100 | **50** | **75** | |
+
+Verdict: **STRONG**. The claim "multi-sensor closed-loop autonomy stack
+validated in simulation on five Indian-road scenarios" is now defensible. The
+claims that remain indefensible: "AI perception" (there is no detector; classes
+come from a simulated camera classifier with a confusion rate), "real-time"
+(Python, 20–80 ms planner), and anything MATLAB.
+
+## Remaining weaknesses, ranked
+
+1. Dense market in sensors mode: 8 emergency-brake activations and ~70 state
+   transitions on a 46 s run; passes, but a judge will call it nervous.
+2. Erratic-cow and a few ablation cases finish with clearance below the 0.5 m
+   margin (DEGRADED).
+3. No reversing: a blocked corridor means waiting.
+4. Prediction is still constant velocity (plus priors); no intent model.
+5. No MathWorks artefact.
+6. Simulated sensors only; no images, no point clouds, no learned detector.

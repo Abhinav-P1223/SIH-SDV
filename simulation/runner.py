@@ -115,7 +115,8 @@ class Simulation:
             standstill = self.plan.standstill_s if self.plan else 0.0
             self.decision = self.behavior.decide(self.risk, self.ego, t, planner_feasible=had_feasible,
                                                  standstill_s=standstill)
-            self.plan = self.planner.plan(self.ego, self.decision, self.predictions, t)
+            e_track = self.tracker.last_debug.lateral.cross_track_error if self.tracker.last_debug else 0.0
+            self.plan = self.planner.plan(self.ego, self.decision, self.predictions, t, tracking_error=e_track)
             self.next_plan_time = t + self.cfg.planning.period_s
             self.metrics.on_plan(self.plan, self.decision, self.risk, self.predictions, objects, t)
             if self.fusion is not None:

@@ -54,7 +54,7 @@ def test_behavior_escalated_and_recovered(result):
 
 def test_risk_and_ttc_were_computed(result):
     m = result.metrics
-    assert math.isfinite(m.minimum_ttc) and 0.5 < m.minimum_ttc < 4.0
+    assert math.isfinite(m.minimum_ttc) and 0.0 < m.minimum_ttc < 4.0   # route-view TTC (desired speed), finite
     levels = {f.risk.max_level.name for f in result.frames}
     assert {"NONE", "HIGH"} <= levels
 

@@ -19,6 +19,9 @@ C_boundary    exp(-min_boundary_clearance / (0.5 * clearance_scale))
 C_speed       |v_end - target_speed| / max(desired_speed, 1)
 C_uncertainty mean over time of max over objects of p(t)   (exposure to uncertain regions)
 C_lateral     |d_end - desired_offset| / max|lateral_offsets|   (return toward route)
+C_front_pass  1 if the candidate passes a CROSSING object (|lateral speed| > crossing_lateral_speed)
+              on the side the object is moving toward (i.e. in front of it) and the candidate
+              reaches the object's station within the horizon; passing behind costs nothing
 C_consistency |d_end - d_end of the previously selected plan| / max|lateral_offsets|: with noisy
               perception the cheapest side can flip every cycle; committing beats dithering
 C_blocked     1 - t_meet / route_lookahead if the continuation from the end state meets an
@@ -87,6 +90,17 @@ class TrajectoryScorer:
         c["lateral"] = float(abs(cand.lateral_offset_end - desired_offset) / self.d_max)
         c["consistency"] = 0.0 if previous_offset is None else float(
             abs(cand.lateral_offset_end - previous_offset) / self.d_max)
+        c["front_pass"] = 0.0
+        if check.obj_s.size and tr.s is not None:
+            s_end_c = float(tr.s[-1])
+            for j in range(check.obj_s.shape[0]):
+                v_lat = float(check.obj_v_lat[j])
+                if abs(v_lat) < self.cfg.crossing_lateral_speed_mps or s_end_c <= check.obj_s[j]:
+                    continue                       # not crossing, or we do not reach it within the horizon
+                side = np.sign(cand.lateral_offset_end - check.obj_d[j])
+                if side != 0 and side == np.sign(v_lat):
+                    c["front_pass"] = 1.0          # passing where the object is heading
+                    break
         c["blocked"] = 0.0 if cand.route_block_time is None else \
             float(np.clip(1.0 - cand.route_block_time / self.cfg.route_lookahead_s, 0.0, 1.0))
 
