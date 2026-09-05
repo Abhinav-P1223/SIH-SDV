@@ -16,9 +16,9 @@ seed: 42
 
 road:
   lane_markings: NONE
-  reference:      [[0.0, 0.0], [160.0, 0.0]]
-  left_boundary:  [[0.0, 3.5], [160.0, 3.5]]
-  right_boundary: [[0.0, -3.5], [160.0, -3.5]]
+  reference:      [[-20.0, 0.0], [160.0, 0.0]]
+  left_boundary:  [[-20.0, 3.5], [160.0, 3.5]]
+  right_boundary: [[-20.0, -3.5], [160.0, -3.5]]
 
 ego:
   x: 0.0

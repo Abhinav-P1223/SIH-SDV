@@ -114,6 +114,7 @@ class PlanningConfig:
     max_lateral_acceleration_mps2: float = 3.5
     safety_margin_m: float = 0.5
     boundary_margin_m: float = 0.25
+    boundary_margin_grace_s: float = 0.5
     clearance_scale_m: float = 2.0
     weights: CostWeights = field(default_factory=CostWeights)
 
@@ -135,6 +136,8 @@ class StanleyConfig:
     k_gain: float = 1.2
     k_soft: float = 1.0
     heading_gain: float = 1.0
+    lookahead_time_s: float = 0.4
+    min_lookahead_m: float = 1.5
 
 
 @dataclass

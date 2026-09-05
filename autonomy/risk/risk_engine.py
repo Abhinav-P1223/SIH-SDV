@@ -1,20 +1,32 @@
 """Risk assessment: separate module, consumed by behaviour, planner and safety.
 
-For every object the ego footprint along its *reference motion* (last selected
-trajectory, or constant velocity along the current heading when no plan
-exists yet) is compared with the object's predicted footprint at each
-prediction time. From the distance series d(t) and uncertainty sigma(t):
+Two ego motions are evaluated against every object's predicted footprint:
 
-    intersection        = any t : d(t) <= margin
-    ttc                 = first t with d(t) <= margin            (inf if none)
-    ttc_kinematic       = d(0) / closing_speed                    (inf if not closing)
-    gap(t)              = max(d(t) - margin, 0)
-    p(t)                = exp(-0.5 * (gap(t) / sigma(t))^2)       (1 when intersecting)
-    risk_score          = w_type * max_t [ p(t) * exp(-t / tau) ]
-    risk_level          = thresholds on risk_score, escalated by TTC thresholds
+1. ROUTE motion — "what happens if the ego proceeds along its route at the
+   desired speed": follow the corridor at the current lateral offset at the
+   scenario's desired speed. This is the reference for behaviour decisions, so
+   a threat to the mission is seen even after the planner has slowed down.
+   With no road model it degrades to constant heading.
 
-A `RiskSummary` aggregates the worst object and also identifies a *lead
-object* (slower traffic ahead within a lateral window) for the FOLLOW state.
+2. PHYSICAL motion — the corridor at the CURRENT speed. Only its earliest
+   overlap time is kept (`min_ttc_current_speed`); it drives the independent
+   safety supervisor and the CRITICAL escalation. A stopped ego has infinite
+   physical TTC, which is what lets the STOPPED state release cleanly.
+
+3. PLANNED motion — the currently selected trajectory. Its aggregates
+   (`plan_*` fields) tell the behaviour layer whether the chosen plan is clear.
+
+Per object, from the distance series d(t) and uncertainty sigma(t):
+
+    intersection   = any t : d(t) <= margin
+    ttc            = first t with d(t) <= margin                     (inf if none)
+    ttc_kinematic  = d(0) / closing_speed                             (inf if not closing)
+    p(t)           = band_collision_probability(d, sigma, margin, W)  (1 when intersecting)
+    risk_score     = w_type * max_t [ p(t) * exp(-t / tau) ]
+    risk_level     = thresholds on risk_score, escalated by TTC thresholds
+
+A `RiskSummary` aggregates the worst object and identifies a *lead object*
+(traffic ahead in the ego's lateral band) for the FOLLOW state.
 """
 from __future__ import annotations
 
@@ -26,6 +38,7 @@ import numpy as np
 from autonomy.core.config import BehaviorConfig, RiskConfig
 from autonomy.core.geometry import box_sequence_distance
 from autonomy.core.interfaces import RoadModel
+from autonomy.core.probability import band_collision_probability
 from autonomy.core.types import (ObjectPrediction, ObjectState, RiskAssessment, RiskLevel,
                                  RiskSummary, Trajectory, VehicleParameters, VehicleState)
 
@@ -42,37 +55,41 @@ def first_overlap_time(rel_times: np.ndarray, distances: np.ndarray, margin: flo
     return float(rel_times[hits[0]]) if hits.size else math.inf
 
 
-def ego_reference_motion(ego: VehicleState, trajectory: Optional[Trajectory],
-                         times: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Ego (x, y, yaw) sampled at absolute `times`.
+def nominal_motion(ego: VehicleState, times: np.ndarray, road: Optional[RoadModel],
+                   speed: Optional[float] = None) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Ego (x, y, yaw) if it follows the corridor at its current offset at `speed` (default: current)."""
+    rel = times - times[0]
+    v = max(ego.longitudinal_velocity if speed is None else speed, 0.0)
+    if road is None:
+        return (ego.x + v * rel * math.cos(ego.yaw), ego.y + v * rel * math.sin(ego.yaw),
+                np.full_like(times, ego.yaw))
+    s0, d0, _ = road.project(ego.x, ego.y)
+    x, y, h = road.to_cartesian(s0 + v * rel, np.full_like(times, d0))
+    return x, y, h
 
-    Uses the trajectory where it covers `times`; beyond its end (or with no
-    trajectory) the ego is propagated at constant velocity along its heading.
-    """
-    if trajectory is not None and len(trajectory) >= 2:
-        t = trajectory.t
-        inside = (times >= t[0]) & (times <= t[-1])
-        x = np.interp(times, t, trajectory.x)
-        y = np.interp(times, t, trajectory.y)
-        yaw = np.interp(times, t, np.unwrap(trajectory.yaw))
-        if not np.all(inside):
-            extra = np.maximum(times - t[-1], 0.0)
-            v_end = float(trajectory.velocity[-1])
-            x = np.where(inside, x, trajectory.x[-1] + v_end * extra * math.cos(trajectory.yaw[-1]))
-            y = np.where(inside, y, trajectory.y[-1] + v_end * extra * math.sin(trajectory.yaw[-1]))
-        return x, y, yaw
-    rel = times - ego.timestamp
-    v = ego.longitudinal_velocity
-    return (ego.x + v * rel * math.cos(ego.yaw),
-            ego.y + v * rel * math.sin(ego.yaw),
-            np.full_like(times, ego.yaw))
+
+def trajectory_motion(traj: Trajectory, times: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Ego (x, y, yaw) along a trajectory, extrapolated at constant velocity beyond its end."""
+    t = traj.t
+    x = np.interp(times, t, traj.x)
+    y = np.interp(times, t, traj.y)
+    yaw = np.interp(times, t, np.unwrap(traj.yaw))
+    beyond = times > t[-1]
+    if np.any(beyond):
+        extra = np.maximum(times - t[-1], 0.0)
+        v_end = float(traj.velocity[-1])
+        x = np.where(beyond, traj.x[-1] + v_end * extra * math.cos(traj.yaw[-1]), x)
+        y = np.where(beyond, traj.y[-1] + v_end * extra * math.sin(traj.yaw[-1]), y)
+    return x, y, yaw
 
 
 class RiskEngine:
-    def __init__(self, config: RiskConfig, behavior_cfg: BehaviorConfig, params: VehicleParameters):
+    def __init__(self, config: RiskConfig, behavior_cfg: BehaviorConfig, params: VehicleParameters,
+                 desired_speed: Optional[float] = None):
         self.cfg = config
         self.bcfg = behavior_cfg
         self.params = params
+        self.desired_speed = desired_speed      # None -> use current speed for the route view
 
     # ------------------------------------------------------------------ #
     def evaluate(self, ego: VehicleState, ego_trajectory: Optional[Trajectory],
@@ -82,16 +99,19 @@ class RiskEngine:
             return RiskSummary.empty()
         times = predictions[0].times
         rel = times - times[0]
-        ex, ey, eyaw = ego_reference_motion(ego, ego_trajectory, times)
-        off = self.params.footprint_center_offset
-        fx = ex + off * np.cos(eyaw)
-        fy = ey + off * np.sin(eyaw)
         ego_vx = ego.longitudinal_velocity * math.cos(ego.yaw)
         ego_vy = ego.longitudinal_velocity * math.sin(ego.yaw)
-        obj_by_id = {o.id: o for o in objects}
 
-        assessments = [self._assess(pred, obj_by_id.get(pred.object_id), rel, fx, fy, eyaw, ego_vx, ego_vy)
-                       for pred in predictions]
+        route_speed = self.desired_speed if self.desired_speed is not None else ego.longitudinal_velocity
+        route_speed = max(route_speed, ego.longitudinal_velocity)
+        nx, ny, nyaw = nominal_motion(ego, times, road, route_speed)
+        fx, fy = self._footprint_centres(nx, ny, nyaw)
+        assessments = [self._assess(pred, rel, fx, fy, nyaw, ego_vx, ego_vy) for pred in predictions]
+
+        # physical TTC at the current speed (independent safety view)
+        cx, cy, cyaw = nominal_motion(ego, times, road)
+        cfx, cfy = self._footprint_centres(cx, cy, cyaw)
+        physical_ttc = min(self._ttc_only(pred, rel, cfx, cfy, cyaw) for pred in predictions)
 
         worst = max(assessments, key=lambda a: (a.risk_level.value, a.risk_score))
         summary = RiskSummary(
@@ -102,13 +122,45 @@ class RiskEngine:
             min_predicted_distance=min(a.min_predicted_distance for a in assessments),
             worst_object_id=worst.object_id,
             any_intersection=any(a.trajectory_intersection for a in assessments),
+            min_ttc_current_speed=physical_ttc,
         )
+        if physical_ttc < self.cfg.ttc_critical_s:
+            summary.max_level = RiskLevel.CRITICAL
+
+        if ego_trajectory is not None and len(ego_trajectory) >= 2:
+            px, py, pyaw = trajectory_motion(ego_trajectory, times)
+            pfx, pfy = self._footprint_centres(px, py, pyaw)
+            plan = [self._assess(pred, rel, pfx, pfy, pyaw, ego_vx, ego_vy) for pred in predictions]
+            pw = max(plan, key=lambda a: (a.risk_level.value, a.risk_score))
+            summary.plan_min_ttc = min(a.ttc for a in plan)
+            summary.plan_max_score = pw.risk_score
+            summary.plan_max_level = pw.risk_level
+            summary.plan_any_intersection = any(a.trajectory_intersection for a in plan)
+            summary.plan_min_predicted_distance = min(a.min_predicted_distance for a in plan)
+        else:
+            summary.plan_min_ttc = summary.min_ttc
+            summary.plan_max_score = summary.max_score
+            summary.plan_max_level = summary.max_level
+            summary.plan_any_intersection = summary.any_intersection
+            summary.plan_min_predicted_distance = summary.min_predicted_distance
+
         if road is not None:
             self._find_lead(summary, ego, objects, road)
         return summary
 
     # ------------------------------------------------------------------ #
-    def _assess(self, pred: ObjectPrediction, obj: Optional[ObjectState], rel: np.ndarray,
+    def _footprint_centres(self, x: np.ndarray, y: np.ndarray, yaw: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        off = self.params.footprint_center_offset
+        return x + off * np.cos(yaw), y + off * np.sin(yaw)
+
+    def _ttc_only(self, pred: ObjectPrediction, rel: np.ndarray,
+                  fx: np.ndarray, fy: np.ndarray, eyaw: np.ndarray) -> float:
+        p = self.params
+        dist = box_sequence_distance(fx, fy, eyaw, p.length, p.width,
+                                     pred.x, pred.y, pred.heading, pred.length, pred.width)
+        return first_overlap_time(rel, dist, self.cfg.safety_margin_m)
+
+    def _assess(self, pred: ObjectPrediction, rel: np.ndarray,
                 fx: np.ndarray, fy: np.ndarray, eyaw: np.ndarray,
                 ego_vx: float, ego_vy: float) -> RiskAssessment:
         p = self.params
@@ -116,13 +168,11 @@ class RiskEngine:
                                      pred.x, pred.y, pred.heading, pred.length, pred.width)
         margin = self.cfg.safety_margin_m
         sigma = pred.sigma()
-
-        gap = np.maximum(dist - margin, 0.0)
-        prob = np.exp(-0.5 * (gap / np.maximum(sigma, 1e-6)) ** 2)
+        band = p.width + max(pred.width, pred.length) + 2.0 * margin
+        prob = band_collision_probability(dist, sigma, margin, band)
         discounted = prob * np.exp(-rel / self.cfg.time_constant_s)
         k_min = int(np.argmin(dist))
         ttc = first_overlap_time(rel, dist, margin)
-        intersection = math.isfinite(ttc)
 
         vx = float(pred.vx[0]); vy = float(pred.vy[0])
         rvx, rvy = vx - ego_vx, vy - ego_vy
@@ -131,7 +181,6 @@ class RiskEngine:
         closing = -(rx * rvx + ry * rvy) / rnorm if rnorm > 1e-9 else 0.0
 
         score = float(pred.risk_weight * np.max(discounted))
-        level = self._level(score, ttc)
         return RiskAssessment(
             object_id=pred.object_id, object_type=pred.object_type,
             distance=float(dist[0]),
@@ -141,10 +190,10 @@ class RiskEngine:
             ttc_kinematic=kinematic_ttc(float(dist[0]), closing),
             min_predicted_distance=float(dist[k_min]),
             time_of_min_distance=float(rel[k_min]),
-            trajectory_intersection=intersection,
+            trajectory_intersection=math.isfinite(ttc),
             collision_probability=float(np.max(prob)),
             risk_score=score,
-            risk_level=level,
+            risk_level=self._level(score, ttc),
             uncertainty=float(sigma[k_min]),
             risk_weight=pred.risk_weight,
         )
@@ -169,17 +218,20 @@ class RiskEngine:
 
     def _find_lead(self, summary: RiskSummary, ego: VehicleState,
                    objects: list[ObjectState], road: RoadModel) -> None:
-        s_ego, d_ego, h_ref = road.project(ego.x, ego.y)
+        """A lead object travels along the corridor ahead of the ego, inside its lateral band."""
+        s_ego, d_ego, _ = road.project(ego.x, ego.y)
         best_gap = math.inf
         for o in objects:
             s_o, d_o, h_o = road.project(o.x, o.y)
             along = s_o - s_ego
             if along <= 0 or along > self.bcfg.follow_max_range_m:
                 continue
-            if abs(d_o - d_ego) > self.bcfg.follow_lateral_window_m:
+            lateral_overlap = abs(d_o - d_ego) < 0.5 * (self.params.width + o.width)
+            if not lateral_overlap and abs(d_o - d_ego) > self.bcfg.follow_lateral_window_m:
                 continue
-            aligned = math.cos(o.heading - h_o) > 0.5 if o.speed > 0.1 else True
-            if not aligned:
+            aligned = math.cos(o.heading - h_o) > 0.5
+            moving_along = o.speed > 0.5 and aligned
+            if not moving_along and not (lateral_overlap and aligned):
                 continue
             gap = along - 0.5 * (self.params.length + o.length)
             if gap < best_gap:

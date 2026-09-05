@@ -295,6 +295,8 @@ class CandidateTrajectory:
     min_boundary_clearance: float = math.inf
     collision_time: Optional[float] = None
     fallback: bool = False
+    margin_only: bool = False          # rejected solely for the boundary *margin*, still on the road
+    degraded: bool = False             # selected although margin_only (no fully feasible candidate)
 
     def to_dict(self, stride: int = 1) -> dict[str, Any]:
         return {
@@ -310,6 +312,8 @@ class CandidateTrajectory:
             "min_boundary_clearance": None if math.isinf(self.min_boundary_clearance) else self.min_boundary_clearance,
             "collision_time": self.collision_time,
             "fallback": self.fallback,
+            "margin_only": self.margin_only,
+            "degraded": self.degraded,
             "trajectory": self.trajectory.to_dict(stride),
         }
 
@@ -357,6 +361,13 @@ class RiskSummary:
     lead_object_id: Optional[str] = None     # slower object ahead in corridor, if any
     lead_gap: float = math.inf
     lead_speed: float = 0.0
+    min_ttc_current_speed: float = math.inf   # physical TTC along the corridor at current speed
+    # aggregates along the currently selected plan (route motion is used for the fields above)
+    plan_min_ttc: float = math.inf
+    plan_max_score: float = 0.0
+    plan_max_level: RiskLevel = RiskLevel.NONE
+    plan_any_intersection: bool = False
+    plan_min_predicted_distance: float = math.inf
 
     @staticmethod
     def empty() -> "RiskSummary":
@@ -373,6 +384,12 @@ class RiskSummary:
             "lead_object_id": self.lead_object_id,
             "lead_gap": None if math.isinf(self.lead_gap) else self.lead_gap,
             "lead_speed": self.lead_speed,
+            "min_ttc_current_speed": None if math.isinf(self.min_ttc_current_speed) else self.min_ttc_current_speed,
+            "plan_min_ttc": None if math.isinf(self.plan_min_ttc) else self.plan_min_ttc,
+            "plan_max_score": self.plan_max_score,
+            "plan_max_level": self.plan_max_level.name,
+            "plan_any_intersection": self.plan_any_intersection,
+            "plan_min_predicted_distance": None if math.isinf(self.plan_min_predicted_distance) else self.plan_min_predicted_distance,
             "objects": [a.to_dict() for a in self.assessments],
         }
 
