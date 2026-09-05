@@ -16,7 +16,10 @@ CROSSING           : trigger_distance_m (30)  - start when ego is this close (Eu
                      stop_after (True)
 MERGING            : trigger_distance_m (25), target_heading_rad (0.0),
                      yaw_rate_rad_s (0.4), target_speed_mps (agent.speed),
-                     acceleration_mps2 (1.0)
+                     acceleration_mps2 (1.0), follow_road (False) - when True and a
+                     road model is available the target heading is the corridor
+                     heading at the agent's position (the agent joins the flow and
+                     then follows the road, also through curves)
 ERRATIC            : heading_sigma_rad (0.35), speed_sigma_mps (0.5),
                      change_interval_s (1.0), max_speed_mps (3.0)
 """
@@ -26,6 +29,7 @@ import math
 from abc import ABC, abstractmethod
 
 from autonomy.core.geometry import wrap_angle
+from autonomy.core.interfaces import RoadModel
 from autonomy.core.types import AgentBehaviorType
 
 from .agent import Agent
@@ -33,24 +37,28 @@ from .agent import Agent
 
 class AgentBehavior(ABC):
     @abstractmethod
-    def update(self, agent: Agent, ego_xy: tuple[float, float], dt: float) -> None: ...
+    def update(self, agent: Agent, ego_xy: tuple[float, float], dt: float,
+               road: RoadModel | None = None) -> None: ...
 
 
 class StaticBehavior(AgentBehavior):
-    def update(self, agent: Agent, ego_xy: tuple[float, float], dt: float) -> None:
+    def update(self, agent: Agent, ego_xy: tuple[float, float], dt: float,
+               road: RoadModel | None = None) -> None:
         agent.speed = 0.0
         agent.phase = "STATIC"
         agent.elapsed += dt
 
 
 class ConstantVelocityBehavior(AgentBehavior):
-    def update(self, agent: Agent, ego_xy: tuple[float, float], dt: float) -> None:
+    def update(self, agent: Agent, ego_xy: tuple[float, float], dt: float,
+               road: RoadModel | None = None) -> None:
         agent.phase = "MOVING"
         agent.advance(dt)
 
 
 class CrossingBehavior(AgentBehavior):
-    def update(self, agent: Agent, ego_xy: tuple[float, float], dt: float) -> None:
+    def update(self, agent: Agent, ego_xy: tuple[float, float], dt: float,
+               road: RoadModel | None = None) -> None:
         p = agent.behavior_params
         trigger_d = p.get("trigger_distance_m", 30.0)
         trigger_t = p.get("trigger_time_s")
@@ -86,10 +94,13 @@ class CrossingBehavior(AgentBehavior):
 
 
 class MergingBehavior(AgentBehavior):
-    def update(self, agent: Agent, ego_xy: tuple[float, float], dt: float) -> None:
+    def update(self, agent: Agent, ego_xy: tuple[float, float], dt: float,
+               road: RoadModel | None = None) -> None:
         p = agent.behavior_params
         trigger_d = p.get("trigger_distance_m", 25.0)
         target_heading = p.get("target_heading_rad", 0.0)
+        if p.get("follow_road", False) and road is not None:
+            _, _, target_heading = road.project(agent.x, agent.y)
         yaw_rate = p.get("yaw_rate_rad_s", 0.4)
         v_target = p.get("target_speed_mps", agent.speed)
         acc = p.get("acceleration_mps2", 1.0)
@@ -110,11 +121,15 @@ class MergingBehavior(AgentBehavior):
                 agent.speed = max(v_target, agent.speed - acc * dt)
             if abs(err) < 1e-3 and abs(agent.speed - v_target) < 1e-3:
                 agent.phase = "MERGED"
+        if agent.phase == "MERGED" and p.get("follow_road", False) and road is not None:
+            err = float(wrap_angle(target_heading - agent.heading))
+            agent.heading = float(wrap_angle(agent.heading + max(-yaw_rate * dt, min(yaw_rate * dt, err))))
         agent.advance(dt)
 
 
 class ErraticBehavior(AgentBehavior):
-    def update(self, agent: Agent, ego_xy: tuple[float, float], dt: float) -> None:
+    def update(self, agent: Agent, ego_xy: tuple[float, float], dt: float,
+               road: RoadModel | None = None) -> None:
         p = agent.behavior_params
         h_sigma = p.get("heading_sigma_rad", 0.35)
         v_sigma = p.get("speed_sigma_mps", 0.5)

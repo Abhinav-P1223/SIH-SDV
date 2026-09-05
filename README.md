@@ -26,6 +26,8 @@ pip install -r requirements.txt
 python -m pytest tests -q                              # unit + integration + scenario tests
 python scripts/run_scenario.py SUDDEN_CATTLE_CROSSING  # closed-loop run, console + logs/
 python scripts/run_scenario.py SUDDEN_PEDESTRIAN_DART  # exercises the emergency-brake path
+python scripts/run_scenario.py MIXED_TRAFFIC_CURVE     # curved corridor, merging auto-rickshaw, erratic pedestrian
+python scripts/sweep.py                                # parameter sweep -> scenario success rate
 
 # engineering debug view from the telemetry log
 python -m visualization.debug_view logs/sudden_cattle_crossing.jsonl --time 6.7 --save frame.png
@@ -72,12 +74,21 @@ docs/            ARCHITECTURE.md, INTERFACES.md, STAGE1_RESULTS.md, img/
 logs/            telemetry output (git-ignored)
 ```
 
+## Scenarios
+
+| Scenario | What it exercises |
+|---|---|
+| `SUDDEN_CATTLE_CROSSING` | the prompt's acceptance scenario: predicted crossing, CAUTION -> AVOID -> CRUISE, pass and return to route |
+| `SUDDEN_PEDESTRIAN_DART` | short-range dart: independent safety supervisor, EMERGENCY_BRAKE and recovery |
+| `MIXED_TRAFFIC_CURVE` | 40-degree curve (R = 60 m), auto-rickshaw merging then following the road, erratic pedestrian, FOLLOW state |
+
 ## Adding a scenario
 
-Scenarios are data: copy `simulation/scenarios/sudden_cattle_crossing.yaml`,
-change the corridor polylines, ego setup, goal and agents (behaviours
-`STATIC`, `CONSTANT_VELOCITY`, `CROSSING`, `MERGING`, `ERRATIC`; types from
-`config/object_profiles.yaml`). Nothing in `autonomy/` needs to change.
+Scenarios are data: copy a file in `simulation/scenarios/`, change the
+corridor (explicit polylines, or `segments` of `straight` / `arc` for curves),
+ego setup, goal and agents (behaviours `STATIC`, `CONSTANT_VELOCITY`,
+`CROSSING`, `MERGING`, `ERRATIC`; types from `config/object_profiles.yaml`;
+positions in `x, y` or corridor `s, d`). Nothing in `autonomy/` needs to change.
 
 ## Engineering rules kept in Stage 1
 

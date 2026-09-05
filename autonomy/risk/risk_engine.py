@@ -154,6 +154,16 @@ class RiskEngine:
 
         if road is not None:
             self._find_lead(summary, ego, objects, road)
+        others = [a for a in assessments if a.object_id != summary.lead_object_id]
+        if summary.lead_object_id is None or not others:
+            summary.non_lead_max_level = summary.max_level if summary.lead_object_id is None else RiskLevel.NONE
+            summary.non_lead_max_score = summary.max_score if summary.lead_object_id is None else 0.0
+            summary.non_lead_any_intersection = summary.any_intersection if summary.lead_object_id is None else False
+        else:
+            w = max(others, key=lambda a: (a.risk_level.value, a.risk_score))
+            summary.non_lead_max_level = w.risk_level
+            summary.non_lead_max_score = w.risk_score
+            summary.non_lead_any_intersection = any(a.trajectory_intersection for a in others)
         return summary
 
     # ------------------------------------------------------------------ #

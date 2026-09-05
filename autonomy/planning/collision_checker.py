@@ -86,8 +86,11 @@ class CollisionChecker:
         FX = (X + off * np.cos(YAW)).ravel()
         FY = (Y + off * np.sin(YAW)).ravel()
         FYAW = YAW.ravel()
-        corners = box_corners(FX, FY, FYAW, p.length, p.width)          # (C*N,4,2)
-        clearance = self.road.boundary_clearance(corners).reshape(C, N)  # 0 when outside
+        if all(c.trajectory.s is not None for c in cands):
+            clearance = self._corridor_clearance(cands, C, N)             # fast path, corridor frame
+        else:
+            corners = box_corners(FX, FY, FYAW, p.length, p.width)      # (C*N,4,2)
+            clearance = self.road.boundary_clearance(corners).reshape(C, N)  # 0 when outside
         on_road = clearance > 0.0
         after_grace = rel_t >= cfg.boundary_margin_grace_s
         margin_ok = (clearance >= cfg.boundary_margin_m) | ~after_grace
@@ -140,6 +143,29 @@ class CollisionChecker:
                                  f"to {predictions[j].object_id} at +{rel_t[i, k]:.1f}s")
                     alive[i] = False
         return results
+
+    def _corridor_clearance(self, cands: list[CandidateTrajectory], C: int, N: int) -> np.ndarray:
+        """Boundary clearance from corridor coordinates.
+
+        Each footprint corner's lateral offset is d_centre +- (W/2 cos th) +- (L/2 sin th)
+        (th = heading relative to the reference); clearance is its distance to the
+        corridor edge at that station. Exact on straight references; on a curve of
+        radius R the error is of order (L/2)^2 / (2R): measured 6 cm at R = 60 m,
+        well inside the 25 cm boundary margin.
+        """
+        p = self.params
+        S = np.stack([c.trajectory.s for c in cands]).ravel()
+        D = np.stack([c.trajectory.d for c in cands]).ravel()
+        TH = np.stack([c.trajectory.heading_rel for c in cands]).ravel()
+        off = p.footprint_center_offset
+        sc = S + off * np.cos(TH)
+        dc = D + off * np.sin(TH)
+        half_w = 0.5 * p.width * np.abs(np.cos(TH)) + 0.5 * p.length * np.abs(np.sin(TH))
+        d_right, d_left = self.road.lateral_bounds(sc)
+        clear_left = d_left - (dc + half_w)
+        clear_right = (dc - half_w) - d_right
+        clearance = np.minimum(clear_left, clear_right)
+        return np.where(clearance > 0.0, clearance, 0.0).reshape(C, N)
 
     @staticmethod
     def _reject(cand: CandidateTrajectory, reason: RejectionReason, detail: str) -> None:

@@ -38,6 +38,10 @@ class RoadModel(ABC):
     def boundary_clearance(self, corners: np.ndarray) -> np.ndarray:
         """corners (N,4,2) -> (N,) min distance from any corner to the nearest boundary (0 if outside)."""
 
+    @abstractmethod
+    def lateral_bounds(self, s: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """(d_right[N], d_left[N]) corridor edges at arc lengths s (right < 0 < left)."""
+
     @property
     @abstractmethod
     def length(self) -> float:

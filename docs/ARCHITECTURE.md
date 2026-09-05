@@ -220,6 +220,10 @@ reason string and the numeric triggers.
    closer than `boundary_margin_m` after `boundary_margin_grace_s` (the current
    pose is not the planner's choice), predicted collision with any object
    (footprint distance <= `safety_margin_m` at the same time index).
+   Boundary clearance uses the candidates' corridor coordinates against
+   `RoadModel.lateral_bounds(s)` (exact on straights, ~6 cm error at R = 60 m,
+   tested against the polygon geometry); the geometric path remains the
+   fallback for trajectories without corridor coordinates.
 4. **Scoring** of feasible candidates:
 
 ```
@@ -299,6 +303,13 @@ Termination: goal reached, collision (configurable stop), or timeout.
   teleported (per-step displacement <= v_max*dt, actuator limits respected).
   SUDDEN_PEDESTRIAN_DART additionally asserts that the safety supervisor fired
   and that the EMERGENCY_BRAKE state was visited and recovered from.
+  MIXED_TRAFFIC_CURVE asserts curve following inside the corridor, the merge
+  and road-following of the auto-rickshaw, bit-identical replay of the seeded
+  erratic pedestrian, use of FOLLOW without chatter, and the planner latency
+  budget (mean < planning period, p95 < 1.5x).
+* `tests/scenarios/test_parameter_sweep.py`: a 3x2 grid over cattle crossing
+  speed and trigger distance must be collision-free with the margin held
+  (`scripts/sweep.py` prints the same table as a success rate).
 
 ## 14. Dependencies
 

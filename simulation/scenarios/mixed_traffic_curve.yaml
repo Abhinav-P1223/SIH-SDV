@@ -1,0 +1,62 @@
+# MIXED_TRAFFIC_CURVE
+# Unmarked corridor with a 40-degree left-hand curve (R = 60 m). Two agents:
+#   - an auto-rickshaw waiting at the left edge before the curve that merges
+#     into the flow ahead of the ego and then follows the road at 5 m/s;
+#   - an erratic pedestrian on the far straight who wanders across the corridor
+#     with seeded random heading / speed changes.
+# Exercises: curved reference (non-zero road heading), MERGING + follow_road,
+# ERRATIC, FOLLOW / overtaking decisions, and several agents at once.
+# The ego's response is not scripted.
+name: MIXED_TRAFFIC_CURVE
+description: Left-hand curve with a merging auto-rickshaw ahead and an erratic pedestrian beyond it.
+seed: 11
+
+road:
+  lane_markings: NONE
+  x0: -20.0
+  y0: 0.0
+  heading_deg: 0.0
+  half_width_left_m: 3.5
+  half_width_right_m: 3.5
+  segments:
+    - straight: 70.0            # s in [0, 70]
+    - arc: {radius: 60.0, angle_deg: 40.0}   # s in [70, 111.9]
+    - straight: 60.0            # s in [111.9, 171.9]
+
+ego:
+  s: 20.0                       # x = 0
+  d: 1.75
+  speed_mps: 8.0
+  desired_speed_mps: 8.0
+  desired_lateral_offset_m: 1.75
+
+goal:
+  s_m: 165.0
+
+agents:
+  - id: auto_1
+    type: AUTO_RICKSHAW
+    s: 62.0
+    d: 2.6                      # left edge (half width 3.5, auto width 1.4)
+    heading_rel_deg: -25.0      # nosing right, into the corridor
+    speed_mps: 1.0
+    behavior: MERGING
+    params:
+      trigger_distance_m: 32.0
+      follow_road: true
+      target_speed_mps: 5.0
+      yaw_rate_rad_s: 0.5
+      acceleration_mps2: 1.5
+
+  - id: ped_1
+    type: PEDESTRIAN
+    s: 138.0
+    d: -1.2
+    heading_rel_deg: 90.0       # starts walking toward the left side
+    speed_mps: 0.8
+    behavior: ERRATIC
+    params:
+      heading_sigma_rad: 0.45
+      speed_sigma_mps: 0.3
+      change_interval_s: 1.0
+      max_speed_mps: 1.5

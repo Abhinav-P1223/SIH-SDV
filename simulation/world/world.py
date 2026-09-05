@@ -37,7 +37,7 @@ class World:
     def update(self, dt: float, ego_xy: tuple[float, float]) -> None:
         self.ego_xy = ego_xy
         for agent in self.agents:
-            behavior_for(agent).update(agent, ego_xy, dt)
+            behavior_for(agent).update(agent, ego_xy, dt, self.road)
         self.time += dt
 
     def to_dict(self) -> dict:

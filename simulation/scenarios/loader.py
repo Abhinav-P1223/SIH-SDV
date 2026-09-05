@@ -42,20 +42,36 @@ def build_scenario(data: dict[str, Any], profiles: ObjectProfiles | None = None)
     profiles = profiles or ObjectProfiles.load()
     seed = int(data.get("seed", 0))
     r = data["road"]
-    road = DrivableSpace(
-        reference=np.asarray(r["reference"], dtype=float),
-        left_boundary=np.asarray(r["left_boundary"], dtype=float),
-        right_boundary=np.asarray(r["right_boundary"], dtype=float),
-        lane_markings=str(r.get("lane_markings", "NONE")),
-    )
+    if "segments" in r:
+        road = DrivableSpace.from_segments(
+            r["segments"], float(r["half_width_left_m"]), float(r["half_width_right_m"]),
+            x0=float(r.get("x0", 0.0)), y0=float(r.get("y0", 0.0)),
+            heading=math.radians(float(r.get("heading_deg", 0.0))),
+            lane_markings=str(r.get("lane_markings", "NONE")),
+        )
+    else:
+        road = DrivableSpace(
+            reference=np.asarray(r["reference"], dtype=float),
+            left_boundary=np.asarray(r["left_boundary"], dtype=float),
+            right_boundary=np.asarray(r["right_boundary"], dtype=float),
+            lane_markings=str(r.get("lane_markings", "NONE")),
+        )
     agents: list[Agent] = []
     for i, a in enumerate(data.get("agents", [])):
         otype = ObjectType(a["type"])
         prof = profiles.get(otype)
+        # agents may be placed in corridor coordinates (s, d) instead of (x, y)
+        if "s" in a:
+            ax, ay, h_ref = road.to_cartesian(np.array([float(a["s"])]), np.array([float(a.get("d", 0.0))]))
+            a_x, a_y = float(ax[0]), float(ay[0])
+            heading = float(h_ref[0]) + math.radians(float(a.get("heading_rel_deg", 0.0)))
+        else:
+            a_x, a_y = float(a["x"]), float(a["y"])
+            heading = math.radians(float(a.get("heading_deg", 0.0)))
         agents.append(Agent(
             id=str(a["id"]), object_type=otype,
-            x=float(a["x"]), y=float(a["y"]),
-            heading=math.radians(float(a.get("heading_deg", 0.0))),
+            x=a_x, y=a_y,
+            heading=heading,
             speed=float(a.get("speed_mps", 0.0)),
             length=float(a.get("length_m", prof.length_m)),
             width=float(a.get("width_m", prof.width_m)),
@@ -64,11 +80,16 @@ def build_scenario(data: dict[str, Any], profiles: ObjectProfiles | None = None)
             seed=seed * 1000 + i,
         ))
     e = data["ego"]
-    ego_state = VehicleState(
-        timestamp=0.0, x=float(e["x"]), y=float(e["y"]),
-        yaw=math.radians(float(e.get("yaw_deg", 0.0))),
-        longitudinal_velocity=float(e.get("speed_mps", 0.0)),
-    )
+    if "s" in e:
+        ex, ey, eh = road.to_cartesian(np.array([float(e["s"])]), np.array([float(e.get("d", 0.0))]))
+        ego_state = VehicleState(timestamp=0.0, x=float(ex[0]), y=float(ey[0]), yaw=float(eh[0]),
+                                 longitudinal_velocity=float(e.get("speed_mps", 0.0)))
+    else:
+        ego_state = VehicleState(
+            timestamp=0.0, x=float(e["x"]), y=float(e["y"]),
+            yaw=math.radians(float(e.get("yaw_deg", 0.0))),
+            longitudinal_velocity=float(e.get("speed_mps", 0.0)),
+        )
     ego = EgoSetup(ego_state, float(e["desired_speed_mps"]),
                    float(e.get("desired_lateral_offset_m", 0.0)))
     world = World(road=road, agents=agents, goal_s=float(data["goal"]["s_m"]),

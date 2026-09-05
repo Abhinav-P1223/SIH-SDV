@@ -91,6 +91,16 @@ def test_returned_to_route_and_boundaries_respected(result):
         assert -3.5 + 0.9 <= f.ego.y <= 3.5 - 0.9
 
 
+def test_planner_latency_budget(result, cfg):
+    """Planning must fit its 10 Hz budget on average, with bounded spikes (Python/numpy, not real-time)."""
+    import numpy as np
+    lat = np.array([f.plan.latency_ms for f in result.frames if f.planning_cycle])
+    assert len(lat) > 50
+    assert lat.mean() < cfg.planning.period_s * 1000.0
+    assert np.percentile(lat, 95) < 1.5 * cfg.planning.period_s * 1000.0
+    assert result.metrics.planning_latency_mean_ms == pytest.approx(lat.mean(), rel=1e-6)
+
+
 def test_decisions_are_explained_and_logged(result):
     reasons = {f.decision.reason for f in result.frames if f.decision}
     assert any("intersects" in r for r in reasons)

@@ -252,6 +252,10 @@ class Trajectory:
     curvature: np.ndarray
     acceleration: np.ndarray
     id: str = ""
+    # optional corridor-frame coordinates (set by planners that work in the corridor frame)
+    s: Optional[np.ndarray] = None            # arc length along the reference
+    d: Optional[np.ndarray] = None            # lateral offset (+left)
+    heading_rel: Optional[np.ndarray] = None  # heading relative to the reference
 
     def __len__(self) -> int:
         return int(self.t.shape[0])
@@ -363,6 +367,10 @@ class RiskSummary:
     lead_gap: float = math.inf
     lead_speed: float = 0.0
     min_ttc_current_speed: float = math.inf   # physical TTC along the corridor at current speed
+    # route-view aggregates EXCLUDING the lead object (equal to the full ones when there is no lead)
+    non_lead_max_level: RiskLevel = RiskLevel.NONE
+    non_lead_max_score: float = 0.0
+    non_lead_any_intersection: bool = False
     # aggregates along the currently selected plan (route motion is used for the fields above)
     plan_min_ttc: float = math.inf
     plan_max_score: float = 0.0
@@ -386,6 +394,9 @@ class RiskSummary:
             "lead_gap": None if math.isinf(self.lead_gap) else self.lead_gap,
             "lead_speed": self.lead_speed,
             "min_ttc_current_speed": None if math.isinf(self.min_ttc_current_speed) else self.min_ttc_current_speed,
+            "non_lead_max_level": self.non_lead_max_level.name,
+            "non_lead_max_score": self.non_lead_max_score,
+            "non_lead_any_intersection": self.non_lead_any_intersection,
             "plan_min_ttc": None if math.isinf(self.plan_min_ttc) else self.plan_min_ttc,
             "plan_max_score": self.plan_max_score,
             "plan_max_level": self.plan_max_level.name,

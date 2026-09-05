@@ -101,3 +101,28 @@ def test_lateral_bounds(road):
 def test_extrapolation_beyond_end(road):
     x, y, _ = road.to_cartesian(np.array([120.0]), np.array([0.0]))
     assert x[0] == pytest.approx(120.0)
+
+
+def test_segment_corridor_and_bounds():
+    r = DrivableSpace.from_segments([{"straight": 30}, {"arc": {"radius": 40, "angle_deg": 60}}, {"straight": 20}], 3.0, 4.0)
+    assert r.length == pytest.approx(30 + math.radians(60) * 40 + 20, abs=0.05)
+    dr, dl = r.lateral_bounds(np.array([10.0, 50.0, 85.0]))
+    assert np.allclose(dr, -4.0, atol=0.05) and np.allclose(dl, 3.0, atol=0.05)
+    # projection round trip inside the curve
+    x, y, _ = r.to_cartesian(np.array([55.0]), np.array([1.2]))
+    s, d, _ = r.project(float(x[0]), float(y[0]))
+    assert (s, d) == pytest.approx((55.0, 1.2), abs=0.05)
+
+
+def test_windowed_inside_matches_polygon_reference():
+    r = DrivableSpace.from_segments([{"straight": 30}, {"arc": {"radius": 40, "angle_deg": 60}}, {"straight": 20}], 3.5, 3.5)
+    rng = np.random.default_rng(3)
+    s = rng.uniform(2, r.length - 2, 400)
+    d = rng.uniform(-5, 5, 400)
+    x, y, _ = r.to_cartesian(s, d)
+    pts = np.stack([x, y], axis=1)
+    fast = r.contains_points(pts)
+    ref = r.contains_points_polygon(pts)
+    # disagreement only possible within a few cm of the edge
+    edge = np.abs(np.abs(d) - 3.5) < 0.1
+    assert np.array_equal(fast[~edge], ref[~edge])

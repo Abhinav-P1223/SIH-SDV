@@ -20,6 +20,8 @@ def risk(level, score, ttc=math.inf, intersection=False, lead=None, lead_speed=0
     s = RiskSummary([a], level, score, ttc, 1.0, "obj", intersection)
     s.lead_object_id, s.lead_speed, s.lead_gap = lead, lead_speed, lead_gap
     s.min_ttc_current_speed = ttc if ttc_phys is None else ttc_phys
+    # the fixture's single assessment is never the lead object
+    s.non_lead_max_level, s.non_lead_max_score, s.non_lead_any_intersection = level, score, intersection
     return s
 
 
@@ -112,6 +114,17 @@ def test_follow_policy_matches_lead(cfg):
     desired_gap = cfg.follow_time_gap_s * 6.0
     expected = 6.0 + (9.0 - desired_gap) / cfg.follow_time_gap_s
     assert d.speed_policy.target_speed == pytest.approx(min(10.0, max(0.0, expected)))
+    # stays in FOLLOW while the slower lead is present, even after the dwell time
+    d = fsm.decide(r, ego(), 5.0)
+    assert d.state == BehaviorState.FOLLOW
+    # a lead-only route intersection (we would rear-end it at desired speed) is not CAUTION
+    r2 = risk(RiskLevel.HIGH, 0.6, ttc=2.5, intersection=True, lead="car", lead_speed=6.0, lead_gap=9.0)
+    r2.non_lead_max_level, r2.non_lead_max_score, r2.non_lead_any_intersection = RiskLevel.NONE, 0.0, False
+    d = fsm.decide(r2, ego(), 6.0)
+    assert d.state == BehaviorState.FOLLOW
+    # lead gone -> back to cruise
+    d = fsm.decide(risk(RiskLevel.NONE, 0.0), ego(), 7.0)
+    assert d.state == BehaviorState.CRUISE
 
 
 def test_every_decision_is_explained(cfg):

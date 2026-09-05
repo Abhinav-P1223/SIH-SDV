@@ -24,6 +24,7 @@ from autonomy.core.config import AutonomyConfig, ObjectProfiles, load_vehicle_pa
 from autonomy.telemetry.telemetry import InMemorySink, TelemetryPublisher  # noqa: E402
 from simulation.runner import Simulation, run_scenario  # noqa: E402
 from simulation.scenarios.loader import SCENARIO_DIR, build_scenario  # noqa: E402
+from scripts.sweep import DEFAULT_GRID, sweep, table as sweep_table  # noqa: E402
 
 
 def fmt(v, nd=2):
@@ -128,19 +129,21 @@ def main() -> int:
 
     # scenarios
     for name, img in (("SUDDEN_CATTLE_CROSSING", ["cattle_caution_t3.3.png", "cattle_avoid_t6.7.png"]),
-                      ("SUDDEN_PEDESTRIAN_DART", ["pedestrian_emergency_t3.7.png"])):
+                      ("SUDDEN_PEDESTRIAN_DART", ["pedestrian_emergency_t3.7.png"]),
+                      ("MIXED_TRAFFIC_CURVE", ["curve_follow_t8.0.png", "curve_pedestrian_t16.0.png"])):
         res = run_scenario(name, log_dir="logs", console=False, keep_frames=True)
         m = res.metrics
         ok = m.scenario_completed and m.collision_count == 0 and m.minimum_obstacle_clearance >= cfg.planning.safety_margin_m
         out.append(f"## {name} — {'PASS' if ok else 'FAIL'}\n")
         sc_data = load_yaml(SCENARIO_DIR / f"{name.lower()}.yaml")
         out.append(sc_data.get("description", "") + "\n")
-        ag = sc_data["agents"][0]
-        out.append(f"Agent `{ag['id']}` ({ag['type']}, behaviour {ag['behavior']}): "
-                   + ", ".join(f"{k}={v}" for k, v in ag["params"].items()) + ". "
-                   f"Ego desired speed {sc_data['ego']['desired_speed_mps']} m/s, "
+        for ag in sc_data["agents"]:
+            out.append(f"- Agent `{ag['id']}` ({ag['type']}, behaviour {ag['behavior']}): "
+                       + ", ".join(f"{k}={v}" for k, v in ag["params"].items()))
+        out.append(f"\nEgo desired speed {sc_data['ego']['desired_speed_mps']} m/s, "
                    f"desired lateral offset {sc_data['ego'].get('desired_lateral_offset_m', 0)} m, "
-                   f"lane markings: {sc_data['road'].get('lane_markings', 'NONE')}.\n")
+                   f"lane markings: {sc_data['road'].get('lane_markings', 'NONE')}"
+                   + (", curved corridor built from segments." if "segments" in sc_data["road"] else ".") + "\n")
         out.append(metrics_table(m, cfg) + "\n")
 
         out.append("### Behaviour timeline (from the decision log)\n")
@@ -171,6 +174,16 @@ def main() -> int:
         for i in img:
             out.append(f"![{i}](img/{i})\n")
         out.append(f"Telemetry: `logs/{name.lower()}.jsonl` (every step), `logs/{name.lower()}_summary.csv` (per planning cycle).\n")
+
+    # parameter sweeps: scenario success rate measured over a grid
+    out.append("## Parameter sweeps — scenario success rate\n")
+    out.append("Each cell is a complete closed-loop run with the committed configuration; only the named "
+               "agent parameters change. The success rate is the Stage 2 `scenario_success_rate` metric "
+               "made concrete.\n")
+    for name, grid in DEFAULT_GRID.items():
+        cells = sweep(name, grid)
+        out.append(f"### {name}\n")
+        out.append(sweep_table(cells) + "\n")
 
     # negative finding: unavoidable dart
     out.append("## Negative result kept on record: pedestrian dart at 14 m\n")

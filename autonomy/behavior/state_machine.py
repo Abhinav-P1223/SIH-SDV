@@ -85,18 +85,30 @@ def g_stopped(c: DecisionContext) -> Optional[str]:
     return None
 
 
+def _has_slower_lead(c: DecisionContext) -> bool:
+    r = c.risk
+    return r.lead_object_id is not None and r.lead_speed < c.desired_speed - 0.5
+
+
 def g_avoid(c: DecisionContext) -> Optional[str]:
-    if c.risk.any_intersection and c.risk.max_level.value >= RiskLevel.HIGH.value:
+    r = c.risk
+    # threats other than a lead vehicle we are following, or the current plan itself being on a
+    # collision course (whichever object), escalate to AVOID
+    if r.non_lead_any_intersection and r.non_lead_max_level.value >= RiskLevel.HIGH.value:
         w = c.worst
         return (f"Predicted trajectory of {w.object_id} ({w.object_type.value}) intersects ego "
                 f"trajectory within {w.ttc:.1f} s (risk {w.risk_score:.2f}).")
+    if r.plan_any_intersection and r.plan_max_level.value >= RiskLevel.HIGH.value:
+        return (f"Selected trajectory intersects {r.worst_object_id} within {r.plan_min_ttc:.1f} s "
+                f"(plan risk {r.plan_max_score:.2f}); re-planning under avoidance.")
     return None
 
 
 def g_caution(c: DecisionContext) -> Optional[str]:
-    if c.risk.max_level.value >= RiskLevel.MEDIUM.value:
-        if c.risk.any_intersection:
-            return (f"Route at desired speed intersects a predicted object in {c.risk.min_ttc:.1f} s "
+    r = c.risk
+    if r.non_lead_max_level.value >= RiskLevel.MEDIUM.value:
+        if r.non_lead_any_intersection:
+            return (f"Route at desired speed intersects a predicted object in {r.min_ttc:.1f} s "
                     f"(beyond the avoidance horizon); reducing speed. {c.describe_worst()}.")
         return f"Elevated collision risk without a predicted intersection: {c.describe_worst()}."
     return None
@@ -104,22 +116,27 @@ def g_caution(c: DecisionContext) -> Optional[str]:
 
 def g_follow(c: DecisionContext) -> Optional[str]:
     r = c.risk
-    if r.lead_object_id is not None and r.lead_speed < c.desired_speed - 0.5:
+    if _has_slower_lead(c) and r.non_lead_max_level.value <= RiskLevel.LOW.value:
         return (f"Slower object {r.lead_object_id} ahead at {r.lead_gap:.1f} m travelling "
                 f"{r.lead_speed:.1f} m/s; matching speed.")
     return None
 
 
 def g_release_to_cruise(c: DecisionContext) -> Optional[str]:
-    if c.risk.max_score < c.cfg.caution_exit_score and not c.risk.any_intersection \
-            and c.risk.max_level.value <= RiskLevel.LOW.value:
-        return f"Risk cleared (max risk {c.risk.max_score:.2f}); resuming cruise."
+    r = c.risk
+    if _has_slower_lead(c):
+        return None
+    if r.non_lead_max_score < c.cfg.caution_exit_score and not r.non_lead_any_intersection \
+            and r.non_lead_max_level.value <= RiskLevel.LOW.value:
+        return f"Risk cleared (max risk {r.non_lead_max_score:.2f}); resuming cruise."
     return None
 
 
 def g_avoid_release(c: DecisionContext) -> Optional[str]:
-    if not c.risk.any_intersection and c.risk.max_score < c.cfg.avoid_exit_score:
-        return f"Selected trajectory clear of predicted objects (max risk {c.risk.max_score:.2f})."
+    r = c.risk
+    if not r.non_lead_any_intersection and r.non_lead_max_score < c.cfg.avoid_exit_score \
+            and not r.plan_any_intersection:
+        return f"Selected trajectory clear of predicted objects (max risk {r.non_lead_max_score:.2f})."
     return None
 
 
@@ -159,6 +176,7 @@ TRANSITIONS: list[tuple[tuple[BehaviorState, ...], BehaviorState, Guard]] = [
     ((S.AVOID,), S.CAUTION, g_avoid_release),
     ((S.CRUISE, S.FOLLOW), S.CAUTION, g_caution),
     ((S.CRUISE, S.CAUTION), S.FOLLOW, g_follow),
+    ((S.AVOID,), S.FOLLOW, g_follow),
     ((S.CAUTION, S.FOLLOW), S.CRUISE, g_release_to_cruise),
 ]
 

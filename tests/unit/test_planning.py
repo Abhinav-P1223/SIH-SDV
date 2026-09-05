@@ -137,6 +137,27 @@ def test_collision_rejection_records_time_and_object(cfg, params, road, profiles
     assert stop.feasible
 
 
+def test_corridor_clearance_matches_geometry(cfg, params):
+    """Frenet fast path vs exact polygon geometry: equal on a straight, close on a curve."""
+    from autonomy.core.geometry import box_corners
+    for road, tol in ((DrivableSpace.straight(200.0, 3.5, 3.5, x0=-20.0), 1e-6),
+                      (DrivableSpace.from_segments([{"straight": 40}, {"arc": {"radius": 60, "angle_deg": 40}},
+                                                    {"straight": 40}], 3.5, 3.5, x0=-20.0), 0.08)):
+        gen = CandidateGenerator(cfg.planning, params, road)
+        chk = CollisionChecker(cfg.planning, params, road)
+        e = VehicleState(0.0, 20.0, 1.0, 0.0, 8.0)
+        cands, _ = gen.generate(e, decision(target=8.0).speed_policy, 1.0, now=0.0)
+        C, N = len(cands), len(cands[0].trajectory)
+        fast = chk._corridor_clearance(cands, C, N)
+        X = np.stack([c.trajectory.x for c in cands]); Y = np.stack([c.trajectory.y for c in cands])
+        YAW = np.stack([c.trajectory.yaw for c in cands])
+        off = params.footprint_center_offset
+        corners = box_corners((X + off * np.cos(YAW)).ravel(), (Y + off * np.sin(YAW)).ravel(), YAW.ravel(),
+                              params.length, params.width)
+        exact = road.boundary_clearance(corners).reshape(C, N)
+        assert np.max(np.abs(fast - exact)) < tol
+
+
 # -------------------------------------------------------------- planner --
 def make_planner(cfg, params, road):
     return Planner(cfg.planning, cfg.risk, params, road, 10.0, 1.75)

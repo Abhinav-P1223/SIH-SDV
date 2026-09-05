@@ -117,7 +117,8 @@ class CandidateGenerator:
         yaw = wrap_angle(h_ref + np.arctan(dd))
         kappa = ddd / np.power(1.0 + dd ** 2, 1.5)
         traj = Trajectory(t=now + self.rel_times, x=x, y=y, yaw=np.asarray(yaw), velocity=v,
-                          curvature=kappa, acceleration=acc, id=label)
+                          curvature=kappa, acceleration=acc, id=label,
+                          s=fr.s0 + s_rel, d=d, heading_rel=np.arctan(dd))
         return CandidateTrajectory(id=label, label=label, trajectory=traj,
                                    lateral_offset_end=d_end, target_speed=v_end)
 
