@@ -114,7 +114,10 @@ class PlanningConfig:
     frequency_hz: float = 10.0
     horizon_s: float = 4.0
     dt_s: float = 0.1
-    lateral_offsets_m: list[float] = field(default_factory=lambda: [-2.0, -1.0, 0.0, 1.0, 2.0])
+    lateral_offsets_m: list[float] = field(default_factory=lambda: [-2.0, -1.0, 0.0, 1.0, 2.0])  # legacy (unused when lateral_step_m > 0)
+    lateral_step_m: float = 0.5               # lattice of end offsets desired + k*step spanning the whole corridor
+    lateral_cost_scale_m: float = 3.0         # normalisation of the lateral-deviation and consistency costs
+    exposure_sigma_cap_m: float = 1.5         # beyond-horizon checks inflate objects by min(meas sigma, cap)
     speed_fractions: list[float] = field(default_factory=lambda: [1.0, 0.75, 0.5, 0.25, 0.0])
     lateral_transition_time_s: float = 2.0
     min_lateral_transition_length_m: float = 10.0

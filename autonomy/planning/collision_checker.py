@@ -177,10 +177,12 @@ class CollisionChecker:
             # measured against each object's predicted position at the end AND its current position: a crossing
             # animal may stop where it is, so the ego must not come to rest right at its current spot either
             if predictions:
+                infl = np.array([min(pr.meas_sigma, cfg.exposure_sigma_cap_m) for pr in predictions])   # (M,)
                 ex0 = FX.reshape(C, N)[:, -1]; ey0 = FY.reshape(C, N)[:, -1]; eyaw0 = YAW[:, -1]
                 d_now = np.stack([box_sequence_distance(ex0, ey0, eyaw0, p.length, p.width,
                                                         np.full(C, pr.x[0]), np.full(C, pr.y[0]), np.full(C, pr.heading[0]),
-                                                        pr.length, pr.width) for pr in predictions])       # (M,C)
+                                                        pr.length + 2 * infl[j], pr.width + 2 * infl[j])
+                                  for j, pr in enumerate(predictions)])                                 # (M,C)
             for i in range(C):
                 if alive[i] and cands[i].target_speed < cfg.stop_standoff_speed_mps and predictions:
                     d_end_all = np.minimum(dist[:, i, -1], d_now[:, i])
@@ -221,7 +223,8 @@ class CollisionChecker:
                     oy = pred.y[-1] + pred.vy[-1] * dt_ext
                     oh = np.full_like(ox, pred.heading[-1])
                     dist_ext = box_sequence_distance(ex, ey, eyaw, p.length, p.width,
-                                                     ox, oy, oh, pred.length, pred.width).reshape(len(idx), E)
+                                                     ox, oy, oh, pred.length + 2 * infl[j], pred.width + 2 * infl[j]
+                                                     ).reshape(len(idx), E)
                     hit_ext = dist_ext <= margins[j]
                     for r, i in enumerate(idx):
                         c = cands[i]

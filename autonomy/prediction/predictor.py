@@ -22,12 +22,17 @@ across the road and make the planner dither. Pedestrians, cattle and pushcarts
 keep free constant-velocity motion. UNKNOWN tracks (not yet classified) are
 treated as road-following only while they move faster than 3 m/s.
 
+Latency compensation: an ObjectState whose `timestamp` is older than `now` is
+first propagated to `now` at its own velocity (the age is what a delayed sensor
+or a slow fusion cycle would introduce).
+
 Output is time-indexed with absolute times t0, t0+dt, ..., t0+horizon.
 """
 from __future__ import annotations
 
 import math
 from abc import ABC, abstractmethod
+from dataclasses import replace
 
 import numpy as np
 
@@ -74,7 +79,11 @@ class ConstantVelocityPredictor(Predictor):
     def predict(self, objects: list[ObjectState], now: float) -> list[ObjectPrediction]:
         out: list[ObjectPrediction] = []
         t = self.rel_times
-        for obj in objects:
+        for obj_raw in objects:
+            # latency compensation: a measurement older than `now` is propagated to now at its own velocity
+            age = max(now - obj_raw.timestamp, 0.0) if obj_raw.timestamp is not None else 0.0
+            obj = obj_raw if age < 1e-6 else replace(obj_raw, x=obj_raw.x + obj_raw.vx * age,
+                                                     y=obj_raw.y + obj_raw.vy * age, timestamp=now)
             prof = self.profiles.get(obj.object_type)
             rf = self._road_following(obj, prof)
             if rf is not None:

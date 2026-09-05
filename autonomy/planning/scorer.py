@@ -49,7 +49,7 @@ class TrajectoryScorer:
         self.desired_speed = max(desired_speed, 1.0)
         self.tau = risk_time_constant_s
         self.margin = safety_margin_m
-        self.d_max = max(max(abs(o) for o in cfg.lateral_offsets_m), 0.5)
+        self.d_max = max(cfg.lateral_cost_scale_m, 0.5)
 
     def score(self, cand: CandidateTrajectory, check: CheckResult, policy: SpeedPolicy,
               desired_offset: float, s0: float, s_end: float, standstill_s: float = 0.0,

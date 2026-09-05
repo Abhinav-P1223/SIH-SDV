@@ -58,6 +58,7 @@ class NoisyProvider(ObjectStateProvider):
         while self.buffer and timestamp - self.buffer[0][0] > self.delay + 1e-9:
             self.buffer.popleft()
         objs = self.buffer[0][1] if self.delay > 0 else truth
+        meas_time = self.buffer[0][0] if self.delay > 0 else timestamp     # honest measurement time stamp
         out = []
         for o in objs:
             self.total += 1
@@ -65,7 +66,7 @@ class NoisyProvider(ObjectStateProvider):
                 self.dropped += 1
                 continue
             cov = np.eye(2) * max(self.sp, 1e-3) ** 2
-            out.append(ObjectState(o.id, o.object_type, timestamp,
+            out.append(ObjectState(o.id, o.object_type, meas_time,
                                    o.x + self.rng.normal(0, self.sp), o.y + self.rng.normal(0, self.sp),
                                    o.vx + self.rng.normal(0, self.sv), o.vy + self.rng.normal(0, self.sv),
                                    o.heading, o.length, o.width, 1.0, cov))

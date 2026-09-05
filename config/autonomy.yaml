@@ -45,7 +45,11 @@ planning:
   frequency_hz: 10.0
   horizon_s: 4.0
   dt_s: 0.1
-  lateral_offsets_m: [-2.5, -2.0, -1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 1.5, 2.0, 2.5]
+  lateral_step_m: 0.5             # end offsets = desired + k*step, every one that fits inside the corridor
+  lateral_cost_scale_m: 3.0       # lateral-deviation / consistency cost = |delta d| / this
+  exposure_sigma_cap_m: 1.5       # beyond-horizon (blocked / standoff) checks inflate objects by their measured
+                                  # position std-dev (capped): a poorly localised far object slows us down instead of
+                                  # flipping which side looks clear
   speed_fractions: [1.0, 0.8, 0.6, 0.4, 0.2, 0.0]   # of the behaviour target speed
   lateral_transition_time_s: 2.0  # time to reach d_end at current speed
   min_lateral_transition_length_m: 6.0   # short enough to bypass from a crawl; curvature check guards feasibility

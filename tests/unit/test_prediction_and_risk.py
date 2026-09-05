@@ -32,12 +32,22 @@ def obj(id_, x, y, vx, vy, otype=ObjectType.CATTLE, heading=None):
 
 # ------------------------------------------------------------- prediction --
 def test_prediction_is_time_indexed_and_constant_velocity(cfg, profiles):
-    pred = ConstantVelocityPredictor(cfg.prediction, profiles).predict([obj("c", 10, 0, 1.0, -0.5)], now=3.0)[0]
+    o = obj("c", 10, 0, 1.0, -0.5)
+    o.timestamp = 3.0                                         # fresh measurement
+    pred = ConstantVelocityPredictor(cfg.prediction, profiles).predict([o], now=3.0)[0]
     assert pred.times[0] == 3.0 and pred.times[-1] == pytest.approx(3.0 + cfg.prediction.horizon_s)
     assert len(pred.times) == cfg.prediction.steps
     k = 10
     assert pred.x[k] == pytest.approx(10 + 1.0 * (pred.times[k] - 3.0))
     assert pred.y[k] == pytest.approx(0 - 0.5 * (pred.times[k] - 3.0))
+
+
+def test_prediction_compensates_measurement_latency(cfg, profiles):
+    """A measurement 0.4 s old is propagated to now before prediction."""
+    stale = obj("c", 10, 0, 2.0, 0.0)
+    stale.timestamp = 2.6
+    pred = ConstantVelocityPredictor(cfg.prediction, profiles).predict([stale], now=3.0)[0]
+    assert pred.x[0] == pytest.approx(10 + 2.0 * 0.4)
 
 
 def test_prediction_uncertainty_grows_monotonically(cfg, profiles):

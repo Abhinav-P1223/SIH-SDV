@@ -53,8 +53,8 @@ def test_quintic_boundary_conditions():
 def test_candidates_are_time_indexed_and_start_at_ego(cfg, params, road):
     gen = CandidateGenerator(cfg.planning, params, road)
     cands, fr = gen.generate(ego(), decision().speed_policy, 1.75, now=5.0)
-    half = 0.5 * params.width + cfg.planning.boundary_margin_m
-    fitting = [o for o in cfg.planning.lateral_offsets_m if -3.5 + half <= 1.75 + o <= 3.5 - half]
+    fitting = [o - 1.75 for o in gen.lateral_offsets(fr, 1.75)]
+    assert len(fitting) >= 8                                  # the lattice spans the corridor, not just +-2.5 m
     assert len(cands) == len(fitting) * len(set(cfg.planning.speed_fractions) | {0.0}) + 1
     for c in cands:
         tr = c.trajectory
@@ -110,6 +110,8 @@ def test_lateral_acceleration_rejection(cfg, params, road):
     chk.check_all(cands, [])
     fast_wide = [c for c in cands if abs(c.lateral_offset_end - 1.75) >= 2.4 and c.target_speed == 10.0]
     assert fast_wide and all(c.rejection_reason == RejectionReason.LATERAL_ACCEL for c in fast_wide)
+    # the lattice reaches the far side of the corridor (right edge for a keep-left ego)
+    assert min(c.lateral_offset_end for c in cands) < -2.0
 
 
 def test_boundary_rejection(cfg, params, road):

@@ -127,6 +127,22 @@ class CandidateGenerator:
         return CandidateTrajectory(id=label, label=label, trajectory=traj,
                                    lateral_offset_end=d_end, target_speed=v_end)
 
+    def lateral_offsets(self, fr: FrameOrigin, desired_offset: float) -> list[float]:
+        """End offsets desired + k*step for every k whose footprint fits inside the corridor at s0."""
+        d_right, d_left = self.road.lateral_bounds_at(fr.s0) if hasattr(self.road, "lateral_bounds_at") \
+            else (-math.inf, math.inf)
+        half = 0.5 * self.params.width + self.cfg.boundary_margin_m
+        lo, hi = d_right + half, d_left - half
+        step = self.cfg.lateral_step_m
+        if step <= 0 or not (math.isfinite(lo) and math.isfinite(hi)):
+            offs = [desired_offset + o for o in self.cfg.lateral_offsets_m]
+        else:
+            k_min = math.ceil((lo - desired_offset) / step - 1e-9)
+            k_max = math.floor((hi - desired_offset) / step + 1e-9)
+            offs = [desired_offset + k * step for k in range(k_min, k_max + 1)]
+        offs = [o for o in offs if lo - 1e-9 <= o <= hi + 1e-9]
+        return offs if offs else [min(max(fr.d0, lo), hi) if math.isfinite(lo) else fr.d0]
+
     # ------------------------------------------------------------------ #
     def generate(self, ego: VehicleState, policy: SpeedPolicy, desired_offset: float,
                  now: float) -> tuple[list[CandidateTrajectory], FrameOrigin]:
@@ -141,15 +157,7 @@ class CandidateGenerator:
                 cands.append(self.build(ego, fr, fr.d0, 0.0, dec, now, f"{name}_d{fr.d0:+.1f}"))
             return cands, fr
 
-        offsets = [desired_offset + o for o in self.cfg.lateral_offsets_m] if policy.allow_lateral_avoidance \
-            else [desired_offset]
-        # keep candidates whose end offset can physically fit inside the corridor
-        d_right, d_left = self.road.lateral_bounds_at(fr.s0) if hasattr(self.road, "lateral_bounds_at") \
-            else (-math.inf, math.inf)
-        half = 0.5 * self.params.width + self.cfg.boundary_margin_m
-        offsets = [o for o in offsets if d_right + half <= o <= d_left - half]
-        if not offsets:
-            offsets = [fr.d0]
+        offsets = self.lateral_offsets(fr, desired_offset) if policy.allow_lateral_avoidance else [desired_offset]
 
         speeds = sorted({round(max(0.0, f * policy.target_speed), 3) for f in self.cfg.speed_fractions} | {0.0},
                         reverse=True)
