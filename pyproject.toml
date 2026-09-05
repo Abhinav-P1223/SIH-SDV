@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sih-sdv-autonomy"
+version = "0.1.0"
+description = "SIH26037 Stage 1 closed-loop autonomy core: adaptive path planning and collision avoidance on unstructured roads"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.26",
+    "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+viz = ["matplotlib>=3.8"]
+test = ["pytest>=8.0"]
+
+[tool.setuptools.packages.find]
+include = ["autonomy*", "simulation*", "visualization*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"

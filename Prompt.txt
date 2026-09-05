@@ -1,0 +1,1079 @@
+Yes. Since you have Claude Code/Opus available, I would **not tell it “build an autonomous vehicle simulator.”** That will produce a huge, incoherent codebase.
+
+Start by making it architect the project and build **Stage 1: closed-loop vehicle dynamics + trajectory planning + control**. No UI-first work, no fake animations, and no ML yet.
+
+Copy this as your **first prompt** to the coding agent:
+
+You are the lead autonomous-driving systems engineer for our Smart India Hackathon 2026 project.
+
+## PROBLEM STATEMENT
+
+We are building a solution for SIH26037:
+
+“Adaptive Path Planning and Collision Avoidance for Autonomous Vehicles on Unstructured Indian Roads.”
+
+The system must ultimately support:
+
+* unstructured Indian roads
+* missing or unreliable lane markings
+* mixed traffic
+* pedestrians
+* motorcycles
+* bicycles
+* cars
+* buses
+* trucks
+* auto-rickshaws
+* pushcarts
+* animals/cattle
+* informal merging
+* wrong-way traffic
+* sudden direction changes
+* unexpected obstacles
+* real-time adaptive replanning
+
+The final architecture will eventually integrate:
+
+* RoadRunner
+* MATLAB
+* Simulink
+* Automated Driving Toolbox
+* Navigation Toolbox
+* Stateflow
+* Vehicle Dynamics / bicycle vehicle model
+* Camera
+* LiDAR
+* Radar
+* Sensor fusion
+* Object tracking
+* Trajectory prediction
+* Risk assessment
+* Adaptive path planning
+* Vehicle control
+* Custom visualization/dashboard
+
+However, DO NOT attempt to build the entire system in one step.
+
+We are starting with the CLOSED-LOOP AUTONOMY CORE.
+
+The code created now must be modular enough that simulated ground-truth objects can later be replaced by Camera/LiDAR/Radar perception and sensor fusion without rewriting the planning/control system.
+
+---
+
+# OBJECTIVE FOR STAGE 1
+
+Build a technically credible closed-loop autonomous vehicle simulation containing:
+
+WORLD
+↓
+EGO VEHICLE
+↓
+DYNAMIC/STATIC OBSTACLES
+↓
+OBJECT STATE INPUT
+↓
+TRAJECTORY PREDICTION
+↓
+COLLISION / RISK ASSESSMENT
+↓
+BEHAVIOR DECISION
+↓
+CANDIDATE TRAJECTORY GENERATION
+↓
+TRAJECTORY SCORING
+↓
+BEST TRAJECTORY SELECTION
+↓
+TRAJECTORY TRACKING CONTROLLER
+↓
+STEERING + ACCELERATION + BRAKING
+↓
+VEHICLE DYNAMICS
+↓
+UPDATED WORLD
+↓
+REPEAT
+
+This must be a genuine closed-loop simulation.
+
+DO NOT move or teleport the ego vehicle directly along a generated path.
+
+The planner produces a desired trajectory.
+
+The controller converts that trajectory into steering, acceleration and braking commands.
+
+The vehicle dynamics model determines the resulting vehicle motion.
+
+---
+
+# 1. SOFTWARE ARCHITECTURE
+
+Before implementing algorithms, define clean interfaces and data structures for:
+
+VehicleState
+VehicleParameters
+ControlCommand
+ObjectState
+ObjectPrediction
+TrajectoryPoint
+Trajectory
+CandidateTrajectory
+RiskAssessment
+PlannerOutput
+SimulationState
+SimulationMetrics
+
+Suggested VehicleState:
+
+* timestamp
+* x
+* y
+* yaw
+* longitudinal_velocity
+* lateral_velocity
+* yaw_rate
+* longitudinal_acceleration
+* steering_angle
+
+Suggested ObjectState:
+
+* id
+* class/type
+* x
+* y
+* vx
+* vy
+* heading
+* dimensions
+* confidence
+* covariance/uncertainty
+
+Even though Stage 1 uses ground-truth obstacle states, DO NOT tightly couple the planner to the simulator.
+
+The planner should consume ObjectState[].
+
+Later this same ObjectState[] will come from sensor fusion.
+
+---
+
+# 2. VEHICLE MODEL
+
+Do NOT implement the ego vehicle as a point mass.
+
+Implement at minimum a proper kinematic bicycle model, structured so that a dynamic bicycle model can replace it later.
+
+Vehicle parameters should include:
+
+* wheelbase
+* distance from CG to front axle
+* distance from CG to rear axle
+* vehicle width
+* vehicle length
+* mass
+* maximum steering angle
+* maximum steering rate
+* maximum acceleration
+* maximum deceleration
+* maximum speed
+
+State evolution must include at minimum:
+
+x
+y
+yaw
+velocity
+steering angle
+acceleration
+
+Use physically consistent SI units:
+
+distance = meters
+velocity = m/s
+acceleration = m/s²
+angles internally = radians
+time = seconds
+
+Use a configurable simulation timestep.
+
+Do not hard-code vehicle parameters throughout the project.
+
+---
+
+# 3. ACTUATOR CONSTRAINTS
+
+The planner/controller must NOT have access to physically impossible instantaneous control.
+
+Model:
+
+steering angle saturation
+steering rate saturation
+acceleration saturation
+braking/deceleration saturation
+
+For example, if the controller requests an instantaneous 30-degree steering change, the vehicle should obey the configured steering-rate constraint instead of immediately rotating the wheels.
+
+---
+
+# 4. COLLISION GEOMETRY
+
+Do NOT represent the ego vehicle or obstacles only as points.
+
+Represent the ego vehicle footprint as an oriented rectangle.
+
+Represent other vehicles/large objects with oriented bounding boxes where appropriate.
+
+Implement collision checking between the ego footprint and obstacle geometry along candidate future trajectories.
+
+Include configurable safety margins.
+
+Collision checking should evaluate the future trajectory over a prediction horizon rather than only checking the current frame.
+
+---
+
+# 5. DYNAMIC OBSTACLES
+
+Create a generic dynamic-agent model.
+
+Agents should have:
+
+position
+velocity
+heading
+dimensions
+behavior type
+
+Initially support:
+
+STATIC
+CONSTANT_VELOCITY
+CROSSING
+MERGING
+ERRATIC
+
+The architecture must later allow behavior profiles such as:
+
+PEDESTRIAN
+MOTORCYCLE
+AUTO_RICKSHAW
+CATTLE
+PUSHCART
+CAR
+TRUCK
+
+Do not hard-code cattle-specific behavior into the planner.
+
+---
+
+# 6. TRAJECTORY PREDICTION
+
+Implement short-horizon motion prediction for surrounding agents.
+
+Stage 1 may use:
+
+constant velocity
+constant heading
+behavior-dependent uncertainty
+
+Prediction output should be time-indexed:
+
+t0 → position + uncertainty
+t1 → position + uncertainty
+t2 → position + uncertainty
+...
+prediction horizon
+
+Prediction uncertainty should increase with time.
+
+The planner must reason about future object positions, not just current positions.
+
+---
+
+# 7. RISK ENGINE
+
+Implement a separate risk-assessment module.
+
+Calculate useful quantities such as:
+
+distance to obstacle
+relative velocity
+time-to-collision where meaningful
+predicted trajectory intersection
+minimum predicted separation
+collision probability/risk approximation
+uncertainty
+object type weighting if appropriate
+
+Return a structured RiskAssessment.
+
+Example conceptual output:
+
+risk_level = HIGH
+TTC = 1.7 seconds
+minimum_predicted_distance = 0.8 m
+trajectory_intersection = true
+
+Do NOT bury risk calculations inside the UI or planner.
+
+Risk assessment must be its own module.
+
+---
+
+# 8. BEHAVIOR DECISION LAYER
+
+Create a behavior decision module/state machine.
+
+At minimum support:
+
+CRUISE
+FOLLOW
+CAUTION
+AVOID
+EMERGENCY_BRAKE
+STOPPED
+
+State transitions should depend on risk conditions.
+
+Do not scatter if/else decisions throughout the codebase.
+
+Keep the decision system modular because this will eventually map naturally to Stateflow.
+
+The module should also provide a machine-readable explanation for every decision.
+
+Example:
+
+state: AVOID
+
+reason:
+"Predicted dynamic-object trajectory intersects ego trajectory within 2.1 seconds."
+
+This explanation will later be displayed in our dashboard.
+
+---
+
+# 9. TRAJECTORY GENERATION
+
+Do NOT implement simple “obstacle detected → steer left/right.”
+
+Implement candidate trajectory generation.
+
+Generate multiple dynamically feasible candidate trajectories over a finite horizon.
+
+Candidate trajectories may vary:
+
+lateral offset
+curvature
+target speed
+terminal state
+
+Examples conceptually:
+
+continue
+slight-left
+left
+slight-right
+right
+decelerate
+stop
+
+But these should emerge as parameterized trajectories rather than being hard-coded animations.
+
+Each trajectory should contain time-indexed:
+
+x
+y
+yaw
+velocity
+curvature
+
+Ensure generated trajectories respect:
+
+maximum curvature
+steering limits
+road/drivable-space boundaries
+vehicle dynamics constraints
+
+Design this module so more advanced planners can later replace the initial generator.
+
+---
+
+# 10. UNSTRUCTURED ROAD REPRESENTATION
+
+This is extremely important.
+
+DO NOT design the planner around mandatory lane centerlines.
+
+The SIH problem specifically concerns unstructured Indian roads.
+
+Represent the navigable environment primarily using:
+
+drivable-space boundaries
+road edges
+obstacles
+goal/reference direction
+local free space
+
+Lane information may later be an OPTIONAL hint.
+
+The planner must still function when:
+
+lane_markings = NONE.
+
+This is a fundamental architectural requirement.
+
+---
+
+# 11. TRAJECTORY COST FUNCTION
+
+Score every candidate trajectory.
+
+Use a weighted cost such as:
+
+J =
+w_collision * collisionRisk
+
+* w_clearance * clearanceCost
+* w_smoothness * smoothnessCost
+* w_curvature * curvatureCost
+* w_progress * progressCost
+* w_boundary * roadBoundaryCost
+* w_speed * speedCost
+* w_uncertainty * uncertaintyCost
+
+Reject infeasible/colliding trajectories before normal ranking.
+
+Do NOT hard-code arbitrary weights throughout the source.
+
+Put planner parameters into configuration.
+
+For every planning cycle retain the individual cost components.
+
+We need to later explain:
+
+WHY was this trajectory selected?
+
+Example:
+
+Candidate A
+collision = 0.92
+clearance = 0.81
+smoothness = 0.12
+total = 8.7
+
+Candidate B
+collision = 0.03
+clearance = 0.11
+smoothness = 0.20
+total = 1.6
+
+SELECTED = B
+
+This information will later be exposed to the UI.
+
+---
+
+# 12. TRAJECTORY TRACKING CONTROLLER
+
+The controller must follow the selected trajectory.
+
+Separate:
+
+LATERAL CONTROL
+
+and
+
+LONGITUDINAL CONTROL.
+
+For lateral tracking, implement a credible controller such as:
+
+Pure Pursuit
+
+or preferably
+
+Stanley controller
+
+with clean interfaces allowing MPC to replace it later.
+
+For longitudinal tracking implement:
+
+PID speed control
+
+with:
+
+target velocity
+current velocity
+acceleration output
+brake output
+
+Respect actuator constraints.
+
+Planner output must NEVER directly modify vehicle position.
+
+---
+
+# 13. EMERGENCY BRAKING
+
+Implement an independent safety override.
+
+If collision risk exceeds a critical threshold or TTC becomes critically small:
+
+planner/controller command
+↓
+SAFETY SUPERVISOR
+↓
+emergency braking override
+↓
+vehicle dynamics
+
+This provides a safety layer independent of normal planning.
+
+Record whenever this override activates.
+
+---
+
+# 14. CLOSED-LOOP EXECUTION
+
+Implement the simulation at a configurable frequency.
+
+Conceptually:
+
+while simulation_running:
+
+```
+update_world()
+
+get_object_states()
+
+predictions = predictor.predict(objects)
+
+risks = risk_engine.evaluate(
+    ego,
+    objects,
+    predictions
+)
+
+behavior = decision_engine.decide(risks)
+
+candidates = planner.generate(...)
+
+selected = planner.select(candidates)
+
+control = controller.track(selected)
+
+control = safety_supervisor.check(control, risks)
+
+vehicle.update(control, dt)
+
+metrics.update(...)
+
+telemetry.publish(...)
+```
+
+Do not simply precompute an animation.
+
+Every simulation step must influence the next one.
+
+---
+
+# 15. FIRST TEST SCENARIO
+
+Create a serious first scenario called:
+
+SUDDEN_CATTLE_CROSSING
+
+Environment:
+
+* unmarked two-way road
+* no lane markings
+* explicit road boundaries
+* ego vehicle travelling forward
+* cattle initially near the road edge
+* cattle begins crossing laterally
+* crossing creates a future collision with the current ego trajectory
+
+The ego vehicle should:
+
+1. travel normally
+2. observe the moving object
+3. predict its future path
+4. calculate increasing collision risk
+5. transition CRUISE → CAUTION
+6. evaluate alternative trajectories
+7. reduce speed if necessary
+8. choose a collision-free feasible trajectory OR stop if no safe trajectory exists
+9. track that trajectory using the controller
+10. pass/avoid the obstacle safely
+11. return toward its desired route
+12. continue toward the goal
+
+The outcome must emerge from the planning/controller logic.
+
+Do not script:
+
+"at t=5 turn right."
+
+That is unacceptable.
+
+---
+
+# 16. METRICS
+
+Record at minimum:
+
+minimum obstacle clearance
+number of collisions
+scenario completion
+time to completion
+replanning count
+planning latency
+maximum acceleration
+maximum deceleration
+maximum steering rate
+trajectory curvature
+path length
+average speed
+emergency brake activations
+minimum TTC
+
+Also create hooks for later metrics:
+
+jerk
+path smoothness
+scenario success rate
+perception latency
+prediction error
+
+Do not fabricate results.
+
+Calculate them from simulation execution.
+
+---
+
+# 17. TELEMETRY INTERFACE
+
+DO NOT build the polished dashboard yet.
+
+But build a telemetry abstraction now.
+
+Every simulation cycle should make available:
+
+timestamp
+ego state
+control command
+detected/tracked objects
+predicted object trajectories
+risk assessments
+behavior state
+candidate trajectories
+selected trajectory
+trajectory cost breakdown
+road boundaries
+planner latency
+TTC
+safety override status
+metrics
+
+Keep telemetry independent of visualization.
+
+Later we may send this through:
+
+WebSocket
+REST
+MATLAB interface
+ROS-style messages
+or another adapter.
+
+The core autonomy stack must not depend on React or any particular UI.
+
+---
+
+# 18. VISUAL DEBUGGER
+
+Create only the engineering visualization required to validate the system.
+
+Show a top-down simulation containing:
+
+* road/drivable boundaries
+* ego vehicle footprint
+* obstacle footprints
+* object IDs/types
+* predicted trajectories
+* prediction uncertainty
+* candidate ego trajectories
+* rejected trajectories
+* selected trajectory
+* safety margins
+* vehicle heading
+* current speed
+* behavior state
+* TTC/risk
+* target point used by controller
+
+This is a DEBUGGING/ENGINEERING visualization, not the final hackathon UI.
+
+---
+
+# 19. LOGGING
+
+Every planning cycle should log structured information.
+
+Example:
+
+timestamp
+behavior state
+objects
+risk
+candidate count
+rejected candidate count
+selected trajectory ID
+cost breakdown
+steering command
+acceleration command
+planner execution time
+
+Prefer machine-readable JSON/CSV logs in addition to human-readable console output.
+
+---
+
+# 20. TESTING
+
+Write automated tests for critical mathematical modules.
+
+At minimum test:
+
+vehicle dynamics
+steering saturation
+acceleration saturation
+collision detection
+trajectory prediction
+TTC calculation
+road-boundary checking
+candidate rejection
+trajectory scoring
+controller behavior
+
+Add scenario-level assertions.
+
+For SUDDEN_CATTLE_CROSSING assert:
+
+collision_count == 0
+
+and
+
+scenario_completed == true
+
+and
+
+minimum_clearance >= configured_safety_margin
+
+Do not fake these assertions.
+
+The simulation must actually satisfy them.
+
+---
+
+# 21. MATLAB/SIMULINK COMPATIBILITY
+
+Even if Stage 1 is implemented outside MATLAB for rapid development, structure algorithms and data contracts so they can later map cleanly into MATLAB/Simulink components.
+
+Specifically keep separate:
+
+Perception
+Fusion
+Prediction
+Risk
+Behavior
+Planning
+Control
+Vehicle Dynamics
+Metrics
+Telemetry
+
+Avoid framework-specific coupling.
+
+Do not create one giant application file.
+
+---
+
+# 22. REPOSITORY STRUCTURE
+
+Create a professional modular repository similar to:
+
+autonomy/
+core/
+vehicle/
+prediction/
+risk/
+behavior/
+planning/
+control/
+safety/
+metrics/
+telemetry/
+
+simulation/
+world/
+agents/
+scenarios/
+
+visualization/
+
+config/
+
+tests/
+unit/
+integration/
+scenarios/
+
+logs/
+
+docs/
+
+Exact naming may change if there is a strong engineering reason.
+
+---
+
+# 23. CONFIGURATION
+
+Important parameters must live in configuration rather than being scattered as magic numbers.
+
+Include:
+
+simulation timestep
+planning frequency
+prediction horizon
+vehicle dimensions
+vehicle limits
+safety margins
+risk thresholds
+TTC thresholds
+trajectory cost weights
+controller gains
+candidate trajectory parameters
+
+---
+
+# 24. DOCUMENTATION
+
+Create:
+
+README.md
+
+ARCHITECTURE.md
+
+INTERFACES.md
+
+STAGE1_RESULTS.md
+
+ARCHITECTURE.md should include a Mermaid diagram showing:
+
+World
+→ Object States
+→ Prediction
+→ Risk
+→ Behavior
+→ Planner
+→ Controller
+→ Safety Supervisor
+→ Vehicle Dynamics
+→ World
+
+Also show Telemetry branching from the modules toward visualization.
+
+---
+
+# IMPORTANT ENGINEERING RULES
+
+Do not:
+
+* build a toy demo
+* teleport the vehicle
+* animate a predetermined avoidance maneuver
+* make the planner lane-dependent
+* put all code into one file
+* hard-code the cattle scenario into the planner
+* build the polished frontend yet
+* add ML merely to claim AI
+* fabricate metrics
+* use random numbers without deterministic seeds/configuration
+* silently ignore impossible trajectories
+* make the visualization responsible for simulation logic
+
+Do:
+
+* prioritize correctness
+* maintain clean interfaces
+* use physically meaningful units
+* use deterministic simulation where possible
+* document equations
+* document assumptions
+* expose parameters through configuration
+* test mathematical modules
+* calculate real metrics
+* log planner decisions
+* keep components replaceable
+* build a genuine closed-loop system
+
+---
+
+# YOUR EXECUTION PROCESS
+
+Do not immediately generate hundreds of files.
+
+STEP 1:
+
+Inspect the existing repository.
+
+STEP 2:
+
+Create ARCHITECTURE.md describing:
+
+* modules
+* interfaces
+* data flow
+* vehicle model
+* planner design
+* controller design
+* risk model
+* simulation loop
+* testing strategy
+
+STEP 3:
+
+Present the proposed file tree.
+
+STEP 4:
+
+Identify dependencies and justify each one.
+
+Avoid unnecessary dependencies.
+
+STEP 5:
+
+Implement foundational data structures and configuration.
+
+STEP 6:
+
+Implement vehicle dynamics and tests.
+
+STEP 7:
+
+Implement world + agents.
+
+STEP 8:
+
+Implement prediction and risk.
+
+STEP 9:
+
+Implement candidate trajectory generation and collision checking.
+
+STEP 10:
+
+Implement trajectory scoring/selection.
+
+STEP 11:
+
+Implement controller.
+
+STEP 12:
+
+Implement safety supervisor.
+
+STEP 13:
+
+Connect everything into the closed-loop simulation.
+
+STEP 14:
+
+Implement SUDDEN_CATTLE_CROSSING.
+
+STEP 15:
+
+Add engineering visualization.
+
+STEP 16:
+
+Run tests and simulation.
+
+STEP 17:
+
+Debug until the scenario actually succeeds.
+
+STEP 18:
+
+Produce STAGE1_RESULTS.md containing actual measured results.
+
+Do not claim success unless tests and scenario execution actually pass.
+
+---
+
+# DEFINITION OF DONE
+
+Stage 1 is NOT complete merely because a vehicle animation appears.
+
+Stage 1 is complete when:
+
+1. Ego vehicle is controlled through steering/acceleration/braking.
+2. Vehicle dynamics determine actual vehicle motion.
+3. A dynamic obstacle can create a future collision.
+4. The system predicts that collision.
+5. Risk/TTC increases appropriately.
+6. Behavior state changes appropriately.
+7. Multiple feasible trajectories are generated.
+8. Unsafe trajectories are rejected.
+9. Remaining trajectories are scored.
+10. A safe trajectory is selected.
+11. Controller tracks the selected trajectory.
+12. Vehicle avoids/stops for the obstacle.
+13. No collision occurs.
+14. Road boundaries are respected.
+15. Vehicle continues toward its goal.
+16. Planner continuously replans.
+17. Metrics are calculated from the actual run.
+18. Decision explanations are logged.
+19. Automated tests pass.
+20. Architecture remains ready for Camera + LiDAR + Radar sensor fusion and MATLAB/Simulink integration.
+
+Start with architecture and interfaces.
+
+Do not simplify the project into a toy simulator merely to finish quickly.
+
+If an engineering choice is uncertain, choose the option that best supports a credible autonomous-driving research prototype for SIH26037.
+
+### What I want you to do with this
+
+Create a **fresh repository/folder**, give this entire prompt to your coding agent, and let it work through **Stage 1 only**.
+
+The first target isn't a beautiful car or UI. The first target is this:
+
+```text
+                     CATTLE PREDICTION
+                       ○
+                    ○
+                 ○
+              🐄
+               ↘
+
+ROAD ─────────────────────────────────────
+                 ╲
+                  ╲   ← selected trajectory
+          🚗       ╲
+           ╲        ╲
+            ╲──────────────→ GOAL
+
+Candidate trajectories:
+ ──────     REJECTED: collision
+ ╲─────     SELECTED: safe
+  ╲────     candidate
+
+Risk: HIGH
+TTC: 1.82 s
+Decision: AVOID
+Speed: 8.7 m/s
+Steering: 6.4°
+Planner: 23 ms
+```
+
+And importantly, **those numbers must come from the running simulation**, not from frontend placeholders.
+
+Once your agent finishes or gives you its architecture/file tree, **paste its output here before asking it to continue too far**. I can review whether it is building the right architecture or quietly turning this into a toy simulator.

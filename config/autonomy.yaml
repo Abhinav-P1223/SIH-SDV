@@ -1,0 +1,78 @@
+# Autonomy stack parameters. SI units unless the key says otherwise.
+# Every tunable used by prediction, risk, behavior, planning, control and
+# safety lives here. The code must not contain magic numbers for these.
+
+simulation:
+  dt_s: 0.02                      # dynamics / control step
+  max_duration_s: 60.0
+  stop_on_collision: true
+  goal_tolerance_m: 2.0           # along-track distance to goal that counts as arrival
+
+prediction:
+  horizon_s: 4.0
+  dt_s: 0.1
+
+risk:
+  safety_margin_m: 0.5            # footprint inflation used for intersection / TTC
+  time_constant_s: 2.0            # tau in risk_score = w * max_t p(t) exp(-t/tau)
+  ttc_high_s: 3.0                 # TTC below this contributes HIGH
+  ttc_critical_s: 1.2             # TTC below this is CRITICAL
+  levels:                         # risk_score thresholds (after type weighting)
+    low: 0.05
+    medium: 0.20
+    high: 0.45
+    critical: 0.80
+
+behavior:
+  min_dwell_s: 0.3                # minimum time in a state before leaving it (hysteresis)
+  caution_speed_factor: 0.6       # target speed cap in CAUTION as fraction of desired speed
+  avoid_speed_factor: 0.7         # target speed cap in AVOID
+  follow_time_gap_s: 1.5          # desired time gap to a lead object in FOLLOW
+  follow_lateral_window_m: 1.5    # lead object must be within this lateral offset of ego
+  follow_max_range_m: 30.0
+  stopped_speed_mps: 0.3          # below this the ego counts as stopped
+  # Exit thresholds are deliberately lower than entry thresholds (hysteresis)
+  caution_exit_score: 0.10
+  avoid_exit_score: 0.25
+
+planning:
+  frequency_hz: 10.0
+  horizon_s: 4.0
+  dt_s: 0.1
+  lateral_offsets_m: [-2.5, -2.0, -1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 1.5, 2.0, 2.5]
+  speed_fractions: [1.0, 0.8, 0.6, 0.4, 0.2, 0.0]   # of the behaviour target speed
+  lateral_transition_time_s: 2.0  # time to reach d_end at current speed
+  min_lateral_transition_length_m: 10.0
+  comfortable_deceleration_mps2: 3.0
+  max_lateral_acceleration_mps2: 3.5
+  safety_margin_m: 0.5            # collision margin between ego footprint and objects
+  boundary_margin_m: 0.25         # footprint must stay this far inside the corridor
+  clearance_scale_m: 2.0          # clearance cost = exp(-clearance / scale)
+  weights:
+    collision: 6.0
+    clearance: 2.0
+    smoothness: 0.8
+    curvature: 0.5
+    progress: 2.5
+    boundary: 1.0
+    speed: 1.5
+    uncertainty: 1.0
+    lateral: 1.2                  # deviation from desired lateral offset (return to route)
+
+control:
+  stanley:
+    k_gain: 1.2                   # cross-track gain
+    k_soft: 1.0                   # softening constant (m/s) for low speed
+    heading_gain: 1.0
+  pid:
+    kp: 1.5
+    ki: 0.15
+    kd: 0.05
+    integral_limit: 2.0
+    use_feedforward: true
+  stop_speed_mps: 0.1             # below this and target 0 -> hold brake
+
+safety:
+  ttc_critical_s: 1.0             # independent threshold, may differ from risk.ttc_critical_s
+  hold_time_s: 0.5                # keep override active at least this long
+  brake_mps2: 8.0

@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+.venv/
+logs/*
+!logs/.gitignore
+*.png
+*.mp4
+*.gif

@@ -1,0 +1,3 @@
+# Runtime logs (JSONL/CSV). Kept out of git.
+*
+!.gitignore

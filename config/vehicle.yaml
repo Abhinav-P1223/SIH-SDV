@@ -1,0 +1,15 @@
+# Ego vehicle parameters. SI units except where the key says _deg.
+# Degrees are converted to radians by autonomy/core/config.py at load time.
+vehicle:
+  name: mid_size_hatchback
+  wheelbase_m: 2.60
+  cg_to_front_axle_m: 1.20        # lf
+  cg_to_rear_axle_m: 1.40         # lr  (lf + lr must equal wheelbase)
+  width_m: 1.80
+  length_m: 4.20
+  mass_kg: 1300.0
+  max_steering_angle_deg: 35.0    # road-wheel angle
+  max_steering_rate_deg_s: 45.0   # road-wheel angular rate
+  max_acceleration_mps2: 3.0
+  max_deceleration_mps2: 8.0      # full braking (positive number)
+  max_speed_mps: 25.0
