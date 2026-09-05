@@ -40,6 +40,7 @@ class Planner:
                                        cfg.safety_margin_m)
         self.last_output: PlannerOutput | None = None
         self.standstill_since: float | None = None
+        self.previous_offset: float | None = None
 
     def plan(self, ego: VehicleState, decision: BehaviorDecision,
              predictions: list[ObjectPrediction], now: float) -> PlannerOutput:
@@ -58,7 +59,8 @@ class Planner:
         for cand, check in zip(candidates, checks):
             if cand.feasible or cand.margin_only:
                 s_end, _, _ = self.road.project(float(cand.trajectory.x[-1]), float(cand.trajectory.y[-1]))
-                self.scorer.score(cand, check, policy, self.desired_offset, frame.s0, s_end, standstill)
+                self.scorer.score(cand, check, policy, self.desired_offset, frame.s0, s_end, standstill,
+                                  self.previous_offset)
                 (feasible if cand.feasible else squeezed).append(cand)
 
         if feasible:
@@ -72,6 +74,7 @@ class Planner:
                 selected = hard[-1] if hard else candidates[-1]
                 selected.fallback = True
 
+        self.previous_offset = None if selected.fallback else selected.lateral_offset_end
         hist = Counter(c.rejection_reason.value for c in candidates if not c.feasible)
         out = PlannerOutput(
             timestamp=now, candidates=candidates, selected=selected,

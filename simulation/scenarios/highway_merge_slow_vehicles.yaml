@@ -1,0 +1,71 @@
+# HIGHWAY_MERGE_SLOW_VEHICLES  (SIH required scenario 3)
+# Wider unmarked highway (10 m), ego at 20 m/s (72 km/h) in the left half. A slow truck ahead
+# in the ego's half at 11 m/s, a tractor-speed pushcart-sized vehicle (modelled as an
+# auto-rickshaw at 6 m/s) merging from the left shoulder with gap acceptance, a bus in the right
+# half at 14 m/s that the ego must not clip when overtaking, and a merging car from the right
+# shoulder later. The ego must slow, follow, and overtake when a gap exists. Not scripted.
+name: HIGHWAY_MERGE_SLOW_VEHICLES
+description: Two-way unmarked highway; slow truck ahead, auto-rickshaw merging from the shoulder, bus in the oncoming half, car merging later.
+seed: 41
+
+road:
+  lane_markings: NONE
+  reference:      [[-30.0, 0.0], [400.0, 0.0]]
+  left_boundary:  [[-30.0, 5.0], [400.0, 5.0]]
+  right_boundary: [[-30.0, -5.0], [400.0, -5.0]]
+
+ego:
+  x: 0.0
+  y: 2.5
+  yaw_deg: 0.0
+  speed_mps: 20.0
+  desired_speed_mps: 20.0
+  desired_lateral_offset_m: 2.5
+
+goal:
+  s_m: 360.0
+
+agents:
+  - id: truck_1
+    type: TRUCK
+    x: 70.0
+    y: 2.5
+    heading_deg: 0.0
+    speed_mps: 11.0
+    behavior: CONSTANT_VELOCITY
+    params: {}
+  - id: auto_shoulder            # merging from the left shoulder into the ego's half, yields if the ego is close
+    type: AUTO_RICKSHAW
+    x: 130.0
+    y: 4.2
+    heading_deg: -12.0
+    speed_mps: 3.0
+    behavior: MERGING
+    params:
+      trigger_distance_m: 60.0
+      yield_gap_m: 25.0
+      follow_road: true
+      target_speed_mps: 6.0
+      yaw_rate_rad_s: 0.4
+      acceleration_mps2: 1.2
+  - id: bus_onc                  # oncoming in the right half
+    type: BUS
+    x: 260.0
+    y: -2.5
+    heading_deg: 180.0
+    speed_mps: 14.0
+    behavior: CONSTANT_VELOCITY
+    params: {}
+  - id: car_shoulder             # later merge from the right shoulder into the right half, then follows the road
+    type: CAR
+    x: 250.0
+    y: -4.0
+    heading_deg: 10.0
+    speed_mps: 4.0
+    behavior: MERGING
+    params:
+      trigger_distance_m: 70.0
+      follow_road: true
+      target_speed_mps: 9.0
+      yaw_rate_rad_s: 0.4
+      acceleration_mps2: 1.5

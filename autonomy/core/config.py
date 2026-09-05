@@ -45,6 +45,8 @@ class SimulationConfig:
 class PredictionConfig:
     horizon_s: float = 4.0
     dt_s: float = 0.1
+    road_following_heading_tol_deg: float = 30.0   # a road-following class within this of the corridor (either way)
+    lateral_velocity_decay_s: float = 1.0          # ... has its lateral velocity decay with this time constant
 
     @property
     def steps(self) -> int:
@@ -63,6 +65,7 @@ class RiskLevelsConfig:
 class RiskConfig:
     safety_margin_m: float = 0.5
     uncertainty_margin_gain: float = 1.0
+    uncertainty_margin_max_m: float = 0.5
     time_constant_s: float = 2.0
     ttc_high_s: float = 3.0
     ttc_critical_s: float = 1.2
@@ -100,6 +103,7 @@ class CostWeights:
     uncertainty: float = 1.0
     lateral: float = 1.2
     blocked: float = 3.0
+    consistency: float = 1.0
 
     def as_dict(self) -> dict[str, float]:
         return {f.name: getattr(self, f.name) for f in fields(self)}
@@ -118,6 +122,7 @@ class PlanningConfig:
     max_lateral_acceleration_mps2: float = 3.5
     safety_margin_m: float = 0.5
     uncertainty_margin_gain: float = 1.0      # margin += gain * measured position std-dev of the object
+    uncertainty_margin_max_m: float = 0.5     # cap: a far, bearing-uncertain track must not block all lateral options
     boundary_margin_m: float = 0.25
     boundary_margin_grace_s: float = 0.5
     clearance_scale_m: float = 2.0
@@ -253,6 +258,7 @@ class ObjectProfile:
     risk_weight: float
     lateral_factor: float = 1.0
     static_factor: float = 1.0
+    follows_road: bool = False
 
 
 class ObjectProfiles:

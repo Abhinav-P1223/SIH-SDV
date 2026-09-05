@@ -96,14 +96,33 @@ def render_frame(ax, f: dict[str, Any], vehicle: dict[str, float], safety_margin
             ax.plot(p["x"][k] + p["sigma"][k] * np.cos(th), p["y"][k] + p["sigma"][k] * np.sin(th),
                     color="#8e24aa", lw=0.5, alpha=0.35)
 
-    # objects
+    # raw detections (sensors mode): camera = triangle, LiDAR = dot, radar = plus, with 1-sigma ellipse axis
+    marker = {"CAMERA": ("^", "#00838f"), "LIDAR": (".", "#37474f"), "RADAR": ("+", "#c62828")}
+    seen = set()
+    for d in f.get("detections", []) or []:
+        mk, col = marker.get(d["sensor"], ("x", "k"))
+        lbl = None if d["sensor"] in seen else f"{d['sensor'].lower()} detection"
+        seen.add(d["sensor"])
+        ax.plot(d["x"], d["y"], mk, color=col, ms=6, alpha=0.8, label=lbl)
+    # objects as the autonomy stack sees them (tracks in sensors mode, ground truth otherwise)
     for o in f.get("objects", []):
         r = _rect(o["x"], o["y"], o["heading"], o["length"], o["width"])
         ax.fill(r[:, 0], r[:, 1], color="#fb8c00", alpha=0.85)
         ax.plot(r[:, 0], r[:, 1], color="#e65100", lw=1)
         ax.annotate(f"{o['id']} ({o['type']})", (o["x"], o["y"] + o["length"] / 2 + 0.3), ha="center", fontsize=8)
+        cov = np.asarray(o.get("covariance", [[0, 0], [0, 0]]))
+        if cov.size == 4 and cov.max() > 1e-6:
+            w, v = np.linalg.eigh(cov)
+            th = np.linspace(0, 2 * math.pi, 40)
+            pts = (v @ np.diag(np.sqrt(np.maximum(w, 0)) * 2.0) @ np.stack([np.cos(th), np.sin(th)]))
+            ax.plot(o["x"] + pts[0], o["y"] + pts[1], color="#e65100", lw=0.8, ls=":")
         ax.arrow(o["x"], o["y"], o["vx"], o["vy"], head_width=0.3, color="#e65100", length_includes_head=True)
 
+    if f.get("perception_mode") == "sensors":
+        for a in f.get("agents", []):
+            r = _rect(a["x"], a["y"], a["heading"], 1.0, 1.0)
+            ax.plot(a["x"], a["y"], "o", mfc="none", mec="0.4", ms=9, lw=0.8,
+                    label="ground-truth agent (evaluation only)" if a is f["agents"][0] else None)
     # ego
     fx = ego["x"] + off * math.cos(ego["yaw"]); fy = ego["y"] + off * math.sin(ego["yaw"])
     r = _rect(fx, fy, ego["yaw"], L, W)
@@ -149,7 +168,8 @@ def render_frame(ax, f: dict[str, Any], vehicle: dict[str, float], safety_margin
     ax.set_ylim(-8, 13)
     ax.set_aspect("equal")
     ax.set_xlabel("x [m]"); ax.set_ylabel("y [m]")
-    ax.set_title(f"SIH26037 Stage 1 engineering view - {state}", color=COLORS.get(state, "k"))
+    ax.set_title(f"SIH26037 engineering view - {state}  [perception: {f.get('perception_mode', 'ground_truth')}]",
+                 color=COLORS.get(state, "k"))
     ax.legend(loc="lower right", fontsize=7, ncol=2)
     ax.grid(alpha=0.2)
 

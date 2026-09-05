@@ -11,7 +11,8 @@ these are the fields a Simulink bus of the same name would carry.
 | `VehicleParameters` | wheelbase, cg_to_front_axle (lf), cg_to_rear_axle (lr), width, length, mass, max_steering_angle, max_steering_rate, max_acceleration, max_deceleration, max_speed; derived `max_curvature`, `footprint_center_offset` | `config/vehicle.yaml` | everything |
 | `VehicleState` | timestamp, x, y, yaw, longitudinal_velocity, lateral_velocity, yaw_rate, longitudinal_acceleration, steering_angle | `VehicleModel.step()` only | risk, behaviour, planner, tracker, safety, metrics |
 | `ControlCommand` | timestamp, steering_angle (requested road-wheel angle), acceleration ≥ 0, brake ≥ 0, source (`tracker` / `safety`) | `TrajectoryTracker.track()`, `SafetySupervisor.check()` | `VehicleModel.step()` (through `ActuatorModel`) |
-| `ObjectState` | id, object_type, timestamp, x, y, vx, vy, heading, length, width, confidence, covariance (2×2) | `ObjectStateProvider.get_object_states()` — ground truth now, sensor fusion later | prediction, risk (lead detection), metrics |
+| `Detection` | sensor, timestamp, x, y, covariance (2×2), object_type + class_confidence (camera), length/width/heading (LiDAR), radial_speed + std (radar), sensor position; `truth_id` for evaluation only | `SensorSuite.sense()` | `SensorFusionTracker.ingest()` |
+| `ObjectState` | id, object_type, timestamp, x, y, vx, vy, heading, length, width, confidence, covariance (2×2) | `ObjectStateProvider.get_object_states()` — `SensorFusionTracker` (sensors mode) or `GroundTruthObjectProvider` | prediction, risk (lead detection), metrics |
 | `ObjectPrediction` | object_id, object_type, times[N], x[N], y[N], heading[N], vx[N], vy[N], covariances[N,2,2], length, width, risk_weight; `sigma()` | `Predictor.predict()` | risk, planner |
 | `Trajectory` | t[N] (absolute), x, y, yaw, velocity, curvature, acceleration, id | candidate generator | checker, scorer, tracker, risk (plan view) |
 | `TrajectoryPoint` | t, x, y, yaw, velocity, curvature, acceleration | `Trajectory.point(i)` | convenience / MATLAB export |
@@ -42,6 +43,15 @@ class RoadModel(ABC):                                 # autonomy/core/interfaces
 class VehicleModel(ABC):                              # autonomy/vehicle/models.py
     def step(self, state: VehicleState, command: ControlCommand, dt: float) -> VehicleState
     def footprint(self, state) -> OrientedBox
+
+class SensorModel:                                    # simulation/sensors/models.py
+    def sense(self, agents, ego, t) -> list[Detection]
+class SensorSuite:
+    def sense(self, agents, ego, t) -> list[Detection]     # honours rate + latency per sensor
+
+class SensorFusionTracker(ObjectStateProvider):       # autonomy/perception/tracker.py
+    def ingest(self, detections: list[Detection], now: float, ego: VehicleState)
+    def get_object_states(self, timestamp: float) -> list[ObjectState]
 
 class Predictor(ABC):                                 # autonomy/prediction/predictor.py
     def predict(self, objects: list[ObjectState], now: float) -> list[ObjectPrediction]
@@ -93,7 +103,7 @@ class TelemetrySink(ABC):                             # autonomy/telemetry/telem
 
 | Stage 1 | Stage 2 |
 |---|---|
-| `GroundTruthObjectProvider` | camera + LiDAR + radar → tracker → fusion implementing `ObjectStateProvider`; `ObjectState.covariance` becomes real |
+| `SensorSuite` + `SensorFusionTracker` (simulated sensors) | Automated Driving Toolbox / RoadRunner sensor models or real hardware drivers producing the same `Detection`s; the tracker is unchanged |
 | `ConstantVelocityPredictor` | acceleration- / intent-aware predictor behind `Predictor` |
 | `DrivableSpace` polylines | RoadRunner scene → drivable-area extraction implementing `RoadModel` |
 | `KinematicBicycleModel` | dynamic bicycle / Vehicle Dynamics Blockset behind `VehicleModel` |

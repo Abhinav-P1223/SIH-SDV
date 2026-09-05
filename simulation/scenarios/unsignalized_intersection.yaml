@@ -1,0 +1,70 @@
+# UNSIGNALIZED_INTERSECTION  (SIH required scenario 2)
+# The ego's unmarked road crosses a side road at x = 80 with no signals and no markings. Traffic
+# streams cross the ego corridor from both sides: a car from the right (south, driving north at
+# 6 m/s), an auto-rickshaw from the left (north, driving south at 4 m/s) that starts when the ego is
+# 35 m away, a motorcycle from the right that arrives later, and a pedestrian who steps off the corner.
+# There is no right-of-way rule in the stack: the ego must time gaps from predicted trajectories,
+# creep or stop, and clear the box. The ego's response is not scripted.
+name: UNSIGNALIZED_INTERSECTION
+description: Unmarked crossroads without signals; cars, an auto-rickshaw and a motorcycle cross the ego corridor from both sides.
+seed: 31
+
+road:
+  lane_markings: NONE
+  reference:      [[-20.0, 0.0], [160.0, 0.0]]
+  left_boundary:  [[-20.0, 3.5], [160.0, 3.5]]
+  right_boundary: [[-20.0, -3.5], [160.0, -3.5]]
+
+ego:
+  x: 0.0
+  y: 1.75
+  yaw_deg: 0.0
+  speed_mps: 8.0
+  desired_speed_mps: 8.0
+  desired_lateral_offset_m: 1.75
+
+goal:
+  s_m: 150.0
+
+agents:
+  - id: car_south                 # crosses from the right side (y < 0) heading north
+    type: CAR
+    x: 78.0
+    y: -30.0
+    heading_deg: 90.0
+    speed_mps: 6.0
+    behavior: CONSTANT_VELOCITY
+    params: {}
+  - id: auto_north                # waits north of the road, pulls out across when the ego is 35 m away
+    type: AUTO_RICKSHAW
+    x: 83.0
+    y: 12.0
+    heading_deg: -90.0
+    speed_mps: 0.0
+    behavior: CROSSING
+    params:
+      trigger_distance_m: 45.0
+      crossing_speed_mps: 4.0
+      acceleration_mps2: 2.0
+      crossing_distance_m: 30.0
+      stop_after: true
+  - id: moto_south                # second crosser from the right, later
+    type: MOTORCYCLE
+    x: 81.0
+    y: -60.0
+    heading_deg: 90.0
+    speed_mps: 7.0
+    behavior: CONSTANT_VELOCITY
+    params: {}
+  - id: ped_corner
+    type: PEDESTRIAN
+    x: 74.0
+    y: 3.4
+    heading_deg: -90.0
+    speed_mps: 0.0
+    behavior: CROSSING
+    params:
+      trigger_distance_m: 20.0
+      crossing_speed_mps: 1.3
+      crossing_distance_m: 7.0
+      stop_after: true

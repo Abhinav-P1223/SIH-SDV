@@ -149,7 +149,8 @@ class CollisionChecker:
                 sig[j] = np.sqrt(np.maximum(Pxx * ux * ux + 2 * Pxy * ux * uy + Pyy * uy * uy, 1e-12)).reshape(C, N)
             # inside the margin counts as a hit, except during the grace window where only overlap does
             margin_ok = rel_t >= cfg.collision_margin_grace_s                      # (C,N)
-            margins = np.array([cfg.safety_margin_m + cfg.uncertainty_margin_gain * pr.meas_sigma for pr in predictions])
+            margins = np.array([cfg.safety_margin_m + min(cfg.uncertainty_margin_gain * pr.meas_sigma, cfg.uncertainty_margin_max_m)
+                                for pr in predictions])
             # inside-margin counts as a hit only when CLOSING relative to the current distance (or overlapping):
             # a candidate that slides past an object at the clearance the ego already has is not a collision
             d0 = dist[:, :, :1]                                                    # (M,C,1) current distance

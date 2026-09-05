@@ -11,10 +11,13 @@ simulation:
 prediction:
   horizon_s: 4.0
   dt_s: 0.1
+  road_following_heading_tol_deg: 30.0   # vehicles aligned with the corridor (either direction) follow it
+  lateral_velocity_decay_s: 1.0          # their lateral velocity (mostly estimation noise) decays
 
 risk:
   safety_margin_m: 0.5            # footprint inflation used for intersection / TTC
   uncertainty_margin_gain: 1.0    # margin grows with the object's measured position std-dev
+  uncertainty_margin_max_m: 0.5
   time_constant_s: 2.0            # tau in risk_score = w * max_t p(t) exp(-t/tau)
   ttc_high_s: 3.0                 # TTC below this contributes HIGH
   ttc_critical_s: 1.2             # TTC below this is CRITICAL
@@ -50,6 +53,7 @@ planning:
   max_lateral_acceleration_mps2: 3.5
   safety_margin_m: 0.5            # collision margin between ego footprint and objects
   uncertainty_margin_gain: 1.0    # margin grows by gain x the object's own measured position std-dev (fusion covariance)
+  uncertainty_margin_max_m: 0.5   # ... capped: a far, bearing-uncertain track must not block every lateral option
   boundary_margin_m: 0.25         # footprint must stay this far inside the corridor
   boundary_margin_grace_s: 0.5    # margin (not corridor edge) is enforced only after this time; the
                                   # current pose is not the planner's choice
@@ -81,6 +85,7 @@ planning:
     uncertainty: 1.0
     lateral: 1.0                  # deviation from desired lateral offset (return to route)
     blocked: 3.0                  # route ahead of the end state meets an object within route_lookahead_s
+    consistency: 1.0              # change of lateral end offset vs the previously selected plan (commit, do not dither)
 
 control:
   stanley:

@@ -187,7 +187,7 @@ class RiskEngine:
         p = self.params
         dist = box_sequence_distance(fx, fy, eyaw, p.length, p.width,
                                      pred.x, pred.y, pred.heading, pred.length, pred.width, exact_within=math.inf)
-        margin = self.cfg.safety_margin_m + self.cfg.uncertainty_margin_gain * pred.meas_sigma
+        margin = self.cfg.safety_margin_m + min(self.cfg.uncertainty_margin_gain * pred.meas_sigma, self.cfg.uncertainty_margin_max_m)
         return first_overlap_time(rel, dist, margin, self.cfg.margin_grace_s)
 
     def _assess(self, pred: ObjectPrediction, rel: np.ndarray,
@@ -196,7 +196,7 @@ class RiskEngine:
         p = self.params
         dist = box_sequence_distance(fx, fy, eyaw, p.length, p.width,
                                      pred.x, pred.y, pred.heading, pred.length, pred.width, exact_within=math.inf)
-        margin = self.cfg.safety_margin_m + self.cfg.uncertainty_margin_gain * pred.meas_sigma
+        margin = self.cfg.safety_margin_m + min(self.cfg.uncertainty_margin_gain * pred.meas_sigma, self.cfg.uncertainty_margin_max_m)
         sigma = pred.sigma_toward(fx, fy)
         band = p.width + max(pred.width, pred.length) + 2.0 * margin
         prob = band_collision_probability(dist, sigma, margin, band)

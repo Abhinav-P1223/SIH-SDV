@@ -150,3 +150,24 @@ def test_lead_object_detection(cfg, profiles, params):
     assert summary.lead_object_id == "lead"
     assert summary.lead_speed == pytest.approx(6.0)
     assert summary.lead_gap == pytest.approx(25.0 - 0.5 * (params.length + 4.3))
+
+
+def test_road_following_prior_damps_lateral_velocity_for_vehicles_only(cfg, profiles):
+    """A tracked car with a noisy lateral velocity must be predicted along the corridor; a cow must not."""
+    road = DrivableSpace.straight(200.0, 3.5, 3.5, x0=-20.0)
+    p_road = ConstantVelocityPredictor(cfg.prediction, profiles, road)
+    p_free = ConstantVelocityPredictor(cfg.prediction, profiles)
+    car = ObjectState("car", ObjectType.CAR, 0.0, 50.0, 1.2, -8.0, -0.5, math.atan2(-0.5, -8.0), 4.3, 1.8)
+    cow = ObjectState("cow", ObjectType.CATTLE, 0.0, 50.0, 1.2, 0.0, -0.8, -math.pi / 2, 2.0, 0.7)
+    car_road, cow_road = p_road.predict([car, cow], 0.0)
+    car_free, cow_free = p_free.predict([car, cow], 0.0)
+    # oncoming car: lateral drift over 4 s is bounded by v_lat * tau (0.5 m) instead of 2 m
+    assert abs(car_road.y[-1] - 1.2) < 0.55 and abs(car_free.y[-1] - 1.2) > 1.9
+    assert car_road.x[-1] == pytest.approx(50.0 - 8.0 * 4.0, abs=0.2)     # along-road speed preserved
+    assert math.cos(car_road.heading[0]) == pytest.approx(-1.0, abs=1e-6)  # heading snapped to the corridor (reverse)
+    # the cow keeps free constant-velocity motion
+    assert np.allclose(cow_road.y, cow_free.y) and np.allclose(cow_road.x, cow_free.x)
+    # a vehicle crossing the corridor (heading off the road axis) is NOT forced to follow it
+    crossing_car = ObjectState("xc", ObjectType.CAR, 0.0, 50.0, -3.0, 0.0, 6.0, math.pi / 2, 4.3, 1.8)
+    xc = p_road.predict([crossing_car], 0.0)[0]
+    assert xc.y[-1] == pytest.approx(-3.0 + 6.0 * 4.0)

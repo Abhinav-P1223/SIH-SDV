@@ -1,0 +1,76 @@
+# DENSE_MARKET_MIXED_TRAFFIC  (SIH required scenario 4)
+# Market street, 6.4 m wide, no markings, market pace (ego desired 5 m/s). Eight agents:
+# pushcarts parked at both edges, a slow auto-rickshaw ahead at 3 m/s, an oncoming motorcycle
+# filtering through the right half, pedestrians crossing from both sides at different times,
+# a pedestrian walking along the edge, and a cow standing at the left edge. The ego must thread
+# the clutter, follow or overtake the auto, and yield to the crossers. Not scripted.
+name: DENSE_MARKET_MIXED_TRAFFIC
+description: Market street with parked carts, a slow auto-rickshaw, a filtering motorcycle, crossing and walking pedestrians and a standing cow.
+seed: 51
+
+road:
+  lane_markings: NONE
+  reference:      [[-20.0, 0.0], [150.0, 0.0]]
+  left_boundary:  [[-20.0, 3.2], [150.0, 3.2]]
+  right_boundary: [[-20.0, -3.2], [150.0, -3.2]]
+
+ego:
+  x: 0.0
+  y: 1.4
+  yaw_deg: 0.0
+  speed_mps: 5.0
+  desired_speed_mps: 5.0
+  desired_lateral_offset_m: 1.4
+
+goal:
+  s_m: 140.0
+
+agents:
+  - {id: cart_left,  type: PUSHCART, x: 30.0,  y: 2.7,  heading_deg: 0.0,   behavior: STATIC, params: {}}
+  - {id: cart_right, type: PUSHCART, x: 55.0,  y: -2.7, heading_deg: 0.0,   behavior: STATIC, params: {}}
+  - {id: cart_left2, type: PUSHCART, x: 95.0,  y: 2.6,  heading_deg: 0.0,   behavior: STATIC, params: {}}
+  - id: auto_slow
+    type: AUTO_RICKSHAW
+    x: 25.0
+    y: 1.2
+    heading_deg: 0.0
+    speed_mps: 3.0
+    behavior: CONSTANT_VELOCITY
+    params: {}
+  - id: moto_onc                 # filtering motorcycle in the right half, oncoming
+    type: MOTORCYCLE
+    x: 110.0
+    y: -1.4
+    heading_deg: 180.0
+    speed_mps: 6.0
+    behavior: CONSTANT_VELOCITY
+    params: {}
+  - id: ped_cross_a
+    type: PEDESTRIAN
+    x: 60.0
+    y: -3.0
+    heading_deg: 90.0
+    behavior: CROSSING
+    params: {trigger_distance_m: 18.0, crossing_speed_mps: 1.2, crossing_distance_m: 6.0, stop_after: true}
+  - id: ped_cross_b
+    type: PEDESTRIAN
+    x: 80.0
+    y: 3.0
+    heading_deg: -90.0
+    behavior: CROSSING
+    params: {trigger_distance_m: 22.0, crossing_speed_mps: 1.0, crossing_distance_m: 6.0, stop_after: true}
+  - id: ped_walk
+    type: PEDESTRIAN
+    x: 70.0
+    y: 2.4
+    heading_deg: 0.0             # walking with the traffic along the left edge
+    speed_mps: 1.0
+    behavior: CONSTANT_VELOCITY
+    params: {}
+  - id: cattle_edge
+    type: CATTLE
+    x: 120.0
+    y: 2.7
+    heading_deg: 0.0
+    behavior: STATIC
+    params: {}

@@ -19,6 +19,8 @@ C_boundary    exp(-min_boundary_clearance / (0.5 * clearance_scale))
 C_speed       |v_end - target_speed| / max(desired_speed, 1)
 C_uncertainty mean over time of max over objects of p(t)   (exposure to uncertain regions)
 C_lateral     |d_end - desired_offset| / max|lateral_offsets|   (return toward route)
+C_consistency |d_end - d_end of the previously selected plan| / max|lateral_offsets|: with noisy
+              perception the cheapest side can flip every cycle; committing beats dithering
 C_blocked     1 - t_meet / route_lookahead if the continuation from the end state meets an
               object within the look-ahead (0 otherwise): postponing a head-on meeting by
               slowing down is not a solution; a clear continuation is
@@ -50,7 +52,8 @@ class TrajectoryScorer:
         self.d_max = max(max(abs(o) for o in cfg.lateral_offsets_m), 0.5)
 
     def score(self, cand: CandidateTrajectory, check: CheckResult, policy: SpeedPolicy,
-              desired_offset: float, s0: float, s_end: float, standstill_s: float = 0.0) -> float:
+              desired_offset: float, s0: float, s_end: float, standstill_s: float = 0.0,
+              previous_offset: float | None = None) -> float:
         tr = cand.trajectory
         rel_t = tr.t - tr.t[0]
         p = self.params
@@ -82,6 +85,8 @@ class TrajectoryScorer:
             if math.isfinite(cand.min_boundary_clearance) else 0.0
         c["speed"] = float(abs(cand.target_speed - policy.target_speed) / self.desired_speed)
         c["lateral"] = float(abs(cand.lateral_offset_end - desired_offset) / self.d_max)
+        c["consistency"] = 0.0 if previous_offset is None else float(
+            abs(cand.lateral_offset_end - previous_offset) / self.d_max)
         c["blocked"] = 0.0 if cand.route_block_time is None else \
             float(np.clip(1.0 - cand.route_block_time / self.cfg.route_lookahead_s, 0.0, 1.0))
 

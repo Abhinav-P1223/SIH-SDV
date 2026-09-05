@@ -20,7 +20,7 @@ sys.path.insert(0, str(ROOT))
 
 import numpy as np  # noqa: E402
 
-from autonomy.core.config import AutonomyConfig, ObjectProfiles, load_vehicle_parameters, load_yaml  # noqa: E402
+from autonomy.core.config import AutonomyConfig, ObjectProfiles, PerceptionConfig, load_vehicle_parameters, load_yaml  # noqa: E402
 from autonomy.telemetry.telemetry import InMemorySink, TelemetryPublisher  # noqa: E402
 from simulation.runner import Simulation, run_scenario  # noqa: E402
 from simulation.scenarios.loader import SCENARIO_DIR, build_scenario  # noqa: E402
@@ -94,7 +94,7 @@ def metrics_table(m, cfg):
     return "\n".join(lines)
 
 
-def run_variant(name, override):
+def run_variant(name, override, mode="sensors"):
     """Run a scenario YAML with a modified agent parameter, without logs."""
     data = load_yaml(SCENARIO_DIR / f"{name.lower()}.yaml")
     for a in data["agents"]:
@@ -102,7 +102,7 @@ def run_variant(name, override):
     sc = build_scenario(data)
     mem = InMemorySink()
     sim = Simulation(sc, AutonomyConfig.load(), load_vehicle_parameters(), ObjectProfiles.load(),
-                     TelemetryPublisher([mem]))
+                     TelemetryPublisher([mem]), perception=PerceptionConfig.load().with_mode(mode))
     return sim.run(), mem.frames
 
 
@@ -128,23 +128,36 @@ def main() -> int:
         out.append(f"## Automated tests\n\nCould not run pytest: {exc}\n")
 
     # scenarios
-    for name, img in (("SUDDEN_CATTLE_CROSSING", ["cattle_caution_t3.3.png", "cattle_avoid_t6.7.png"]),
+    scenario_table = []
+    for name, img in (("UNMARKED_VILLAGE_ROAD", []), ("UNSIGNALIZED_INTERSECTION", []),
+                      ("HIGHWAY_MERGE_SLOW_VEHICLES", []), ("DENSE_MARKET_MIXED_TRAFFIC", []),
+                      ("SUDDEN_CATTLE_CROSSING", ["cattle_caution_t3.3.png", "cattle_avoid_t6.7.png", "cattle_sensors_t6.5.png"]),
                       ("SUDDEN_PEDESTRIAN_DART", ["pedestrian_emergency_t3.7.png"]),
                       ("MIXED_TRAFFIC_CURVE", ["curve_follow_t8.0.png", "curve_pedestrian_t16.0.png"])):
-        res = run_scenario(name, log_dir="logs", console=False, keep_frames=True)
+        gt = run_scenario(name, log_dir=None, console=False, keep_frames=False, perception="ground_truth").metrics
+        res = run_scenario(name, log_dir="logs", console=False, keep_frames=True, perception="sensors")
         m = res.metrics
         ok = m.scenario_completed and m.collision_count == 0 and m.minimum_obstacle_clearance >= cfg.planning.safety_margin_m
-        out.append(f"## {name} — {'PASS' if ok else 'FAIL'}\n")
+        scenario_table.append((name, m, gt, ok))
+        out.append(f"## {name} — {'PASS' if ok else 'FAIL'} (sensors mode)\n")
         sc_data = load_yaml(SCENARIO_DIR / f"{name.lower()}.yaml")
         out.append(sc_data.get("description", "") + "\n")
         for ag in sc_data["agents"]:
             out.append(f"- Agent `{ag['id']}` ({ag['type']}, behaviour {ag['behavior']}): "
-                       + ", ".join(f"{k}={v}" for k, v in ag["params"].items()))
+                       + (", ".join(f"{k}={v}" for k, v in ag["params"].items()) or "no parameters"))
         out.append(f"\nEgo desired speed {sc_data['ego']['desired_speed_mps']} m/s, "
                    f"desired lateral offset {sc_data['ego'].get('desired_lateral_offset_m', 0)} m, "
                    f"lane markings: {sc_data['road'].get('lane_markings', 'NONE')}"
                    + (", curved corridor built from segments." if "segments" in sc_data["road"] else ".") + "\n")
         out.append(metrics_table(m, cfg) + "\n")
+        out.append(f"Ground-truth mode for comparison: {gt.termination_reason}, collisions {gt.collision_count}, "
+                   f"min clearance {fmt(gt.minimum_obstacle_clearance)} m, min TTC {fmt(gt.minimum_ttc)} s, "
+                   f"EB {gt.emergency_brake_activations}, done {fmt(gt.time_to_completion, 1)} s, "
+                   f"planner {fmt(gt.planning_latency_mean_ms, 1)} ms.\n")
+        out.append(f"Perception (sensors mode): tracking position error {fmt(m.tracking_position_error_m, 3)} m, "
+                   f"velocity error {fmt(m.tracking_velocity_error_mps, 3)} m/s, perception latency "
+                   f"{fmt(m.perception_latency_ms, 1)} ms, detections {m.detections_total}, "
+                   f"mean published tracks {fmt(m.track_count_mean, 2)}.\n")
 
         out.append("### Behaviour timeline (from the decision log)\n")
         out.append("| t [s] | state | machine-readable reason |\n|---|---|---|")
@@ -175,6 +188,12 @@ def main() -> int:
             out.append(f"![{i}](img/{i})\n")
         out.append(f"Telemetry: `logs/{name.lower()}.jsonl` (every step), `logs/{name.lower()}_summary.csv` (per planning cycle).\n")
 
+    # summary table across the required scenarios
+    out.insert(3, "## Scenario summary (sensors mode)\n\n| Scenario | Result | Collisions | Min clearance [m] | Min TTC [s] | EB | Time [s] | Planner mean [ms] |\n|---|---|---|---|---|---|---|---|\n"
+               + "\n".join(f"| {n} | {'PASS' if ok else 'FAIL'} | {m.collision_count} | {fmt(m.minimum_obstacle_clearance)} | "
+                           f"{fmt(m.minimum_ttc)} | {m.emergency_brake_activations} | {fmt(m.time_to_completion, 1)} | "
+                           f"{fmt(m.planning_latency_mean_ms, 1)} |" for n, m, gt, ok in scenario_table) + "\n")
+
     # parameter sweeps: scenario success rate measured over a grid
     out.append("## Parameter sweeps — scenario success rate\n")
     out.append("Each cell is a complete closed-loop run with the committed configuration; only the named "
@@ -188,6 +207,7 @@ def main() -> int:
     # negative finding: unavoidable dart
     out.append("## Negative result kept on record: pedestrian dart at 14 m\n")
     m14, fr14 = run_variant("SUDDEN_PEDESTRIAN_DART", {"trigger_distance_m": 14.0})
+    m17, _ = run_variant("SUDDEN_PEDESTRIAN_DART", {"trigger_distance_m": 17.0})
     v0 = 10.0
     d_brake = v0 ** 2 / (2 * params.max_deceleration)
     eb_t = next((f.timestamp for f in fr14 if f.safety.override_active), None)
@@ -198,18 +218,19 @@ def main() -> int:
                f"Braking distance from {v0:.0f} m/s at {params.max_deceleration:.0f} m/s^2 is "
                f"{d_brake:.1f} m, and the constant-velocity predictor cannot see the dart until the pedestrian "
                f"has actually accelerated, so the outcome is physically determined, not a tuning problem. "
-               f"It is recorded here rather than hidden; Stage 2 prediction (intent / acceleration-aware) is the lever.\n")
+               f"It is recorded here rather than hidden; intent / acceleration-aware prediction is the lever. "
+               f"At 17 m the outcome is `{m17.termination_reason}` (collisions {m17.collision_count}) in sensors mode, "
+               f"whereas ground-truth objects survive 17 m: the tracker's confirmation and velocity lag cost about 2 m of "
+               f"reaction distance at 10 m/s.\n")
 
     # known limitations
-    out.append("## Known limitations (Stage 1)\n")
-    out.append("- Constant-velocity prediction lags accelerating agents (see the 14 m result above).\n"
-               "- Jerk is not constrained: the planner may switch between deceleration and acceleration "
-               "candidates between cycles; `max_jerk` is reported as a Stage 2 hook.\n"
-               "- The reference direction is a polyline; candidate curvature assumes zero reference curvature "
-               "per segment, adequate for the straight corridors used here.\n"
-               "- Ground-truth objects with zero covariance; Stage 2 fusion will supply real covariances "
-               "through the same `ObjectState` contract.\n"
-               "- Planner latency (~40 ms mean in pure Python/numpy) is measured and logged, not real-time.\n")
+    out.append("## Known limitations\n")
+    out.append("- Constant-velocity prediction (with anisotropic uncertainty) lags accelerating agents; see the dart results.\n"
+               "- Sensors are simulated models, not rendered images or point clouds; no learned detector exists and none is claimed.\n"
+               "- No reversing: when an agent stops right in front of a stationary ego the ego waits (standoff logic keeps this rare).\n"
+               "- Jerk is not constrained; `max_jerk` is reported.\n"
+               "- Planner latency (tens of ms in pure Python/numpy) is measured and logged, not hard real-time.\n"
+               "- No MATLAB/Simulink artefact yet; the module boundaries are designed for that port.\n")
 
     (ROOT / "docs" / "STAGE1_RESULTS.md").write_text("\n".join(out), encoding="utf-8")
     print("wrote docs/STAGE1_RESULTS.md")

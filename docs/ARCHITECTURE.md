@@ -1,12 +1,16 @@
-# Architecture — Stage 1 Closed-Loop Autonomy Core
+# Architecture — Closed-Loop Autonomy Core with Simulated Multi-Sensor Perception
 
 Project: SIH26037 — Adaptive Path Planning and Collision Avoidance for
 Autonomous Vehicles on Unstructured Indian Roads.
 
-Stage 1 scope: a genuine closed-loop simulation in which a planner produces a
-trajectory, a controller converts it into steering / acceleration / braking,
-actuator limits shape the command, and a bicycle model determines motion.
-No perception, no ML, no polished UI.
+Scope: a genuine closed-loop simulation in which simulated camera, LiDAR and
+radar observe the world, a tracker fuses their detections into object tracks,
+a planner produces a trajectory, a controller converts it into steering /
+acceleration / braking, actuator limits shape the command, and a bicycle model
+determines motion. No ML (object classes come from the simulated camera's
+noisy classifier, not from a network), no polished UI. `perception.mode` in
+`config/sensors.yaml` switches between `sensors` (the system) and
+`ground_truth` (the Stage 1 baseline used to isolate planning behaviour).
 
 ## 1. Design principles
 
@@ -15,9 +19,10 @@ No perception, no ML, no polished UI.
 2. **Lane markings are optional.** The planner reasons over a *drivable-space
    corridor* (left/right boundary polylines) plus a *reference direction*
    toward the goal. Nothing requires a lane centreline.
-3. **Ground truth enters through the same door as perception.** The world
-   exposes `ObjectState[]` via an `ObjectStateProvider`. Stage 2 sensor fusion
-   implements the same provider; prediction/risk/planning are untouched.
+3. **Perception and ground truth enter through the same door.** The world
+   exposes `ObjectState[]` via an `ObjectStateProvider`; the sensor-fusion
+   tracker (`autonomy/perception/tracker.py`) implements the same provider.
+   Prediction, risk, planning and control cannot tell which one is active.
 4. **One module, one responsibility.** Each box below is a package with a small
    public interface so it can later map onto a Simulink subsystem or a
    Stateflow chart.
@@ -31,7 +36,10 @@ No perception, no ML, no polished UI.
 
 ```mermaid
 flowchart TD
-    W[World<br/>road corridor + agents] -->|ObjectState list via ObjectStateProvider| P[Prediction<br/>ConstantVelocityPredictor]
+    W[World<br/>road corridor + agents] -->|agents, ego pose| SEN[Sensor models<br/>camera / LiDAR / radar<br/>FOV, range, occlusion,<br/>noise, dropout, latency]
+    SEN -->|Detection list| FUS[Tracker / fusion<br/>KF per track, gated NN association,<br/>class votes, extents, radial speed]
+    FUS -->|ObjectState list via ObjectStateProvider<br/>tracks with covariance, ids, confidence| P[Prediction<br/>ConstantVelocityPredictor<br/>anisotropic uncertainty]
+    W -.->|ground_truth mode only| P
     W -->|VehicleState| R
     P -->|ObjectPrediction list| R[Risk Engine<br/>TTC, min separation,<br/>collision probability]
     R -->|RiskAssessment list + RiskSummary| B[Behavior FSM<br/>CRUISE / FOLLOW / CAUTION /<br/>AVOID / EMERGENCY_BRAKE / STOPPED]
@@ -74,7 +82,9 @@ and actuator model run every dynamics step.
 |---|---|---|---|
 | `autonomy/core` | Data contracts, geometry (oriented boxes, SAT, distances), config loading, enums | `types.py`, `geometry.py`, `config.py` | Simulink bus definitions |
 | `autonomy/vehicle` | Vehicle parameters, actuator saturation, kinematic bicycle model | `VehicleModel.step()` | Dynamic bicycle model / Vehicle Dynamics Blockset |
-| `autonomy/prediction` | Time-indexed predicted positions with growing uncertainty | `Predictor.predict()` | Learned or interaction-aware predictor |
+| `autonomy/perception` | Multi-object tracker and sensor fusion: KF per track, gated nearest-neighbour association, lifecycle, class/extent/velocity fusion, duplicate merge | `SensorFusionTracker.ingest()` / `.get_object_states()` | JPDA / learned association behind the same provider |
+| `simulation/sensors` | Camera / LiDAR / radar models with FOV, range, occlusion, noise, dropout, update rate, latency | `SensorSuite.sense()` | Automated Driving Toolbox sensors / RoadRunner |
+| `autonomy/prediction` | Time-indexed predicted positions with growing anisotropic uncertainty | `Predictor.predict()` | Learned or interaction-aware predictor |
 | `autonomy/risk` | Distance, closing speed, TTC, min predicted separation, intersection, collision probability, risk level | `RiskEngine.evaluate()` | Same interface, richer models |
 | `autonomy/behavior` | Finite state machine with declared transition table, hysteresis, explanation | `BehaviorStateMachine.decide()` | Stateflow chart |
 | `autonomy/planning` | Candidate generation in corridor frame, collision sweep, boundary check, scoring, selection | `Planner.plan()` | Lattice/MPC planner behind same interface |
@@ -126,19 +136,49 @@ v_lat  = v * sin(beta)        (reported for interface completeness)
 A `DynamicBicycleModel` (tyre slip, yaw inertia) can implement the same
 `VehicleModel` interface; the controller and planner see only `VehicleState`.
 
+## 5b. Sensors and fusion
+
+Sensor models (`simulation/sensors/models.py`) convert ground-truth agents into
+`Detection`s in the world frame, per sensor at its own rate, with field of
+view, range, line-of-sight occlusion by other agents' footprints, Gaussian
+noise in the sensor's natural coordinates (bearing/range for camera and
+radar, x/y for LiDAR), dropout probability and delivery latency:
+
+| Sensor | Measures | Noise model | Notes |
+|---|---|---|---|
+| Camera | bearing, range, class + confidence | σ_bearing, σ_range = frac·range + min; class confusion 1 − accuracy | 100° FOV, 60 m |
+| LiDAR | x, y, length, width, heading | isotropic σ_pos, σ_extent, σ_heading | 360°, 80 m |
+| Radar | range, bearing, radial speed | σ_range, coarse σ_bearing, σ_ṙ; small objects dropped more often | 60° FOV, 120 m |
+
+The tracker (`autonomy/perception/tracker.py`) keeps one Kalman filter per
+track, state [x, y, vx, vy], constant-velocity model with acceleration process
+noise. Position measurements from all three sensors update it with their own
+covariance; radar radial speed is an EKF update. Association is gated nearest
+neighbour (Mahalanobis, χ² gate) per sensor batch. Tracks are tentative until
+`confirm_hits`, deleted after `max_misses` or `max_age_s`, and duplicates that
+gate on each other are merged. Class = confidence-weighted camera votes
+(UNKNOWN without camera), dimensions = LiDAR extents, heading = velocity when
+moving else LiDAR. Published `ObjectState`s carry the filter covariance, and
+downstream margins grow with it (`uncertainty_margin_gain`). Ablations that
+must change the output are unit-tested: no camera → UNKNOWN classes; no radar
+→ larger velocity covariance; no LiDAR → larger positional covariance.
+
 ## 6. Prediction model
 
 Constant velocity and heading over `prediction.horizon_s` at
 `prediction.dt_s`. Positional standard deviation grows with time using the
-object's behaviour profile:
+object's behaviour profile, anisotropically:
 
 ```
-sigma^2(t) = sigma_pos0^2 + (sigma_vel * t)^2 + (0.5 * sigma_acc * t^2)^2
+sigma_l^2(t) = sigma_pos0^2 + f_s^2 [ (sigma_vel t)^2 + (0.5 sigma_acc t^2)^2 ]   along the heading
+sigma_t(t)   = lateral_factor * sigma_l(t)                                       across the heading
+f_s          = static_factor while the object is (near) stationary, else 1
 ```
 
-Profiles live in `config/object_profiles.yaml` (per object type: dimensions,
-sigma values, risk weight). The planner never sees object types directly; it
-sees predicted positions, covariances and per-object risk weights.
+Road-following vehicles have small lateral factors (0.3–0.45), pedestrians and
+cattle 1.0. The initial term is max(profile σ₀², tracked covariance). The risk
+engine and scorer project the covariance onto the direction toward the ego
+(`ObjectPrediction.sigma_toward`). Profiles live in `config/object_profiles.yaml`.
 
 ## 7. Risk model
 
@@ -148,7 +188,7 @@ Three ego motions are compared against every object's predicted footprint
 | View | Ego motion | Used by |
 |---|---|---|
 | **route** | follow the corridor at the current lateral offset at the *desired* speed | behaviour levels CAUTION / AVOID, `RiskAssessment` list |
-| **physical** | follow the corridor at the *current* speed | `min_ttc_current_speed`; the only source of CRITICAL; safety supervisor |
+| **physical** | constant velocity along the *current heading* at the current speed ("if control froze now") | `min_ttc_current_speed`; the only source of CRITICAL; safety supervisor |
 | **plan** | the currently selected trajectory | `plan_*` aggregates (is the chosen plan clear?) |
 
 The route view is what makes the behaviour layer see a threat *before* the
@@ -161,7 +201,9 @@ Per object:
 
 * `min_predicted_distance`, `time_of_min_distance`
 * `trajectory_intersection` = any `t_k` with distance <= safety margin (route view)
-* `ttc` (route), `ttc_physical` (current speed), `ttc_kinematic` = d(0) / closing speed
+* `ttc` (route), `ttc_physical` (current heading and speed), `ttc_kinematic` = d(0) / closing speed.
+  A TTC is the earliest `t_k` at which the footprints come within the margin *while closing*
+  (a constant sub-margin distance alongside an object is not a TTC) or truly overlap.
 * `collision_probability(t)` = band probability (`autonomy/core/probability.py`):
   `Phi((gap + W)/sigma) - Phi(gap/sigma)`, gap = max(d - margin, 0),
   W = ego width + object size + 2 margin; 1 when footprints overlap. Unlike a
@@ -237,11 +279,25 @@ Each component is normalised to roughly [0, 1] and documented in
 an addition to the prompt's list and is what makes the vehicle return toward
 its route after an avoidance.
 
-5. **Selection**: minimum `J` among feasible candidates. If none is feasible
-   but some are collision-free and on the road (only the boundary *margin* is
-   violated) the cheapest of those is selected and flagged `degraded=True`.
-   Otherwise the maximum-deceleration stop trajectory is returned flagged
-   `fallback=True`; behaviour and safety supervisor treat that as an emergency.
+5. **Beyond the horizon**: each surviving candidate is continued along the
+   corridor at its terminal speed (frozen for a stop) up to `route_lookahead_s`
+   against constant-velocity extrapolations of all objects. A meeting before
+   `terminal_exposure_horizon_s` rejects the candidate (`TERMINAL_STATE_EXPOSED`:
+   "do not stop where you will be hit, do not creep toward a blocked route");
+   a later meeting adds the graded `blocked` cost. Near-stop candidates must
+   also come to rest at least `stop_standoff_m` from every object (now and
+   predicted) so a bypass remains possible from standstill. Being inside the
+   margin counts as a hit only while the distance is still shrinking, and the
+   first `collision_margin_grace_s` excuses the current pose.
+6. **Anti-freeze**: while the ego stands still under planner control, the
+   progress weight grows with waiting time (`standstill_progress_gain`) so a
+   feasible bypass eventually outweighs waiting.
+7. **Selection**: minimum `J` among feasible candidates. If none is feasible
+   but some are collision-free and on the road (only margin, standoff or
+   beyond-horizon exposure violated) the cheapest of those is selected and
+   flagged `degraded=True`. Otherwise the maximum-deceleration stop trajectory
+   is returned flagged `fallback=True`; behaviour and safety supervisor treat
+   that as an emergency.
 
 ## 10. Controller
 

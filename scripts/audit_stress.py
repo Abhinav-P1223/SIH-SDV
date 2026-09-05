@@ -3,7 +3,8 @@ PASS / DEGRADED / FAIL per case, with what the system actually did.
 
 PASS      completed, no collision, clearance >= margin
 DEGRADED  no collision but not completed (stopped / timeout), or margin violated
-FAIL      collision
+FAIL      collision; annotated "agent-initiated" when the ego was stationary at impact
+          (an agent walked into a stopped ego; only reversing could avoid it)
 
 Sensor-noise / dropout / delay cases wrap the ground-truth provider, since the
 repository has no sensor models; they show how the stack degrades when the
@@ -24,7 +25,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from autonomy.core.config import AutonomyConfig, ObjectProfiles, load_vehicle_parameters, load_yaml  # noqa: E402
+from autonomy.core.config import AutonomyConfig, ObjectProfiles, PerceptionConfig, load_vehicle_parameters, load_yaml  # noqa: E402
 from autonomy.core.interfaces import ObjectStateProvider  # noqa: E402
 from autonomy.core.types import ObjectState  # noqa: E402
 from autonomy.telemetry.telemetry import InMemorySink, TelemetryPublisher  # noqa: E402
@@ -71,23 +72,53 @@ class NoisyProvider(ObjectStateProvider):
         return out
 
 
-def run(data, provider_kwargs=None, cfg=None):
+PERCEPTION_MODE = "ground_truth"      # overridden by --perception
+
+
+def run(data, provider_kwargs=None, cfg=None, sensor_override=None):
     cfg = cfg or AutonomyConfig.load()
     sc = build_scenario(data)
     if provider_kwargs:
         sc.world._provider = NoisyProvider(sc.world._provider, **provider_kwargs)
     mem = InMemorySink()
-    sim = Simulation(sc, cfg, load_vehicle_parameters(), ObjectProfiles.load(), TelemetryPublisher([mem]))
+    perception = PerceptionConfig.load().with_mode(PERCEPTION_MODE)
+    if sensor_override:
+        perception = sensor_override(perception)
+    sim = Simulation(sc, cfg, load_vehicle_parameters(), ObjectProfiles.load(), TelemetryPublisher([mem]),
+                     perception=perception)
     m = sim.run()
     return m, mem.frames, sc
 
 
-def classify(m, margin):
+def classify(m, margin, frames=None, road=None):
     if m.collision_count > 0:
+        # a free-moving agent (not road-following traffic) walking into a STATIONARY ego is agent-initiated:
+        # only reversing could avoid it. Road traffic hitting a stopped ego is the ego's failure to clear the path.
+        info = contact_info(frames, road) if frames is not None else None
+        if info is not None and info[0] < 0.1 and not info[1]:
+            return "FAIL (agent-initiated: free-moving agent walked into the stationary ego)"
         return "FAIL"
     if not m.scenario_completed or m.minimum_obstacle_clearance < margin:
         return "DEGRADED"
     return "PASS"
+
+
+def contact_info(frames, road=None):
+    """(ego speed, agent_is_road_following) at the first frame where the ego footprint touches a truth agent."""
+    from autonomy.core.geometry import OrientedBox, box_distance, wrap_angle
+    from autonomy.vehicle.models import footprint_for
+    P = load_vehicle_parameters()
+    for f in frames:
+        fp = footprint_for(P, f.ego.x, f.ego.y, f.ego.yaw)
+        for a in f.agents:
+            if box_distance(fp, OrientedBox(a["x"], a["y"], a["heading"], 1.0, 1.0)) <= 0.5:
+                following = False
+                if road is not None:
+                    _, _, h_ref = road.project(a["x"], a["y"])
+                    rel = abs(float(wrap_angle(a["heading"] - h_ref)))
+                    following = (rel < math.radians(30) or abs(rel - math.pi) < math.radians(30)) and a["speed"] > 1.0
+                return f.ego.longitudinal_velocity, following
+    return None
 
 
 def row(name, m, frames, verdict, note=""):
@@ -104,6 +135,11 @@ def row(name, m, frames, verdict, note=""):
 
 
 def main() -> int:
+    global PERCEPTION_MODE
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--perception", choices=["ground_truth", "sensors"], default="ground_truth")
+    PERCEPTION_MODE = ap.parse_args().perception
     cfg = AutonomyConfig.load()
     margin = cfg.planning.safety_margin_m
     cattle = load_yaml(SCENARIO_DIR / "sudden_cattle_crossing.yaml")
@@ -152,16 +188,34 @@ def main() -> int:
     fast = copy.deepcopy(cattle); fast["ego"]["speed_mps"] = 20.0; fast["ego"]["desired_speed_mps"] = 20.0
     fast["agents"][0]["params"]["trigger_distance_m"] = 45.0
     cases.append(("high-speed approach 20 m/s (72 km/h), cow crossing triggered at 45 m", fast, None))
-    # 8 sensor noise on the ObjectState contract
-    cases.append(("position noise 0.5 m, velocity noise 0.4 m/s (seeded)", copy.deepcopy(cattle),
-                  {"sigma_pos": 0.5, "sigma_vel": 0.4, "seed": 1}))
-    # 9 dropout
-    cases.append(("30 % detection dropout", copy.deepcopy(cattle), {"dropout": 0.3, "seed": 2}))
-    # 10 delayed measurements
-    cases.append(("0.4 s measurement delay", copy.deepcopy(cattle), {"delay_s": 0.4}))
-    # 11 all three together
-    cases.append(("noise 0.3 m/0.3 m/s + 20 % dropout + 0.2 s delay", copy.deepcopy(cattle),
-                  {"sigma_pos": 0.3, "sigma_vel": 0.3, "dropout": 0.2, "delay_s": 0.2, "seed": 3}))
+    if PERCEPTION_MODE == "ground_truth":
+        # 8-11 imperfect ObjectState input straight into the planner (no filtering)
+        cases.append(("position noise 0.5 m, velocity noise 0.4 m/s (seeded)", copy.deepcopy(cattle),
+                      {"sigma_pos": 0.5, "sigma_vel": 0.4, "seed": 1}))
+        cases.append(("30 % detection dropout", copy.deepcopy(cattle), {"dropout": 0.3, "seed": 2}))
+        cases.append(("0.4 s measurement delay", copy.deepcopy(cattle), {"delay_s": 0.4}))
+        cases.append(("noise 0.3 m/0.3 m/s + 20 % dropout + 0.2 s delay", copy.deepcopy(cattle),
+                      {"sigma_pos": 0.3, "sigma_vel": 0.3, "dropout": 0.2, "delay_s": 0.2, "seed": 3}))
+    else:
+        # 8-11 sensor degradation through the real tracker: ablations and a degraded suite
+        def degraded(pc):
+            pc = pc.with_mode("sensors")
+            for name in pc.sensors:
+                s = pc.sensors[name]
+                for k in ("bearing_std_deg", "range_std_frac", "range_std_min_m", "position_std_m", "range_std_m",
+                          "radial_speed_std_mps", "extent_std_m", "heading_std_deg"):
+                    if k in s:
+                        s[k] = s[k] * 2.0
+                s["dropout_prob"] = min(0.6, s.get("dropout_prob", 0.0) + 0.3)
+                s["latency_s"] = s.get("latency_s", 0.0) + 0.1
+            return pc
+        cases.append(("camera disabled (LiDAR + radar only, classes UNKNOWN)", copy.deepcopy(cattle), None,
+                      lambda pc: pc.without("camera")))
+        cases.append(("LiDAR disabled (camera + radar only)", copy.deepcopy(cattle), None,
+                      lambda pc: pc.without("lidar")))
+        cases.append(("radar disabled (camera + LiDAR only, no radial speed)", copy.deepcopy(cattle), None,
+                      lambda pc: pc.without("radar")))
+        cases.append(("degraded suite: 2x noise, +30 % dropout, +0.1 s latency", copy.deepcopy(cattle), None, degraded))
     # 12 sudden direction change: cow stops mid-road then reverses (two-phase via ERRATIC with strong sigma)
     cases.append(("erratic cow wandering in the ego half (seeded random direction changes)", scenario("ERRATIC_COW", [
         {"id": "cattle_1", "type": "CATTLE", "x": 60, "y": 1.5, "heading_deg": -90, "speed_mps": 0.6,
@@ -172,14 +226,16 @@ def main() -> int:
     print("| case | verdict | termination | collisions | min clearance [m] | min TTC [s] | EB | min speed [m/s] | "
           "behaviour states | t_done [s] | note |")
     print("|---|---|---|---|---|---|---|---|---|---|---|")
-    for name, data, pk in cases:
+    for case in cases:
+        name, data, pk = case[0], case[1], case[2]
+        so = case[3] if len(case) > 3 else None
         try:
-            m, frames, sc = run(data, pk, cfg)
+            m, frames, sc = run(data, pk, cfg, so)
             note = ""
             if pk and "dropout" in pk:
                 prov = sc.world._provider
                 note = f"dropped {prov.dropped}/{prov.total} detections"
-            print(row(name, m, frames, classify(m, margin), note))
+            print(row(name, m, frames, classify(m, margin, frames, sc.world.road), note))
         except Exception as exc:  # report, never hide
             print(f"| {name} | **ERROR** | exception | - | - | - | - | - | - | - | {type(exc).__name__}: {exc} |")
     return 0

@@ -134,6 +134,8 @@ def g_release_to_cruise(c: DecisionContext) -> Optional[str]:
     r = c.risk
     if _has_slower_lead(c):
         return None
+    if r.lead_object_id is None and r.non_lead_max_level.value <= RiskLevel.LOW.value             and not r.non_lead_any_intersection:
+        return "Lead object gone and no elevated risk; resuming cruise."
     if r.non_lead_max_score < c.cfg.caution_exit_score and not r.non_lead_any_intersection \
             and r.non_lead_max_level.value <= RiskLevel.LOW.value:
         return f"Risk cleared (max risk {r.non_lead_max_score:.2f}); resuming cruise."
@@ -244,6 +246,8 @@ class BehaviorStateMachine:
         if state == BehaviorState.CRUISE:
             return SpeedPolicy(v, True, False)
         if state == BehaviorState.FOLLOW:
+            if risk.lead_object_id is None:
+                return SpeedPolicy(v, True, False)        # lead gone: never brake for a phantom
             desired_gap = max(c.follow_time_gap_s * max(risk.lead_speed, 0.0), 2.0)
             gap_err = risk.lead_gap - desired_gap if math.isfinite(risk.lead_gap) else 0.0
             target = risk.lead_speed + gap_err / c.follow_time_gap_s

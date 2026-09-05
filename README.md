@@ -1,17 +1,24 @@
 # SIH26037 — Adaptive Path Planning and Collision Avoidance on Unstructured Indian Roads
 
-Stage 1: **closed-loop autonomy core**. A planner produces trajectories, a
-controller turns them into steering / acceleration / braking, actuator limits
-shape those commands, and a kinematic bicycle model moves the vehicle. Ground
-truth obstacles enter through the same `ObjectState` interface that sensor
-fusion will use in Stage 2. Lane markings are optional: the planner works on a
-drivable-space corridor and a reference direction.
+A **closed-loop autonomy stack with simulated multi-sensor perception**.
+Simulated camera, LiDAR and radar observe the world; a Kalman-filter tracker
+fuses their detections into object tracks with covariance; a corridor-frame
+lattice planner produces trajectories; a Stanley + PID controller turns them
+into steering / acceleration / braking; actuator limits shape those commands;
+a kinematic bicycle model moves the vehicle. Lane markings are optional: the
+planner works on a drivable-space corridor and a reference direction. There is
+no machine learning: object classes come from the simulated camera's noisy
+classifier, and the stack is honest about that.
 
 ```
-World -> ObjectState[] -> Prediction -> Risk -> Behaviour FSM -> Planner
-      -> Tracker (Stanley + PID) -> Safety Supervisor -> Actuators -> Vehicle Dynamics -> World
+World -> Sensors (camera/LiDAR/radar) -> Detections -> Tracker/Fusion -> ObjectState[]
+      -> Prediction -> Risk -> Behaviour FSM -> Planner -> Tracker (Stanley + PID)
+      -> Safety Supervisor -> Actuators -> Vehicle Dynamics -> World
                                    \-> Telemetry (JSONL / CSV / console / debug view)
 ```
+
+`config/sensors.yaml: perception.mode` selects `sensors` (default) or
+`ground_truth` (the baseline that isolates planning behaviour).
 
 Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design,
 [docs/INTERFACES.md](docs/INTERFACES.md) for the data contracts, and
@@ -24,10 +31,13 @@ python -m venv .venv && .venv\Scripts\activate         # Windows; use source .ve
 pip install -r requirements.txt
 
 python -m pytest tests -q                              # unit + integration + scenario tests
-python scripts/run_scenario.py SUDDEN_CATTLE_CROSSING  # closed-loop run, console + logs/
+python scripts/run_scenario.py SUDDEN_CATTLE_CROSSING  # closed-loop run (sensors), console + logs/
+python scripts/run_scenario.py SUDDEN_CATTLE_CROSSING --perception ground_truth
 python scripts/run_scenario.py SUDDEN_PEDESTRIAN_DART  # exercises the emergency-brake path
 python scripts/run_scenario.py MIXED_TRAFFIC_CURVE     # curved corridor, merging auto-rickshaw, erratic pedestrian
 python scripts/sweep.py                                # parameter sweep -> scenario success rate
+python scripts/audit_adaptivity.py --perception sensors # jury audit: perturbations change the plan
+python scripts/audit_stress.py --perception sensors     # jury audit: 12 stress cases, PASS/DEGRADED/FAIL
 
 # engineering debug view from the telemetry log
 python -m visualization.debug_view logs/sudden_cattle_crossing.jsonl --time 6.7 --save frame.png
@@ -78,7 +88,11 @@ logs/            telemetry output (git-ignored)
 
 | Scenario | What it exercises |
 |---|---|
-| `SUDDEN_CATTLE_CROSSING` | the prompt's acceptance scenario: predicted crossing, CAUTION -> AVOID -> CRUISE, pass and return to route |
+| `UNMARKED_VILLAGE_ROAD` | SIH #1: 5.6 m road narrowing to 4.6 m, parked pushcart, slow bicycle, walking pedestrian, wandering cow |
+| `UNSIGNALIZED_INTERSECTION` | SIH #2: crossroads without signals, car / auto-rickshaw / motorcycle crossing from both sides, corner pedestrian |
+| `HIGHWAY_MERGE_SLOW_VEHICLES` | SIH #3: 20 m/s ego, slow truck, auto-rickshaw merging with gap acceptance, oncoming bus, later car merge |
+| `DENSE_MARKET_MIXED_TRAFFIC` | SIH #4: market street, parked carts, slow auto, filtering motorcycle, crossing and walking pedestrians, standing cow |
+| `SUDDEN_CATTLE_CROSSING` | SIH #5 and the acceptance scenario: predicted crossing, CAUTION -> AVOID -> CRUISE, pass and return to route |
 | `SUDDEN_PEDESTRIAN_DART` | short-range dart: independent safety supervisor, EMERGENCY_BRAKE and recovery |
 | `MIXED_TRAFFIC_CURVE` | 40-degree curve (R = 60 m), auto-rickshaw merging then following the road, erratic pedestrian, FOLLOW state |
 
@@ -90,7 +104,7 @@ ego setup, goal and agents (behaviours `STATIC`, `CONSTANT_VELOCITY`,
 `CROSSING`, `MERGING`, `ERRATIC`; types from `config/object_profiles.yaml`;
 positions in `x, y` or corridor `s, d`). Nothing in `autonomy/` needs to change.
 
-## Engineering rules kept in Stage 1
+## Engineering rules kept
 
 * The ego is never teleported; only `VehicleModel.step()` moves it.
 * No scripted ego manoeuvres. Agents are scripted; the ego's response emerges.

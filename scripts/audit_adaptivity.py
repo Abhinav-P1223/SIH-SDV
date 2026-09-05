@@ -13,17 +13,22 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from autonomy.core.config import AutonomyConfig, ObjectProfiles, load_vehicle_parameters, load_yaml  # noqa: E402
+from autonomy.core.config import AutonomyConfig, ObjectProfiles, PerceptionConfig, load_vehicle_parameters, load_yaml  # noqa: E402
 from autonomy.telemetry.telemetry import InMemorySink, TelemetryPublisher  # noqa: E402
 from simulation.runner import Simulation  # noqa: E402
 from simulation.scenarios.loader import SCENARIO_DIR, build_scenario  # noqa: E402
+
+
+PERCEPTION_MODE = "ground_truth"      # overridden by --perception
 
 
 def run(data, cfg=None):
     cfg = cfg or AutonomyConfig.load()
     sc = build_scenario(data)
     mem = InMemorySink()
-    sim = Simulation(sc, cfg, load_vehicle_parameters(), ObjectProfiles.load(), TelemetryPublisher([mem]))
+    perception = PerceptionConfig.load().with_mode(PERCEPTION_MODE)
+    sim = Simulation(sc, cfg, load_vehicle_parameters(), ObjectProfiles.load(), TelemetryPublisher([mem]),
+                     perception=perception)
     m = sim.run()
     return m, mem.frames
 
@@ -55,6 +60,11 @@ def summarise(name, m, frames, obj_id="cattle_1"):
 
 
 def main() -> int:
+    global PERCEPTION_MODE
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--perception", choices=["ground_truth", "sensors"], default="ground_truth")
+    PERCEPTION_MODE = ap.parse_args().perception
     base = load_yaml(SCENARIO_DIR / "sudden_cattle_crossing.yaml")
     variants = []
 

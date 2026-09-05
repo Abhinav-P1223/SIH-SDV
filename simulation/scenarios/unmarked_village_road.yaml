@@ -1,0 +1,63 @@
+# UNMARKED_VILLAGE_ROAD  (SIH required scenario 1)
+# Narrow village road (5.6 m) that narrows further to 4.6 m through a built-up stretch, no markings.
+# Clutter: a pushcart parked at the left edge, a slow bicycle ahead in the ego's half, a pedestrian
+# walking along the right edge toward the ego, and a cow that wanders out from the left edge.
+# The ego must pass the cart and bicycle with little lateral room, respect the narrowing, and handle
+# the cow. The ego's response is not scripted.
+name: UNMARKED_VILLAGE_ROAD
+description: Narrow unmarked village road with a parked pushcart, slow bicycle, walking pedestrian and a wandering cow.
+seed: 21
+
+road:
+  lane_markings: NONE
+  reference:      [[-20.0, 0.0], [170.0, 0.0]]
+  left_boundary:  [[-20.0, 2.8], [50.0, 2.8], [65.0, 2.3], [105.0, 2.3], [120.0, 2.8], [170.0, 2.8]]
+  right_boundary: [[-20.0, -2.8], [50.0, -2.8], [65.0, -2.3], [105.0, -2.3], [120.0, -2.8], [170.0, -2.8]]
+
+ego:
+  x: 0.0
+  y: 1.2
+  yaw_deg: 0.0
+  speed_mps: 7.0
+  desired_speed_mps: 7.0          # ~25 km/h village pace
+  desired_lateral_offset_m: 1.2
+
+goal:
+  s_m: 165.0
+
+agents:
+  - id: cart_1
+    type: PUSHCART
+    x: 40.0
+    y: 2.2                        # parked at the left edge, intrudes into the ego's half
+    heading_deg: 0.0
+    behavior: STATIC
+    params: {}
+  - id: bike_1
+    type: BICYCLE
+    x: 30.0
+    y: 1.0
+    heading_deg: 0.0
+    speed_mps: 3.5
+    behavior: CONSTANT_VELOCITY
+    params: {}
+  - id: ped_1
+    type: PEDESTRIAN
+    x: 95.0
+    y: -2.0
+    heading_deg: 180.0            # walking toward the ego along the right edge
+    speed_mps: 1.2
+    behavior: CONSTANT_VELOCITY
+    params: {}
+  - id: cattle_1
+    type: CATTLE
+    x: 130.0
+    y: 2.3
+    heading_deg: -90.0
+    speed_mps: 0.0
+    behavior: ERRATIC
+    params:
+      heading_sigma_rad: 0.6
+      speed_sigma_mps: 0.4
+      change_interval_s: 1.2
+      max_speed_mps: 1.2

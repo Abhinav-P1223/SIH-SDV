@@ -75,7 +75,7 @@ class Simulation:
 
         self.ego: VehicleState = scenario.ego.initial_state
         self.vehicle = vehicle or KinematicBicycleModel(params)
-        self.predictor = ConstantVelocityPredictor(cfg.prediction, profiles)
+        self.predictor = ConstantVelocityPredictor(cfg.prediction, profiles, self.road)
         self.risk_engine = RiskEngine(cfg.risk, cfg.behavior, params, scenario.ego.desired_speed)
         self.behavior = BehaviorStateMachine(cfg.behavior, scenario.ego.desired_speed)
         self.planner = Planner(cfg.planning, cfg.risk, params, self.road,
