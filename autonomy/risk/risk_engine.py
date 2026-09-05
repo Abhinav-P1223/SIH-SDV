@@ -188,7 +188,12 @@ class RiskEngine:
         dist = box_sequence_distance(fx, fy, eyaw, p.length, p.width,
                                      pred.x, pred.y, pred.heading, pred.length, pred.width, exact_within=math.inf)
         margin = self.cfg.safety_margin_m + min(self.cfg.uncertainty_margin_gain * pred.meas_sigma, self.cfg.uncertainty_margin_max_m)
-        return first_overlap_time(rel, dist, margin, self.cfg.margin_grace_s)
+        # Being inside the margin is not by itself an emergency: while squeezing past a parked obstacle the ego
+        # sits inside it for the whole pass, and braking does not widen the gap. Only a distance that is still
+        # shrinking (or a real overlap) can raise the physical view to CRITICAL, which is the same rule the
+        # collision checker uses. Without it the ego panic-brakes repeatedly alongside anything it passes close.
+        closing = (dist < dist[0] - self.cfg.closing_epsilon_m) | (dist <= 0.0)
+        return first_overlap_time(rel, np.where(closing, dist, math.inf), margin, self.cfg.margin_grace_s)
 
     def _assess(self, pred: ObjectPrediction, rel: np.ndarray,
                 fx: np.ndarray, fy: np.ndarray, eyaw: np.ndarray,

@@ -162,8 +162,16 @@ class CollisionChecker:
                 sig[j] = np.sqrt(np.maximum(Pxx * ux * ux + 2 * Pxy * ux * uy + Pyy * uy * uy, 1e-12)).reshape(C, N)
             # inside the margin counts as a hit, except during the grace window where only overlap does
             margin_ok = rel_t >= cfg.collision_margin_grace_s                      # (C,N)
-            margins = np.array([cfg.safety_margin_m + extra_margin
-                                + min(cfg.uncertainty_margin_gain * pr.meas_sigma, cfg.uncertainty_margin_max_m)
+            # The margin grows with how uncertain the object's position is AT THE TIME the candidate would be
+            # there, not just with the measurement noise now. An animal two seconds out has a much wider
+            # distribution than the tracker's current error, and a fixed margin lets the ego accelerate past it
+            # on a prediction it has no right to trust. `sig` is the predicted covariance projected onto the
+            # line to the ego, so this is the real thing, capped by uncertainty_margin_max_m.
+            unc = np.minimum(cfg.uncertainty_margin_gain * sig, cfg.uncertainty_margin_max_m)     # (M,C,N)
+            margins_t = cfg.safety_margin_m + extra_margin + unc                                  # (M,C,N)
+            margins = np.array([cfg.safety_margin_m + extra_margin                                # scalar view,
+                                + min(cfg.uncertainty_margin_gain * pr.meas_sigma,                # used beyond
+                                      cfg.uncertainty_margin_max_m)                               # the horizon
                                 for pr in predictions])
             # inside-margin counts as a hit only when CLOSING relative to the current distance (or overlapping):
             # a candidate that slides past an object at the clearance the ego already has is not a collision
@@ -180,7 +188,7 @@ class CollisionChecker:
                                                      np.interp(T[:, -1], pr.times, np.unwrap(pr.heading)), pr.length, pr.width)
                                for pr in predictions])                                            # (M,C)
             allow = np.maximum(V[:, 0], 0.0) ** 2 / (2 * cfg.comfortable_deceleration_mps2) + cfg.creep_guard_slack_m  # (C,)
-            hit = (dist <= 0.0) | ((dist <= margins[:, None, None]) & closing & margin_ok[None, :, :])   # (M,C,N)
+            hit = (dist <= 0.0) | ((dist <= margins_t) & closing & margin_ok[None, :, :])              # (M,C,N)
             for i in range(C):
                 results[i].distances = dist[:, i, :]
                 results[i].sigmas = sig[:, i, :]
@@ -194,7 +202,7 @@ class CollisionChecker:
                     j = int(np.argmax(hit[:, i, k]))
                     cands[i].collision_time = float(rel_t[i, k])
                     self._reject(cands[i], RejectionReason.COLLISION,
-                                 f"distance {dist[j, i, k]:.2f} m <= margin {margins[j]:.2f} m "
+                                 f"distance {dist[j, i, k]:.2f} m <= margin {margins_t[j, i, k]:.2f} m "
                                  f"to {predictions[j].object_id} at +{rel_t[i, k]:.1f}s")
                     # inside the margin but never actually touching (and not creeping): still scorable in the
                     # degraded tier, so a tight pass beats a stop that would itself be struck
@@ -272,9 +280,20 @@ class CollisionChecker:
                     dist_ext = box_sequence_distance(ex, ey, eyaw, p.length, p.width,
                                                      ox, oy, oh, pred.length + 2 * infl[j], pred.width + 2 * infl[j]
                                                      ).reshape(len(idx), E)
+                    # Grade the exposure instead of testing a binary "does it meet". Beyond the horizon the
+                    # object is extrapolated for many seconds from a noisy tracked velocity, so a yes/no test
+                    # sitting on the margin flips from cycle to cycle and takes whole groups of candidates in
+                    # and out of the feasible set with it. Two continuous factors instead: how far inside the
+                    # margin the closest approach comes, and how soon it comes.
+                    scale = max(cfg.exposure_proximity_scale_m, 1e-6)
+                    d_min = dist_ext.min(axis=1)                                              # (I,)
+                    prox = np.clip((margins[j] + scale - dist_ext) / scale, 0.0, 1.0)         # (I,E)
+                    recency = np.clip(1.0 - ext / cfg.route_lookahead_s, 0.0, 1.0)            # (E,)
+                    severity = (prox * recency[None, :]).max(axis=1)   # worst mix of "how close" and "how soon"
                     hit_ext = dist_ext <= margins[j]
                     for r, i in enumerate(idx):
                         c = cands[i]
+                        c.route_block_severity = max(c.route_block_severity, float(severity[r]))
                         if not hit_ext[r].any():
                             continue
                         k = int(np.argmax(hit_ext[r]))
@@ -283,10 +302,13 @@ class CollisionChecker:
                             c.route_block_time = t_meet
                         if not alive[i]:
                             continue
-                        if t_meet <= cfg.terminal_exposure_horizon_s:
+                        # The hard rejection is kept for exposure the ego is committed to, but it now needs a
+                        # clear violation, not a graze: a candidate that merely brushes the margin stays
+                        # feasible and carries the graded cost above, which is what stops the flip-flopping.
+                        if t_meet <= cfg.terminal_exposure_horizon_s and d_min[r] <= margins[j] - cfg.exposure_reject_slack_m:
                             self._reject(c, RejectionReason.TERMINAL_EXPOSURE,
                                          f"continuing at {c.target_speed:.1f} m/s from the end state meets "
-                                         f"{pred.object_id} at +{t_meet:.1f}s")
+                                         f"{pred.object_id} at +{t_meet:.1f}s (closest {d_min[r]:.2f} m)")
                             c.margin_only = True          # scorable in the degraded tier
                             alive[i] = False
                         elif c.target_speed < cfg.stop_standoff_speed_mps and dist_ext[r, 0] < cfg.stop_standoff_m:

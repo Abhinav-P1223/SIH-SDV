@@ -367,7 +367,8 @@ class CandidateTrajectory:
     min_clearance: float = math.inf     # to any predicted object footprint (m)
     min_boundary_clearance: float = math.inf
     collision_time: Optional[float] = None
-    route_block_time: Optional[float] = None   # when the continuation beyond the horizon meets an object (s from now)
+    route_block_time: Optional[float] = None
+    route_block_severity: float = 0.0    # graded 0..1 exposure of the continuation beyond the horizon   # when the continuation beyond the horizon meets an object (s from now)
     fallback: bool = False
     margin_only: bool = False          # rejected solely for the boundary *margin*, still on the road
     degraded: bool = False             # selected although margin_only (no fully feasible candidate)

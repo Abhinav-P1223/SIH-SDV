@@ -82,6 +82,7 @@ class RiskConfig:
     ttc_high_s: float = 3.0
     ttc_critical_s: float = 1.2
     margin_grace_s: float = 0.3          # inside-margin (no overlap) is not a hit before this: current pose
+    closing_epsilon_m: float = 0.05      # the physical view only escalates while the gap is still shrinking
     levels: RiskLevelsConfig = field(default_factory=RiskLevelsConfig)
 
     def __post_init__(self) -> None:
@@ -163,6 +164,8 @@ class PlanningConfig:
     standstill_progress_max_factor: float = 6.0
     terminal_exposure_horizon_s: float = 7.0   # end pose must not be hit by CV-extrapolated objects before this
     route_lookahead_s: float = 15.0            # continuation checked this far for the graded 'blocked' cost
+    exposure_proximity_scale_m: float = 1.0    # beyond-horizon exposure grades to zero this far outside the margin
+    exposure_reject_slack_m: float = 0.2       # ... and only rejects outright when it comes this far inside it
     stop_standoff_m: float = 5.0               # a near-stop end state behind a blocked route keeps this gap
     stop_standoff_speed_mps: float = 1.0
     collision_margin_grace_s: float = 0.3      # inside-margin (not overlap) tolerated this long: current pose

@@ -103,8 +103,7 @@ class TrajectoryScorer:
                 if side != 0 and side == np.sign(v_lat):
                     c["front_pass"] = 1.0          # passing where the object is heading
                     break
-        c["blocked"] = 0.0 if cand.route_block_time is None else \
-            float(np.clip(1.0 - cand.route_block_time / self.cfg.route_lookahead_s, 0.0, 1.0))
+        c["blocked"] = float(np.clip(cand.route_block_severity, 0.0, 1.0))
 
         w = dict(self.cfg.weights.as_dict())
         if standstill_s > 0.0:

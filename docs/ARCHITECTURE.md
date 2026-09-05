@@ -305,7 +305,13 @@ episode ends when a forward plan reappears, and `reverse_count` resets on CRUISE
    `v^2*|kappa| > a_lat_max`, footprint outside the corridor at any time or
    closer than `boundary_margin_m` after `boundary_margin_grace_s` (the current
    pose is not the planner's choice), predicted collision with any object
-   (footprint distance <= `safety_margin_m` at the same time index).
+   (footprint distance <= the margin at the same time index). That margin is
+   `safety_margin_m` plus a tracking-error budget plus
+   `min(uncertainty_margin_gain * sigma(t), uncertainty_margin_max_m)`, where
+   `sigma(t)` is the object's PREDICTED positional standard deviation at that instant
+   projected onto the line to the ego. Using the prediction rather than the current
+   measurement error is what stops the ego accelerating past an erratic animal on a
+   forecast it has no right to trust.
    Boundary clearance uses the candidates' corridor coordinates against
    `RoadModel.lateral_bounds(s)` (exact on straights, ~6 cm error at R = 60 m,
    tested against the polygon geometry); the geometric path remains the
@@ -331,10 +337,19 @@ its route after an avoidance.
    the lateral rate the candidate ended with, up to its target offset, instead of
    freezing `d`: a wide shift outlasts the 4 s horizon, so freezing it would make
    every candidate that is half-way around an obstacle look like it drives into
-   it. A meeting before
-   `terminal_exposure_horizon_s` rejects the candidate (`TERMINAL_STATE_EXPOSED`:
-   "do not stop where you will be hit, do not creep toward a blocked route");
-   a later meeting adds the graded `blocked` cost. Near-stop candidates must
+   it. The exposure is **graded, not binary**. Out there the object has been
+   extrapolated for many seconds from a noisy tracked velocity, so a yes/no test
+   sitting on the margin flips from cycle to cycle and drags whole groups of
+   candidates in and out of the feasible set, which is what made the ego chatter
+   under sensor noise. Instead the `blocked` cost is the worst combination over the
+   continuation of how far inside the margin it comes
+   (`exposure_proximity_scale_m`) and how soon (`route_lookahead_s`), and the hard
+   `TERMINAL_STATE_EXPOSED` rejection needs both a meeting before
+   `terminal_exposure_horizon_s` and a clear violation of at least
+   `exposure_reject_slack_m`. A graze at long range therefore costs something
+   instead of deleting the candidate ("do not stop where you will be hit, do not
+   creep toward a blocked route" still holds for real violations). Near-stop
+   candidates must
    also come to rest at least `stop_standoff_m` from every object (now and
    predicted) so a bypass remains possible from standstill. Being inside the
    margin counts as a hit only while the distance is still shrinking, and the

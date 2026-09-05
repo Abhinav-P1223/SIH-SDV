@@ -551,3 +551,66 @@ Unchanged from the re-audit, plus one addition:
    fewer legs in tight geometry.
 4. Simulated sensors only; no images, no point clouds, no learned detector.
 5. Agents do not react to the ego except through gap acceptance in the merge behaviours.
+
+
+---
+
+# FOURTH AUDIT — the chatter round
+
+One weakness was taken on directly this round: **weakness 1 and 2 of the third audit**,
+the nervousness under sensor noise and the threshold cliff behind it. Everything below was
+executed on the working tree of this round.
+
+## The mechanism, and why it was a cliff
+
+Beyond the planning horizon each candidate is continued along the corridor and checked
+against objects extrapolated at constant velocity. That check asked a yes/no question: does
+the continuation come within the margin, and if so, is that within
+`terminal_exposure_horizon_s`? Out there the object has been extrapolated for many seconds
+from a tracked velocity that carries sensor noise, so a candidate sitting near either
+boundary answered differently from cycle to cycle. A rejected candidate is not merely
+expensive, it is gone, so whole groups of candidates entered and left the feasible set
+together and the winner jumped with them. Measured on the dense market in sensors mode: the
+selected lateral line moved by more than 0.9 m on 56 of 467 planning cycles, and the
+feasible count swung by more than five on 124 of them.
+
+## What was changed
+
+| Change | Why |
+|---|---|
+| The `blocked` cost is now the worst combination over the whole continuation of how far inside the margin it comes (`exposure_proximity_scale_m`) and how soon (`route_lookahead_s`), instead of a step function of the first meeting time | A continuous signal moves the ranking smoothly under noise instead of deleting candidates |
+| The hard `TERMINAL_STATE_EXPOSED` rejection now needs a clear violation, at least `exposure_reject_slack_m` inside the margin, as well as an early meeting | A graze at long range costs something rather than removing the option |
+| The collision margin grows with the object's **predicted** positional standard deviation at the time the candidate would be there, projected onto the line to the ego, instead of only its current measurement error | Found by the stress battery: with a fixed margin the ego accelerated from rest to 5 m/s past an erratic cow and hit it, on a forecast it had no right to trust |
+| The physical (emergency) risk view only escalates while the gap is still shrinking | Sitting inside the margin is not an emergency. While squeezing past a parked obstacle the ego is inside it for the whole pass, and braking does not widen the gap |
+| `NARROW_LANE_BOXED_IN` gives the bypass about 1.35 m of free width | Once the margin grows with prediction uncertainty, the old 1.45 m band was knife-edge. The scenario exists to test the reversing recovery, not margin arithmetic |
+
+## Effect
+
+Dense market, the scenario the criticism was about:
+
+| Metric (sensors mode) | Before | After |
+|---|---|---|
+| Emergency-brake activations | 8 | 1 |
+| Behaviour transitions | 72 | 54 |
+| Lateral line moved > 0.9 m | 56 cycles | 37 cycles |
+| Minimum clearance | 0.65 m | 0.67 m |
+
+The stress battery improved from 10 PASS and 2 DEGRADED per mode to 11 and 1: the erratic-cow
+case, previously the worst result in the suite, now clears by 0.76 m instead of colliding.
+The one remaining DEGRADED case is the blocked road, where there is genuinely no way through
+and stopping is the correct outcome.
+
+One honest cost: in ground-truth mode the dense market gives up some clearance
+(0.92 m to 0.76 m) and one emergency brake, because grazing candidates now survive with a
+cost instead of being deleted. Ground truth is the idealised mode; the shipped default is
+sensors, and it improved on every count.
+
+## Remaining weaknesses, re-ranked
+
+1. `NARROW_LANE_BOXED_IN` in sensors mode still makes four emergency-brake activations while
+   threading the gap beside the cart. It reaches the goal without collision, and ground truth
+   makes none, which again localises it to tracking noise on a deliberately tight pass.
+2. Reversing is straight-line only. A real driver would steer while backing up.
+3. Simulated sensors only; no images, no point clouds, no learned detector.
+4. Agents do not react to the ego except through gap acceptance in the merge behaviours.
+5. The MATLAB exports have still never been run in MATLAB.

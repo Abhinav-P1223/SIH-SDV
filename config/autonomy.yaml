@@ -41,6 +41,8 @@ risk:
   ttc_high_s: 3.0                 # TTC below this contributes HIGH
   ttc_critical_s: 1.2             # TTC below this is CRITICAL
   margin_grace_s: 0.3             # being inside the margin (no overlap) before this is the current pose, not a hit
+  closing_epsilon_m: 0.05         # the physical (emergency) view only escalates while the gap is still shrinking:
+                                  # sitting inside the margin alongside a parked obstacle is not an emergency
   levels:                         # risk_score thresholds (after type weighting)
     low: 0.05
     medium: 0.20
@@ -83,7 +85,10 @@ planning:
   max_jerk_mps3: 4.0              # speed profiles are jerk-limited S-curves (hard stops are exempt: safety first)
   max_lateral_acceleration_mps2: 3.5
   safety_margin_m: 0.5            # collision margin between ego footprint and objects
-  uncertainty_margin_gain: 1.0    # margin grows by gain x the object's own measured position std-dev (fusion covariance)
+  uncertainty_margin_gain: 1.0    # margin grows by gain x the object's PREDICTED position std-dev at the time the
+                                  # candidate would be there, projected onto the line to the ego, not just the
+                                  # measurement error now: an animal 2 s out has a far wider distribution, and a
+                                  # fixed margin lets the ego accelerate past it on a prediction it cannot trust
   uncertainty_margin_max_m: 0.5   # ... capped: a far, bearing-uncertain track must not block every lateral option
   tracking_margin_speed_gain_s: 0.02   # margin += 0.02 s x ego speed (0.2 m at 10 m/s): the controller does not track
                                         # the plan perfectly, and the error grows with speed
@@ -108,6 +113,9 @@ planning:
   stop_standoff_m: 5.0            # do not come to rest closer than this to any object (now or predicted): room
                                   # to steer around it from standstill (no reversing in Stage 1)
   stop_standoff_speed_mps: 1.0
+  exposure_proximity_scale_m: 1.0 # beyond-horizon exposure is graded: severity falls to 0 this far outside the margin
+  exposure_reject_slack_m: 0.2    # ... and a candidate is only rejected outright once it comes this far inside it,
+                                  # so a graze at long range costs something instead of deleting the candidate
   route_lookahead_s: 15.0         # continuation from the end state is checked this far; a meeting inside
                                   # the window adds the graded 'blocked' cost (1 - t_meet / lookahead)
   collision_margin_grace_s: 0.3   # being inside the margin (no overlap) is tolerated this long: the current pose is a given

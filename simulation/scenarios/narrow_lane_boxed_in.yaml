@@ -3,12 +3,14 @@
 # when the ego is ~11 m away and is then abandoned across the ego's half of the lane.
 #
 # The geometry is the point of the scenario:
-#   * there IS a way past. The cart occupies d in [0.5, 2.5]; a 1.8 m car needs d <= -0.9 to clear it with the
-#     0.5 m safety margin, and the corridor allows down to d = -2.35. So a 1.45 m band on the right is free.
+#   * there IS a way past, with room to spare. The cart occupies d in [0.9, 2.9]; a 1.8 m car needs d <= -1.0 to
+#     clear it once the margin has grown with the cart's predicted position uncertainty, and the corridor allows
+#     down to d = -2.35. So about 1.35 m of the right-hand side is genuinely free. The bypass is deliberately
+#     comfortable: this scenario tests the reversing recovery, not margin arithmetic.
 #   * the ego cannot USE it from where it stops. Shifting from d = +1.75 to about d = -1.5 is a 3.2 m lateral
-#     move; the quintic's peak curvature limits that to roughly 9.3 m of forward travel, and the standoff
-#     leaves the ego only ~5 m in front of the cart. Every wide candidate still overlaps the cart inside the
-#     planning horizon and is rejected.
+#     move; the quintic's peak curvature limits that to roughly 9 m of forward travel, and the standoff leaves
+#     the ego only ~5 m in front of the cart. Every wide candidate still overlaps the cart inside the planning
+#     horizon and is rejected.
 # The only way out is to back up, buy the run-up, and then take the gap. Nothing about that is scripted: the
 # reversing must emerge from the planner reporting no forward plan and the behaviour layer reacting.
 name: NARROW_LANE_BOXED_IN
@@ -44,5 +46,5 @@ agents:
       trigger_distance_m: 11.0
       crossing_speed_mps: 1.0
       acceleration_mps2: 1.5
-      crossing_distance_m: 1.7   # ends centred at y = 1.5, spanning y in [0.5, 2.5]
+      crossing_distance_m: 1.3   # ends centred at y = 1.9, spanning y in [0.9, 2.9]
       stop_after: true
