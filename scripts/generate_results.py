@@ -133,7 +133,8 @@ def main() -> int:
                       ("HIGHWAY_MERGE_SLOW_VEHICLES", []), ("DENSE_MARKET_MIXED_TRAFFIC", []),
                       ("SUDDEN_CATTLE_CROSSING", ["cattle_caution_t3.3.png", "cattle_avoid_t6.7.png", "cattle_sensors_t6.5.png"]),
                       ("SUDDEN_PEDESTRIAN_DART", ["pedestrian_emergency_t3.7.png"]),
-                      ("MIXED_TRAFFIC_CURVE", ["curve_follow_t8.0.png", "curve_pedestrian_t16.0.png"])):
+                      ("MIXED_TRAFFIC_CURVE", ["curve_follow_t8.0.png", "curve_pedestrian_t16.0.png"]),
+                      ("NARROW_LANE_BOXED_IN", [])):
         gt = run_scenario(name, log_dir=None, console=False, keep_frames=False, perception="ground_truth").metrics
         res = run_scenario(name, log_dir="logs", console=False, keep_frames=True, perception="sensors")
         m = res.metrics

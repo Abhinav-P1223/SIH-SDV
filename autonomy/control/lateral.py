@@ -60,7 +60,13 @@ class StanleyController(LateralController):
         # signed lateral offset of the nearest path point relative to the vehicle heading
         dx, dy = px - fx, py - fy
         e = -math.sin(ego.yaw) * dx + math.cos(ego.yaw) * dy        # +ve: path is to the left
-        v = max(ego.longitudinal_velocity, 0.0)
+        v = abs(ego.longitudinal_velocity)
+        if ego.longitudinal_velocity < -0.05 or float(traj.velocity[min(1, len(traj) - 1)]) < -1e-6:
+            # reversing: hold the path heading; steering acts with inverted sign on the travel direction
+            theta_e = float(wrap_angle(float(traj.yaw[i]) - ego.yaw))
+            delta = -self.cfg.heading_gain * theta_e
+            delta = max(-self.params.max_steering_angle, min(self.params.max_steering_angle, delta))
+            return delta, LateralDebug(i, px, py, e, theta_e, delta)
 
         # look-ahead point for heading and curvature
         la = max(self.cfg.lookahead_time_s * v, self.cfg.min_lookahead_m)

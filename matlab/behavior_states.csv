@@ -1,0 +1,8 @@
+state,code,severity,speed_policy
+CRUISE,0,0,desired speed; lateral avoidance allowed
+FOLLOW,1,1,"min(desired, lead speed + gap error / follow_time_gap_s); lateral avoidance allowed"
+CAUTION,2,2,desired * caution_speed_factor; lateral avoidance allowed
+AVOID,3,3,desired * avoid_speed_factor; lateral avoidance allowed
+EMERGENCY_BRAKE,4,5,"target 0, force_stop: stop trajectories only"
+STOPPED,5,4,desired * caution_speed_factor; lateral avoidance allowed (planner keeps searching)
+REVERSING,6,4,desired * caution_speed_factor; lateral avoidance and reversing candidates allowed

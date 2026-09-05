@@ -1,0 +1,15 @@
+priority,from_states,to_state,guard,guard_doc,dwell_guarded_from
+0,CRUISE;FOLLOW;CAUTION;AVOID,EMERGENCY_BRAKE,g_emergency,,
+1,EMERGENCY_BRAKE,STOPPED,g_stopped,,EMERGENCY_BRAKE
+2,AVOID;CAUTION,STOPPED,g_planner_standstill,,
+3,EMERGENCY_BRAKE,CAUTION,g_eb_release,,EMERGENCY_BRAKE
+4,STOPPED,REVERSING,g_boxed_in,,STOPPED
+5,REVERSING,CAUTION,g_reverse_done,,REVERSING
+6,STOPPED,AVOID,g_stopped_to_avoid,,STOPPED
+7,STOPPED,CAUTION,g_stopped_release,,STOPPED
+8,CRUISE;FOLLOW;CAUTION,AVOID,g_avoid,"threats other than a lead vehicle we are following, or the current plan itself being on a collision course (whichever object), escalate to AVOID",
+9,AVOID,CAUTION,g_avoid_release,,AVOID
+10,CRUISE;FOLLOW,CAUTION,g_caution,,
+11,CRUISE;CAUTION,FOLLOW,g_follow,,CAUTION
+12,AVOID,FOLLOW,g_follow,,AVOID
+13,CAUTION;FOLLOW,CRUISE,g_release_to_cruise,,CAUTION;FOLLOW

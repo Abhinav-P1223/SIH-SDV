@@ -197,3 +197,22 @@ def test_tracker_never_reads_truth_id():
     src = inspect.getsource(mod)
     body = src.split("def ingest", 1)[1]
     assert body.count("truth_id") == 1 and "assert d.truth_id" in body
+
+
+def test_lidar_only_track_survives_between_10hz_frames_and_a_dropped_frame():
+    """Ingest runs at 50 Hz; a LiDAR-only object seen at 10 Hz must not be deleted by the empty ingests,
+    nor by one dropped frame. Deletion is time-based (max_age_s)."""
+    tr = make_tracker()
+    t = 0.0
+    published = []
+    for k in range(150):                      # 3 s at 50 Hz
+        t = k * 0.02
+        lidar_frame = (k % 5 == 0) and not (60 <= k < 75)      # 10 Hz, one dropped frame at t=1.2..1.5 s
+        dets = [det(SensorType.LIDAR, t, 20.0, 1.0)] if lidar_frame else []
+        tr.ingest(dets, t, ego())
+        published.append(len(tr.get_object_states(t)))
+    assert all(p == 1 for p in published[15:]), "track dropped out"
+    assert len(tr.tracks) == 1 and tr.tracks[0].id == "trk_1"    # never re-created under a new id
+    for k in range(150, 210):                 # object disappears for 1.2 s -> deleted
+        tr.ingest([], k * 0.02, ego())
+    assert tr.get_object_states(4.2) == []

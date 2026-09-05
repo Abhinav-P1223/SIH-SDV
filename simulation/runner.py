@@ -111,7 +111,7 @@ class Simulation:
             self.predictions = self.predictor.predict(objects, t)
             ref = self.plan.selected.trajectory if self.plan else None
             self.risk = self.risk_engine.evaluate(self.ego, ref, objects, self.predictions, self.road)
-            had_feasible = self.plan.feasible_count > 0 if self.plan else True
+            had_feasible = (self.plan.feasible_count > 0 and not self.plan.selected.id.startswith("reverse_")) if self.plan else True
             standstill = self.plan.standstill_s if self.plan else 0.0
             self.decision = self.behavior.decide(self.risk, self.ego, t, planner_feasible=had_feasible,
                                                  standstill_s=standstill)

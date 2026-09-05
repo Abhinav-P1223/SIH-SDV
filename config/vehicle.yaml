@@ -13,3 +13,4 @@ vehicle:
   max_acceleration_mps2: 3.0
   max_deceleration_mps2: 8.0      # full braking (positive number)
   max_speed_mps: 25.0
+  max_reverse_speed_mps: 2.0      # reversing is a low-speed recovery manoeuvre only

@@ -42,10 +42,10 @@ class SafetySupervisor:
     def _trigger(self, risk: RiskSummary, plan: Optional[PlannerOutput], ego: VehicleState) -> Optional[str]:
         if plan is not None and plan.selected.fallback and ego.longitudinal_velocity > 0.05:
             return "planner returned fallback stop (no feasible trajectory)"
-        if risk.min_ttc_current_speed < self.cfg.ttc_critical_s:
+        if risk.min_ttc_current_speed < self.cfg.ttc_critical_s and ego.longitudinal_velocity >= self.cfg.min_speed_for_ttc_override_mps:
             return (f"physical TTC {risk.min_ttc_current_speed:.2f} s < {self.cfg.ttc_critical_s:.2f} s "
                     f"to {risk.worst_object_id}")
-        if risk.max_level == RiskLevel.CRITICAL and ego.longitudinal_velocity > 0.05:
+        if risk.max_level == RiskLevel.CRITICAL and ego.longitudinal_velocity >= self.cfg.min_speed_for_ttc_override_mps:
             return f"critical risk level from {risk.worst_object_id}"
         return None
 
@@ -64,7 +64,8 @@ class SafetySupervisor:
             self.current_reason = ""
 
         if self.active:
-            command = ControlCommand(now, command.steering_angle, 0.0, self.cfg.brake_mps2, source="safety")
+            command = ControlCommand(now, command.steering_angle, 0.0, self.cfg.brake_mps2, source="safety",
+                                     reverse=command.reverse)
         status = SafetyStatus(self.active, self.current_reason, len(self.activations),
                               self.activations[-1].time if self.active else None)
         return command, status

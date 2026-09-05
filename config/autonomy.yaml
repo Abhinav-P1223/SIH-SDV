@@ -13,6 +13,25 @@ prediction:
   dt_s: 0.1
   road_following_heading_tol_deg: 30.0   # vehicles aligned with the corridor (either direction) follow it
   lateral_velocity_decay_s: 1.0          # their lateral velocity (mostly estimation noise) decays
+  # Acceleration is estimated inside the predictor from the velocity history of successive cycles
+  # (least-squares slope over velocity_history_s, low-passed, clamped). Constant acceleration is
+  # applied for acceleration_horizon_s, then the velocity is held; a decelerating object stops and
+  # never reverses.
+  estimate_acceleration: true
+  max_acceleration_mps2: 2.0             # |a| clamp: bounds what velocity noise can inject
+  max_acceleration_by_type:              # per-class clamp overrides (others use max_acceleration_mps2)
+    PEDESTRIAN: 3.0
+    CAR: 3.0
+    MOTORCYCLE: 3.0
+    PUSHCART: 1.0
+  acceleration_horizon_s: 1.5
+  velocity_history_s: 0.6
+  min_history_samples: 3                 # below this the model is pure constant velocity
+  acceleration_filter_s: 0.3
+  # intent prior for free movers (pedestrians, cattle, pushcarts): along-heading uncertainty growth
+  intent_accel_threshold_mps2: 0.5       # braking / speeding up harder than this along the heading ...
+  intent_stopping_growth_factor: 0.6     # ... braking: it is about to stop, tighter growth
+  intent_accelerating_growth_factor: 1.4 # ... speeding up: it is committing to the crossing, wider growth
 
 risk:
   safety_margin_m: 0.5            # footprint inflation used for intersection / TTC
@@ -40,6 +59,9 @@ behavior:
   caution_exit_score: 0.10
   avoid_exit_score: 0.25
   standstill_to_stopped_s: 1.0   # a planner-induced standstill this long is reported as STOPPED
+  reverse_after_standstill_s: 3.0 # STOPPED with no forward candidate for this long -> REVERSING
+  reverse_timeout_s: 8.0          # give up a reversing leg after this long
+  max_reverse_manoeuvres: 3       # per boxed-in episode; then wait
 
 planning:
   frequency_hz: 10.0
@@ -48,6 +70,9 @@ planning:
   lateral_step_m: 0.5             # end offsets = desired + k*step, every one that fits inside the corridor
   lateral_cost_scale_m: 2.0       # lateral-deviation / consistency cost = |delta d| / this
   crossing_lateral_speed_mps: 0.3 # objects moving across the corridor faster than this count as crossing
+  reverse_speed_mps: 1.5          # boxed-in recovery: reverse straight back at most this fast ...
+  reverse_distances_m: [3.0, 6.0]        # ... by one of these leg lengths (longest clear one), then re-plan forward
+  reverse_acceleration_mps2: 1.0
   exposure_sigma_cap_m: 1.5       # beyond-horizon (blocked / standoff) checks inflate objects by their measured
                                   # position std-dev (capped): a poorly localised far object slows us down instead of
                                   # flipping which side looks clear
@@ -55,6 +80,7 @@ planning:
   lateral_transition_time_s: 2.0  # time to reach d_end at current speed
   min_lateral_transition_length_m: 6.0   # short enough to bypass from a crawl; curvature check guards feasibility
   comfortable_deceleration_mps2: 3.0
+  max_jerk_mps3: 4.0              # speed profiles are jerk-limited S-curves (hard stops are exempt: safety first)
   max_lateral_acceleration_mps2: 3.5
   safety_margin_m: 0.5            # collision margin between ego footprint and objects
   uncertainty_margin_gain: 1.0    # margin grows by gain x the object's own measured position std-dev (fusion covariance)
@@ -70,6 +96,9 @@ planning:
   # anti-freeze: when the ego has been stationary the progress weight grows with waiting time so a
   # feasible bypass eventually outweighs the comfort of standing still
   standstill_speed_mps: 0.5
+  creep_guard_slack_m: 0.05           # degraded (squeezed) plans may not end closer to an object than holding position
+  progress_feasible_min_m: 1.0        # a degraded (squeezed) plan is a 'forward plan' for the FSM only if it advances this far
+  boxed_in_range_m: 10.0              # reversing recovery only applies this close to the blocker (a wide shift needs ~9 m of run-up)
   standstill_progress_gain: 0.5   # +50 % progress weight per second at standstill
   standstill_progress_max_factor: 6.0
   # do not stop where you will be hit: a candidate whose terminal pose is struck by a constant-velocity
@@ -95,8 +124,10 @@ planning:
     blocked: 3.0                  # route ahead of the end state meets an object within route_lookahead_s
     front_pass: 1.5               # passing IN FRONT of a crossing object (on the side it is moving toward) instead of
                                   # behind it; a driver lets the animal cross and passes where it came from
-    consistency: 0.3              # change of lateral end offset vs the previously selected plan: damps dithering but
-                                  # stays below `lateral` so the desired offset still wins in steady state
+    consistency: 0.5              # change of lateral end offset vs the previously selected plan. Damps dithering,
+                                  # but must stay a clear margin BELOW `lateral`, otherwise returning one lattice
+                                  # step toward the route never pays for itself and the ego parks off-route.
+    jerk: 0.3                     # mean |da/dt| of the speed profile relative to max_jerk_mps3 (ride comfort)
 
 control:
   stanley:
@@ -112,9 +143,11 @@ control:
     kd: 0.05
     integral_limit: 2.0
     use_feedforward: true
+    preview_s: 0.2                # look this far ahead on the speed profile when deciding hold vs move-off
   stop_speed_mps: 0.1             # below this and target 0 -> hold brake
 
 safety:
   ttc_critical_s: 1.0             # independent threshold, may differ from risk.ttc_critical_s
   hold_time_s: 0.5                # keep override active at least this long
   brake_mps2: 8.0
+  min_speed_for_ttc_override_mps: 1.5   # at crawl speed a TTC override is pointless (stopping distance < 0.2 m)

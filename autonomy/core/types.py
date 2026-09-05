@@ -54,6 +54,7 @@ class BehaviorState(str, Enum):
     AVOID = "AVOID"
     EMERGENCY_BRAKE = "EMERGENCY_BRAKE"
     STOPPED = "STOPPED"
+    REVERSING = "REVERSING"
 
 
 class RejectionReason(str, Enum):
@@ -82,6 +83,7 @@ class VehicleParameters:
     max_acceleration: float          # m/s^2 (>0)
     max_deceleration: float          # m/s^2 (>0, braking magnitude)
     max_speed: float                 # m/s
+    max_reverse_speed: float = 2.0   # m/s (magnitude)
 
     def __post_init__(self) -> None:
         if abs(self.cg_to_front_axle + self.cg_to_rear_axle - self.wheelbase) > 1e-6:
@@ -140,6 +142,7 @@ class ControlCommand:
     acceleration: float
     brake: float
     source: str = "tracker"
+    reverse: bool = False          # reverse gear: acceleration drives the vehicle backwards (v <= 0)
 
     @property
     def net_acceleration(self) -> float:
@@ -482,6 +485,7 @@ class SpeedPolicy:
     target_speed: float                # m/s the planner should aim for
     allow_lateral_avoidance: bool      # may the planner leave the desired offset
     force_stop: bool                   # only stop trajectories are acceptable
+    allow_reverse: bool = False        # the planner may generate reversing candidates (boxed in)
 
 
 @dataclass
@@ -504,6 +508,7 @@ class BehaviorDecision:
             "target_speed": self.speed_policy.target_speed,
             "allow_lateral_avoidance": self.speed_policy.allow_lateral_avoidance,
             "force_stop": self.speed_policy.force_stop,
+            "allow_reverse": self.speed_policy.allow_reverse,
             "time_in_state": self.time_in_state,
         }
 
@@ -567,6 +572,8 @@ class SimulationMetrics:
     path_length: float = 0.0
     average_speed: float = 0.0
     emergency_brake_activations: int = 0
+    reverse_manoeuvres: int = 0
+    reverse_distance_m: float = 0.0
     minimum_ttc: float = math.inf
     behavior_state_durations: dict[str, float] = field(default_factory=dict)
     behavior_transitions: int = 0

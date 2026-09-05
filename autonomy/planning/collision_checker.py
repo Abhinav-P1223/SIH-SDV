@@ -80,6 +80,7 @@ class CollisionChecker:
         rel_t = T - T[:, :1]
         results = [CheckResult() for _ in cands]
         alive = np.ones(C, dtype=bool)
+        soft = np.zeros(C, dtype=bool)     # margin-only (degraded-tier) candidates: still collision-checked
 
         grace = rel_t < cfg.collision_margin_grace_s          # the current state is not the planner's choice
 
@@ -92,7 +93,7 @@ class CollisionChecker:
             alive[i] = False
 
         # 2. lateral acceleration (comfort limit; excused during the grace window, the ego is already turning)
-        a_lat = V ** 2 * K
+        a_lat = V ** 2 * K                                  # V may be negative (reverse); squared
         bad = (a_lat > cfg.max_lateral_acceleration_mps2) & alive[:, None] & ~grace
         for i in np.nonzero(bad.any(axis=1))[0]:
             k = int(np.argmax(np.where(~grace[i], a_lat[i], -1.0)))
@@ -129,6 +130,7 @@ class CollisionChecker:
                              f"boundary clearance {clearance[i, k]:.2f} m < margin {cfg.boundary_margin_m:.2f} m "
                              f"at +{rel_t[i, k]:.1f}s")
                 cands[i].margin_only = True
+                soft[i] = True                    # a squeezed candidate must still be clear of objects
                 alive[i] = False
 
         # 4. predicted collisions
@@ -167,6 +169,17 @@ class CollisionChecker:
             # a candidate that slides past an object at the clearance the ego already has is not a collision
             d0 = dist[:, :, :1]                                                    # (M,C,1) current distance
             closing = dist < d0 - 0.05
+            # creep guard. A candidate that violates a margin/standoff is only scorable in the degraded tier
+            # if it does not end closer to the object than HOLDING POSITION would (allowing for the distance a
+            # comfortable stop from the current speed needs). Otherwise the degraded tier lets the ego inch
+            # into an obstacle one cycle at a time and hides that it is boxed in (which is what triggers the
+            # reversing recovery).
+            ex_s = FX.reshape(C, N)[:, 0]; ey_s = FY.reshape(C, N)[:, 0]; eyaw_s = YAW[:, 0]
+            d_hold = np.stack([box_sequence_distance(ex_s, ey_s, eyaw_s, p.length, p.width,
+                                                     np.interp(T[:, -1], pr.times, pr.x), np.interp(T[:, -1], pr.times, pr.y),
+                                                     np.interp(T[:, -1], pr.times, np.unwrap(pr.heading)), pr.length, pr.width)
+                               for pr in predictions])                                            # (M,C)
+            allow = np.maximum(V[:, 0], 0.0) ** 2 / (2 * cfg.comfortable_deceleration_mps2) + cfg.creep_guard_slack_m  # (C,)
             hit = (dist <= 0.0) | ((dist <= margins[:, None, None]) & closing & margin_ok[None, :, :])   # (M,C,N)
             for i in range(C):
                 results[i].distances = dist[:, i, :]
@@ -175,7 +188,7 @@ class CollisionChecker:
                 results[i].band_widths = bw
                 results[i].obj_s, results[i].obj_d, results[i].obj_v_lat = obj_s, obj_d, obj_vl
                 cands[i].min_clearance = float(dist[:, i, :].min())
-                if alive[i] and hit[:, i, :].any():
+                if (alive[i] or soft[i]) and hit[:, i, :].any():
                     any_t = hit[:, i, :].any(axis=0)
                     k = int(np.argmax(any_t))
                     j = int(np.argmax(hit[:, i, k]))
@@ -183,10 +196,11 @@ class CollisionChecker:
                     self._reject(cands[i], RejectionReason.COLLISION,
                                  f"distance {dist[j, i, k]:.2f} m <= margin {margins[j]:.2f} m "
                                  f"to {predictions[j].object_id} at +{rel_t[i, k]:.1f}s")
-                    # inside the margin but never actually touching: still scorable in the degraded tier,
-                    # so a tight pass beats a stop that would itself be struck
-                    if not np.any(dist[:, i, :] <= 0.0):
-                        cands[i].margin_only = True
+                    # inside the margin but never actually touching (and not creeping): still scorable in the
+                    # degraded tier, so a tight pass beats a stop that would itself be struck
+                    creep = dist[j, i, -1] < d_hold[j, i] - allow[i]
+                    touching = bool(np.any(dist[:, i, :] <= 0.0))
+                    cands[i].margin_only = soft[i] = not touching and not creep
                     alive[i] = False
 
             # 4b. standoff for near-stop candidates: do not come to rest closer than stop_standoff_m to any
@@ -201,30 +215,46 @@ class CollisionChecker:
                                                         pr.length + 2 * infl[j], pr.width + 2 * infl[j])
                                   for j, pr in enumerate(predictions)])                                 # (M,C)
             for i in range(C):
-                if alive[i] and cands[i].target_speed < cfg.stop_standoff_speed_mps and predictions:
+                if cands[i].id.startswith("reverse_"):
+                    continue                                  # reversing ends at rest by construction; judged by collision only
+                if (alive[i] or soft[i]) and cands[i].target_speed < cfg.stop_standoff_speed_mps and predictions:
                     d_end_all = np.minimum(dist[:, i, -1], d_now[:, i])
                     j = int(np.argmin(d_end_all))
                     if d_end_all[j] < cfg.stop_standoff_m:
+                        creep = (dist[j, i, -1] < d_hold[j, i] - allow[i]) or (d_now[j, i] < dist[j, i, 0] - allow[i])
                         self._reject(cands[i], RejectionReason.TERMINAL_EXPOSURE,
                                      f"would come to rest {d_end_all[j]:.1f} m from {predictions[j].object_id} "
-                                     f"(< standoff {cfg.stop_standoff_m:.1f} m)")
-                        cands[i].margin_only = True
+                                     f"(< standoff {cfg.stop_standoff_m:.1f} m)" + (" - creeping closer" if creep else ""))
+                        cands[i].margin_only = soft[i] = not creep   # holding position is degraded-scorable, creeping is not
                         alive[i] = False
 
             # 5. terminal exposure: continue each surviving candidate beyond the horizon along the corridor
             #    at its terminal speed (frozen for a stop) and extrapolate objects at constant velocity
             T_end = float(rel_t[0, -1])
+            idx = np.zeros(0, dtype=int)
             if cfg.route_lookahead_s > T_end + 1e-9 and alive.any():
                 ext_dt = 2.0 * cfg.dt_s                                                       # coarser beyond the horizon
                 ext = np.arange(T_end + ext_dt, cfg.route_lookahead_s + 1e-9, ext_dt)               # (E,)
-                idx = np.nonzero(alive)[0]
+                # reversing candidates end at rest away from the blocker by construction: collision check only
+                idx = np.array([i for i in np.nonzero(alive)[0] if not cands[i].id.startswith("reverse_")], dtype=int)
                 E = len(ext)
+            if len(idx) > 0:
                 if all(cands[i].trajectory.s is not None for i in idx):
                     s_end = np.array([cands[i].trajectory.s[-1] for i in idx])
                     d_end = np.array([cands[i].trajectory.d[-1] for i in idx])
                     v_end = np.array([cands[i].trajectory.velocity[-1] for i in idx])
-                    s_ext = (s_end[:, None] + v_end[:, None] * (ext - T_end)[None, :]).ravel()
-                    d_ext = np.repeat(d_end, E)
+                    s_grid = s_end[:, None] + v_end[:, None] * (ext - T_end)[None, :]              # (I,E)
+                    # the lateral transition usually outlasts the horizon (a wide shift needs ~9 m of travel).
+                    # Continue it at the rate the candidate ended with, up to its target offset, instead of
+                    # freezing d: otherwise a candidate half-way around an obstacle looks like it hits it.
+                    h_end = np.array([cands[i].trajectory.heading_rel[-1] if cands[i].trajectory.heading_rel
+                                      is not None else 0.0 for i in idx])
+                    d_tgt = np.array([cands[i].lateral_offset_end for i in idx])
+                    d_grid = d_end[:, None] + np.tan(h_end)[:, None] * (s_grid - s_end[:, None])
+                    lo_d = np.minimum(d_end, d_tgt)[:, None]
+                    hi_d = np.maximum(d_end, d_tgt)[:, None]
+                    d_grid = np.clip(d_grid, lo_d, hi_d)
+                    s_ext, d_ext = s_grid.ravel(), d_grid.ravel()
                     cx, cy, ch = self.road.to_cartesian(s_ext, d_ext)
                     ex = cx + off * np.cos(ch)
                     ey = cy + off * np.sin(ch)

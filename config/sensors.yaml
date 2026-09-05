@@ -9,8 +9,9 @@ perception:
     process_noise_accel_mps2: 2.5      # CV model process noise (acceleration std-dev): darting pedestrians
     gate_chi2: 9.21                    # Mahalanobis gate, 99 % for 2 dof
     confirm_hits: 3                    # detections before a track is published
-    max_misses: 6                      # consecutive missed cycles before deletion
-    max_age_s: 1.0                     # delete if not updated for this long
+    max_misses: 100                    # legacy guard; deletion is time-based
+    max_age_s: 1.0                     # confirmed track coasts this long without an update
+    tentative_max_age_s: 0.5           # unconfirmed tracks die sooner
     init_velocity_std_mps: 3.0
     min_speed_for_heading_mps: 0.5     # below this, heading comes from LiDAR extent / last value
     class_confidence_floor: 0.35       # below this the type is reported as UNKNOWN

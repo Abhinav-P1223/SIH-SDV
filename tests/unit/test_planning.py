@@ -85,10 +85,13 @@ def test_force_stop_generates_only_stop_candidates(cfg, params, road):
 
 
 def test_offsets_outside_corridor_are_not_generated(cfg, params):
-    narrow = DrivableSpace.straight(200.0, 1.5, 1.5, x0=-20.0)   # 3 m wide: only d=0 fits a 1.8 m car
+    narrow = DrivableSpace.straight(200.0, 1.5, 1.5, x0=-20.0)   # 3 m wide for a 1.8 m car: barely anything fits
     gen = CandidateGenerator(cfg.planning, params, narrow)
     cands, _ = gen.generate(ego(y=0.0), decision().speed_policy, 0.0, now=0.0)
-    assert {round(c.lateral_offset_end, 2) for c in cands} == {0.0}
+    limit = 1.5 - 0.5 * params.width - cfg.planning.boundary_margin_m       # 0.35 m either side of the centre
+    offsets = {round(c.lateral_offset_end, 2) for c in cands}
+    assert offsets and all(abs(o) <= limit + 1e-9 for o in offsets)
+    assert 0.0 in offsets                                                   # the centre is always available
 
 
 # -------------------------------------------------------------- checker --
@@ -108,8 +111,19 @@ def test_lateral_acceleration_rejection(cfg, params, road):
     chk = CollisionChecker(cfg.planning, params, road)
     cands, _ = gen.generate(ego(v=10.0), decision().speed_policy, 1.75, now=0.0)
     chk.check_all(cands, [])
+    # the generator stretches wide transitions so that v^2*kappa stays under the comfort limit at speed ...
     fast_wide = [c for c in cands if abs(c.lateral_offset_end - 1.75) >= 2.4 and c.target_speed == 10.0]
-    assert fast_wide and all(c.rejection_reason == RejectionReason.LATERAL_ACCEL for c in fast_wide)
+    assert fast_wide
+    for c in fast_wide:
+        tr = c.trajectory
+        assert np.max(tr.velocity ** 2 * np.abs(tr.curvature)) <= cfg.planning.max_lateral_acceleration_mps2 + 1e-6
+        assert c.rejection_reason != RejectionReason.LATERAL_ACCEL
+    # ... and the checker still rejects a trajectory that violates it (curvature forced 3x higher)
+    c = fast_wide[0]
+    c.trajectory.curvature = c.trajectory.curvature * 3.0
+    c.feasible, c.rejection_reason, c.rejection_detail = True, RejectionReason.NONE, ""
+    chk.check_all([c], [])
+    assert c.rejection_reason == RejectionReason.LATERAL_ACCEL
     # the lattice reaches the far side of the corridor (right edge for a keep-left ego)
     assert min(c.lateral_offset_end for c in cands) < -2.0
 
@@ -171,7 +185,7 @@ def test_planner_prefers_route_when_clear(cfg, params, road):
     assert out.selected.target_speed == pytest.approx(10.0)
     assert out.feasible_count > 0 and set(out.selected.costs) == {
         "collision", "uncertainty", "clearance", "smoothness", "curvature", "progress", "boundary", "speed",
-        "lateral", "blocked", "consistency", "front_pass"}
+        "lateral", "blocked", "consistency", "front_pass", "jerk"}
 
 
 def test_planner_rejects_colliding_candidates_and_explains(cfg, params, road, profiles):

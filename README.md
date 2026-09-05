@@ -35,6 +35,7 @@ python scripts/run_scenario.py SUDDEN_CATTLE_CROSSING  # closed-loop run (sensor
 python scripts/run_scenario.py SUDDEN_CATTLE_CROSSING --perception ground_truth
 python scripts/run_scenario.py SUDDEN_PEDESTRIAN_DART  # exercises the emergency-brake path
 python scripts/run_scenario.py MIXED_TRAFFIC_CURVE     # curved corridor, merging auto-rickshaw, erratic pedestrian
+python scripts/run_scenario.py NARROW_LANE_BOXED_IN   # boxed in by a pushcart: backs up, then takes the gap
 python scripts/sweep.py                                # parameter sweep -> scenario success rate
 python scripts/audit_adaptivity.py --perception sensors # jury audit: perturbations change the plan
 python scripts/audit_stress.py --perception sensors     # jury audit: 12 stress cases, PASS/DEGRADED/FAIL
@@ -46,6 +47,37 @@ python -m visualization.debug_view logs/sudden_cattle_crossing.jsonl --animate -
 # regenerate docs/STAGE1_RESULTS.md from fresh runs (never edit its numbers by hand)
 python scripts/generate_results.py
 ```
+
+### Live dashboard
+
+```bash
+python scripts/run_scenario.py SUDDEN_CATTLE_CROSSING --dashboard --realtime   # http://127.0.0.1:8765/
+python scripts/run_scenario.py MIXED_TRAFFIC_CURVE --dashboard 9000 --realtime 2 --perception sensors
+```
+
+`--dashboard [PORT]` adds a `DashboardSink` (stdlib `http.server`, no build
+tooling, no external JS) that serves a self-contained page: top-down canvas
+(corridor, ego footprint, tracked objects with type labels, predicted paths,
+candidate and selected trajectories), behaviour state and reason, speed, risk
+level / score / TTC, planner feasible / rejected counts with the rejection
+histogram, the safety-override flag and rolling speed / steering strips. Frames
+stream over Server-Sent Events at ~10 Hz (`/stream`); `/latest` and `/metrics`
+return JSON. `--realtime [SPEED]` paces the run at wall-clock speed so the page
+shows the manoeuvre rather than only the end state. The server stays up after
+the run until Ctrl+C.
+
+### MATLAB / Simulink exports (untested in MATLAB)
+
+```bash
+python scripts/export_matlab.py        # -> matlab/buses.m, behavior_transitions.{m,csv}, behavior_states.csv, replay_telemetry.m
+```
+
+`matlab/` is generated from the Python sources: `Simulink.Bus` definitions
+introspected from the dataclasses in `autonomy/core/types.py`, the behaviour
+FSM's declared transition table for a Stateflow chart, and a replay script
+that loads a JSONL telemetry log and re-checks the scenario-test invariants.
+No MATLAB was available while writing them, so they are **untested in MATLAB**;
+see [matlab/README.md](matlab/README.md).
 
 Requirements: Python 3.11+, numpy, PyYAML; matplotlib for the debug view;
 pytest for tests. No MATLAB needed for Stage 1.
@@ -74,12 +106,13 @@ latency.
 
 ```
 autonomy/        the stack: core (types, geometry, config), vehicle, prediction, risk,
-                 behavior, planning, control, safety, metrics, telemetry
+                 behavior, planning, control, safety, metrics, telemetry (incl. live dashboard sink)
+matlab_export/   generator for matlab/ (Simulink buses, FSM table, telemetry replay; untested in MATLAB)
 simulation/      world (drivable-space corridor), agents (behaviours), scenarios (YAML), runner
 visualization/   read-only matplotlib debug view over telemetry frames
 config/          vehicle.yaml, autonomy.yaml (all tunables), object_profiles.yaml
 tests/           unit / integration / scenarios
-scripts/         run_scenario.py, generate_results.py
+scripts/         run_scenario.py, generate_results.py, export_matlab.py
 docs/            ARCHITECTURE.md, INTERFACES.md, STAGE1_RESULTS.md, img/
 logs/            telemetry output (git-ignored)
 ```
@@ -95,6 +128,7 @@ logs/            telemetry output (git-ignored)
 | `SUDDEN_CATTLE_CROSSING` | SIH #5 and the acceptance scenario: predicted crossing, CAUTION -> AVOID -> CRUISE, pass and return to route |
 | `SUDDEN_PEDESTRIAN_DART` | short-range dart: independent safety supervisor, EMERGENCY_BRAKE and recovery |
 | `MIXED_TRAFFIC_CURVE` | 40-degree curve (R = 60 m), auto-rickshaw merging then following the road, erratic pedestrian, FOLLOW state |
+| `NARROW_LANE_BOXED_IN` | pushcart abandoned across a 7 m lane, too close to steer around from rest: REVERSING recovery, then the bypass |
 
 ## Adding a scenario
 

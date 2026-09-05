@@ -181,3 +181,81 @@ def test_road_following_prior_damps_lateral_velocity_for_vehicles_only(cfg, prof
     crossing_car = ObjectState("xc", ObjectType.CAR, 0.0, 50.0, -3.0, 0.0, 6.0, math.pi / 2, 4.3, 1.8)
     xc = p_road.predict([crossing_car], 0.0)[0]
     assert xc.y[-1] == pytest.approx(-3.0 + 6.0 * 4.0)
+
+
+# ------------------------------------------------- acceleration-aware prediction --
+def feed_history(predictor, id_, otype, x0, y0, heading, speeds, dt=0.1):
+    """Present the object at successive cycles moving along `heading` with the given speeds.
+
+    Returns the prediction made at the last cycle and the object state that produced it.
+    """
+    c, s = math.cos(heading), math.sin(heading)
+    x, y, t, pred, o = x0, y0, 0.0, None, None
+    for i, v in enumerate(speeds):
+        if i:
+            x, y, t = x + speeds[i - 1] * c * dt, y + speeds[i - 1] * s * dt, t + dt
+        o = ObjectState(id_, otype, t, x, y, v * c, v * s, heading, 0.6, 0.6)
+        pred = predictor.predict([o], now=t)[0]
+    return pred, o
+
+
+def along(pred, o):
+    """Signed displacement of the predicted mean along the object's heading."""
+    return (pred.x - o.x) * math.cos(o.heading) + (pred.y - o.y) * math.sin(o.heading)
+
+
+def test_constant_velocity_history_reproduces_pure_cv_prediction(cfg, profiles):
+    """(a) With a steady velocity the estimated acceleration is exactly zero: x = x0 + v t."""
+    p = ConstantVelocityPredictor(cfg.prediction, profiles)
+    pred, o = feed_history(p, "cv", ObjectType.CATTLE, 10.0, -2.0, math.atan2(-0.5, 1.0), [math.hypot(1.0, 0.5)] * 8)
+    t = pred.times - o.timestamp
+    assert np.allclose(pred.x, o.x + o.vx * t) and np.allclose(pred.y, o.y + o.vy * t)
+    assert np.allclose(pred.vx, o.vx) and np.allclose(pred.vy, o.vy)
+    assert pred.sigma()[0] == pytest.approx(profiles.get(ObjectType.CATTLE).sigma_pos0_m)
+
+
+def test_decelerating_pedestrian_stops_short_and_never_reverses(cfg, profiles):
+    """(b) A pedestrian braking at 2 m/s^2 is predicted to come to rest, not to walk backwards."""
+    p = ConstantVelocityPredictor(cfg.prediction, profiles)
+    speeds = [max(2.5 - 2.0 * 0.1 * k, 0.0) for k in range(10)]           # 2.5 -> 0.7 m/s over 0.9 s
+    pred, o = feed_history(p, "ped", ObjectType.PEDESTRIAN, 30.0, -3.0, math.pi / 2, speeds)
+    s = along(pred, o)
+    t = pred.times - o.timestamp
+    assert np.all(s[1:] < o.speed * t[1:])                                   # short of the CV path
+    assert np.all(np.diff(s) >= -1e-9)                                      # never reverses
+    v_along = pred.vx * math.cos(o.heading) + pred.vy * math.sin(o.heading)
+    assert np.all(v_along >= -1e-9) and v_along[-1] == pytest.approx(0.0)  # comes to rest and stays
+    assert s[-1] < o.speed ** 2 / (2 * 1.0) + 0.05                         # stopping distance for |a| >= 1 m/s^2
+    # intent prior: a braking pedestrian is about to stop -> along-heading uncertainty grows less than CV
+    cv = ConstantVelocityPredictor(cfg.prediction, profiles).predict([o], now=o.timestamp)[0]
+    assert pred.covariances[-1, 1, 1] < cv.covariances[-1, 1, 1]           # heading is +y
+    assert pred.covariances[-1, 0, 0] == pytest.approx(cv.covariances[-1, 0, 0])   # lateral growth unchanged
+
+
+def test_accelerating_vehicle_is_predicted_ahead_of_cv(cfg, profiles):
+    """(c) A car speeding up along the corridor is predicted further ahead than constant velocity at 1 s."""
+    road = DrivableSpace.straight(200.0, 3.5, 3.5, x0=-20.0)
+    p = ConstantVelocityPredictor(cfg.prediction, profiles, road)
+    speeds = [8.0 + 1.5 * 0.1 * k for k in range(10)]                     # +1.5 m/s^2
+    pred, o = feed_history(p, "car", ObjectType.CAR, 20.0, 1.75, 0.0, speeds)
+    k = int(round(1.0 / cfg.prediction.dt_s))
+    assert pred.times[k] - o.timestamp == pytest.approx(1.0)
+    assert pred.x[k] > o.x + o.vx * 1.0 + 0.3                              # ahead of CV
+    assert pred.x[k] < o.x + o.vx * 1.0 + 0.5 * 1.5 * 1.0 ** 2 + 1e-6      # but not beyond the true CA
+    assert np.allclose(pred.y, 1.75)                                       # stays in its lane
+    assert pred.vx[-1] == pytest.approx(pred.vx[k + 5]) and pred.vx[-1] > o.vx  # velocity held after the CA horizon
+
+
+def test_noisy_velocity_history_respects_acceleration_clamp(cfg, profiles):
+    """(d) Velocity noise of 1 m/s per cycle cannot inject more than max_acceleration_mps2."""
+    rng = np.random.default_rng(3)
+    p = ConstantVelocityPredictor(cfg.prediction, profiles)
+    a_max = cfg.prediction.max_acceleration_mps2
+    t = 0.0
+    for _ in range(40):
+        vx, vy = 1.0 + rng.normal(0.0, 1.0), rng.normal(0.0, 1.0)
+        o = ObjectState("noisy", ObjectType.CATTLE, t, 5.0, 5.0, vx, vy, math.atan2(vy, vx), 2.0, 0.7)
+        pred = p.predict([o], now=t)[0]
+        dv = math.hypot(pred.vx[-1] - pred.vx[0], pred.vy[-1] - pred.vy[0])
+        assert dv <= a_max * cfg.prediction.acceleration_horizon_s + 1e-9
+        t += 0.1

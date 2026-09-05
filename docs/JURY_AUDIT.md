@@ -455,3 +455,99 @@ come from a simulated camera classifier with a confusion rate), "real-time"
 4. Prediction is still constant velocity (plus priors); no intent model.
 5. No MathWorks artefact.
 6. Simulated sensors only; no images, no point clouds, no learned detector.
+
+
+---
+
+# THIRD AUDIT — recovery, prediction and tooling round
+
+Same role and method again. Everything below was executed on the working tree of this
+round: `python -m pytest tests` (164 passed), all eight scenarios in both perception
+modes, `scripts/audit_adaptivity.py` and `scripts/audit_stress.py` in both modes.
+
+## What changed since the re-audit
+
+| Re-audit weakness | What was built | Evidence |
+|---|---|---|
+| 3. No reversing: a blocked corridor means waiting | Reverse gear in the vehicle model (signed speed, `max_reverse_speed_mps`, gear changes only near standstill), reversing candidates in the planner, a committed leg re-planned each cycle, `REVERSING` in the behaviour FSM with a boxed-in guard and a manoeuvre cap, reverse-aware Stanley and PID, reverse metrics | New scenario `NARROW_LANE_BOXED_IN` passes in both modes with exactly one ~6 m leg; 10 scenario tests assert the recovery, its bounds and the bypass side |
+| 4. Prediction is still constant velocity | Constant-acceleration propagation with an acceleration estimated inside the predictor from tracked velocity history, per-class clamps, no sign reversal, and an intent prior on free movers | 4 new prediction tests; pedestrian-dart clearance 0.78 m -> 1.54 m in ground truth |
+| 5. No MathWorks artefact | `matlab_export/` generates Simulink bus definitions from the dataclasses, the FSM transition table for Stateflow, and a telemetry replay script that re-checks the Python invariants | `scripts/export_matlab.py`, 4 tests. Generated, **not executed in MATLAB** — no MATLAB on this machine, and the files say so |
+| 10 (J). No dashboard | Telemetry sink serving a live top-down view, decision panel and time series over SSE, plus `--dashboard` / `--realtime` on the runner | `autonomy/telemetry/dashboard.py`, 4 tests |
+| 1. Dense market nervousness | Root cause found: the lattice flipped its lateral commitment several times a second because the `consistency` cost was too weak and was forgotten whenever a hard-stop fallback intervened | Ground-truth dense market: clearance 0.65 -> 0.92 m, emergency brakes 1 -> 0 |
+
+## Defects found and fixed while building the above
+
+These were found by running the closed loop, not by reading the code. Each is a real bug
+that was present before this round.
+
+| Defect | Effect | Fix |
+|---|---|---|
+| The beyond-horizon check froze the candidate's lateral offset at the end of the planning horizon | A wide lateral shift needs ~9 m of travel and so outlasts the 4 s horizon. Every candidate half-way around an obstacle looked like it drove straight into it, so the planner could not see its own bypass | The continuation keeps the lateral rate the candidate ended with, up to its target offset |
+| The lattice was a grid anchored on the desired offset | Both corridor extremes were quantised away — exactly the offsets needed to squeeze past an obstacle | The corridor edges are always added to the offset set |
+| The jerk-limited speed profile restarted from zero acceleration on every re-plan | The controller tracks the first samples of each new profile, so the vehicle accelerated at ~0.5 m/s^2 instead of 3 and crawled | The profile is seeded with the ego's current acceleration |
+| The degraded (squeezed) tier admitted candidates that inched toward a static obstacle | The ego walked into an obstacle a few centimetres per cycle and never reported being stuck | Creep guard: a squeezed candidate must not end closer than simply holding position would |
+| Candidates rejected only for a boundary-margin violation skipped the collision check entirely | A squeezed plan could be selected without ever being tested against objects | Margin-only candidates stay in the collision check |
+| A clear zero-speed candidate counted as a usable forward plan | The behaviour layer never learned that the ego was boxed in | At standstill, only candidates that advance `progress_feasible_min_m` count |
+| Plan latching (tried, then removed) | An earlier attempt to add hysteresis in plan space captured the ego half a metre off its route for ever | Reverted; the `consistency` cost does the job, and it must stay a clear margin below `lateral` or the same capture happens |
+
+## Results on this round's code
+
+| Battery | Runs | Collisions | Notes |
+|---|---|---|---|
+| Eight scenarios x two perception modes | 16 | 0 | all GOAL_REACHED |
+| Adaptivity variants x two modes | 22 | 0 | all GOAL_REACHED |
+| Stress battery x two modes | 24 | 0 | 22 PASS, 2 DEGRADED |
+| `python -m pytest tests` | 164 tests | — | all pass |
+
+The two DEGRADED stress cases, stated plainly:
+
+* **Blocked road (truck across the corridor)** — TIMEOUT, no collision. There is no way
+  through and the ego now backs up before holding position. That is the correct outcome,
+  not a failure.
+* **Erratic cow** — minimum clearance 0.03 m in sensors mode. Traced frame by frame: the
+  ego is **stationary** at (53.6, 0.05) from t = 27.8 s and the animal walks past its front
+  from y = +0.8 to y = -2.5. The ego is not moving and has already reversed once; a
+  stationary vehicle cannot open the gap further. It is animal-initiated proximity, and the
+  same case measures 0.47 m in ground-truth mode purely because the seeded random walk
+  lands differently. Raising the uncertainty margin cap changes the result by nothing at
+  all, which confirms the planner is not the actor.
+
+## Score (third audit)
+
+| Area | Points | First | Re-audit | Now | Basis |
+|---|---|---|---|---|---|
+| A. Problem alignment | 15 | 7 | 12 | 12 | five required scenarios plus three stress scenarios; still no learned perception |
+| B. Closed-loop autonomy | 20 | 12 | 17 | 18 | unchanged pipeline, now with a reversing recovery closing the loop on blocked corridors |
+| C. Adaptive planning | 15 | 10 | 13 | 14 | 24/24 stress and 22/22 adaptivity collision-free; reversing recovery; dense market calmer in ground truth, still chattery under sensor noise |
+| D. Multi-sensor perception/fusion | 10 | 0 | 6 | 6 | unchanged |
+| E. Prediction | 10 | 4 | 6 | 8 | constant acceleration with an estimated acceleration and an intent prior; still no interaction model |
+| F. Indian-road realism | 10 | 5 | 7 | 7 | unchanged; agents mostly non-reactive |
+| G. MathWorks integration | 5 | 0 | 0 | 2 | generated bus / Stateflow / replay artefacts, untested in MATLAB |
+| H. Validation / metrics | 5 | 3 | 5 | 5 | 8 scenarios x 2 modes, sweeps, stress, adaptivity, all generated |
+| I. Engineering quality | 5 | 5 | 5 | 5 | |
+| J. Demo / explainability | 5 | 4 | 4 | 5 | live dashboard on the telemetry sink alongside the debug view |
+| **Total** | 100 | **50** | **75** | **82** | |
+
+## Claims that are still indefensible
+
+Unchanged from the re-audit, plus one addition:
+
+* "AI perception" — there is no detector. Classes come from a simulated camera classifier
+  with a confusion rate.
+* "Real-time" — Python, 20-80 ms planner.
+* "MATLAB/Simulink model" — the export scripts generate MATLAB files that **have never been
+  run in MATLAB**. Say "generated, untested" or say nothing.
+
+## Remaining weaknesses, ranked
+
+1. Dense market in sensors mode: 8 emergency-brake activations and ~70 state transitions on
+   a 47 s run. Better in ground truth (0 and 16) which localises it to tracking noise, but a
+   judge will still call it nervous.
+2. The hard beyond-horizon rejection has a threshold cliff at
+   `terminal_exposure_horizon_s`. Near that boundary the same situation flips between
+   "blocked" and "clear" from cycle to cycle, which is the mechanism behind the remaining
+   chatter. A graded or hysteretic version would be the next fix.
+3. Reversing is straight-line only. A real driver would steer while backing up, which needs
+   fewer legs in tight geometry.
+4. Simulated sensors only; no images, no point clouds, no learned detector.
+5. Agents do not react to the ego except through gap acceptance in the merge behaviours.

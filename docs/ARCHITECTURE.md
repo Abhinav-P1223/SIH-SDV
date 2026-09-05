@@ -165,9 +165,24 @@ must change the output are unit-tested: no camera → UNKNOWN classes; no radar
 
 ## 6. Prediction model
 
-Constant velocity and heading over `prediction.horizon_s` at
-`prediction.dt_s`. Positional standard deviation grows with time using the
-object's behaviour profile, anisotropically:
+Constant acceleration over `prediction.acceleration_horizon_s`, then constant
+velocity, to `prediction.horizon_s` at `prediction.dt_s`. Neither the ground-truth
+provider nor the tracker's constant-velocity Kalman filter reports acceleration, so
+the predictor estimates it itself: a per-object history of the last
+`velocity_history_s` of velocity samples, least-squares slope, first-order filter
+(`acceleration_filter_s`), clamped to a per-class limit (`max_acceleration_by_type`,
+else `max_acceleration_mps2`). With fewer than `min_history_samples` the estimate is
+exactly zero, so the model degrades to constant velocity rather than guessing.
+
+Speed is propagated signed and never reverses sign: a decelerating pedestrian comes
+to a stop and stays there. Road followers get the acceleration along the corridor
+only; free movers (`follows_road: false`) get it along their heading, plus an intent
+prior that shrinks the along-heading uncertainty growth when they are braking
+(`intent_stopping_growth_factor`) and grows it when they are speeding up. Setting
+`prediction.estimate_acceleration: false` restores pure constant velocity.
+
+Positional standard deviation grows with time using the object's behaviour profile,
+anisotropically:
 
 ```
 sigma_l^2(t) = sigma_pos0^2 + f_s^2 [ (sigma_vel t)^2 + (0.5 sigma_acc t^2)^2 ]   along the heading
@@ -219,7 +234,7 @@ object* (traffic ahead inside the ego's lateral band) for FOLLOW.
 
 ## 8. Behaviour state machine
 
-States: CRUISE, FOLLOW, CAUTION, AVOID, EMERGENCY_BRAKE, STOPPED.
+States: CRUISE, FOLLOW, CAUTION, AVOID, EMERGENCY_BRAKE, STOPPED, REVERSING.
 Transitions are declared in one table (`behavior/state_machine.py:TRANSITIONS`)
 with guard functions over `RiskSummary`, ego speed and planner feasibility.
 Escalations are immediate; de-escalations respect `min_dwell_s` and lower exit
@@ -231,6 +246,8 @@ thresholds (hysteresis).
 | EMERGENCY_BRAKE -> STOPPED | vehicle stationary |
 | EMERGENCY_BRAKE -> CAUTION | no longer CRITICAL and planner feasible |
 | STOPPED -> AVOID / CAUTION | vehicle moves off on a clear plan / risk subsides |
+| STOPPED -> REVERSING | boxed in: stationary for `reverse_after_standstill_s` with no forward plan, and fewer than `max_reverse_manoeuvres` legs used |
+| REVERSING -> CAUTION | back at rest and a forward plan exists again, or `reverse_timeout_s` elapsed |
 | CRUISE, FOLLOW, CAUTION -> AVOID | route intersection predicted and level >= HIGH |
 | AVOID -> CAUTION | no intersection and score < `avoid_exit_score` |
 | CRUISE, FOLLOW -> CAUTION | level >= MEDIUM |
@@ -241,19 +258,46 @@ Speed policy per state: CRUISE desired speed; FOLLOW gap-controlled lead
 speed; CAUTION `caution_speed_factor`; AVOID `avoid_speed_factor` with lateral
 candidates enabled; EMERGENCY_BRAKE stop-only candidates; STOPPED caution
 speed with lateral candidates so the planner can find a way out while the
-zero-speed candidate remains available. Every `BehaviorDecision` carries a
-reason string and the numeric triggers.
+zero-speed candidate remains available; REVERSING caution speed with
+`allow_reverse` set, which is the only state in which the planner emits reversing
+candidates. Every `BehaviorDecision` carries a reason string and the numeric
+triggers.
+
+**Reversing recovery.** A vehicle stopped a few metres in front of an obstacle can
+be geometrically unable to steer around it: the quintic's peak curvature ties a
+lateral shift of `w` metres to roughly `sqrt(5.77 w / (0.8 kappa_max))` metres of
+forward travel, about 9 m for a 3 m shift, which is more room than the stop standoff
+leaves. The planner reports that state (no forward candidate that makes progress),
+the behaviour layer enters REVERSING, and the planner commits to the longest clear
+reversing leg out of `planning.reverse_distances_m`, re-planning the remaining
+distance each cycle until the leg is done. One leg per REVERSING episode; the
+episode ends when a forward plan reappears, and `reverse_count` resets on CRUISE.
+`NARROW_LANE_BOXED_IN` is the scenario that exercises it end to end.
 
 ## 9. Planner
 
 1. **Frame**: project ego pose to `(s0, d0, theta_rel)`.
-2. **Candidates**: for every lateral end offset `d_end` in
-   `planning.lateral_offsets_m` and every terminal speed in the speed set
-   derived from the behaviour speed policy, build
+2. **Candidates**: for every lateral end offset `d_end` and every terminal speed
+   in the speed set derived from the behaviour speed policy, build
    * lateral profile: quintic polynomial `d(s)` from `(d0, d0', d0'')` to
-     `(d_end, 0, 0)` over a transition length `max(v0*T_lat, S_min)`, then hold;
-   * longitudinal profile: `v(t)` ramp from `v0` to `v_end` under
-     `a_accel_max` / comfortable deceleration, integrated to `s(t)`;
+     `(d_end, 0, 0)` over a transition length, then hold. The offsets span the whole
+     drivable width on a `lateral_step_m` grid anchored on the desired offset, plus
+     both corridor extremes (the grid quantises them away, and squeezing past an
+     obstacle is exactly when they are needed). The transition length is
+     `max(v0*T_lat, S_min, S_kappa, S_alat)`, where `S_kappa` keeps the quintic's
+     peak curvature `5.77*shift/S^2` inside the steering limit and `S_alat` keeps
+     `v0^2*kappa` inside the lateral-acceleration comfort limit, so wide shifts are
+     stretched rather than rejected;
+   * longitudinal profile: jerk-limited S-curve from `v0` to `v_end`. The
+     acceleration starts at the ego's current acceleration, ramps toward
+     `a_accel_max` / comfortable deceleration at most `max_jerk_mps3` per second and
+     is wound back to reach `v_end` with zero acceleration. Seeding from the current
+     acceleration matters because the planner re-plans at 10 Hz and the controller
+     tracks the first samples of each new profile. The hard-stop candidate keeps the
+     instantaneous full-braking ramp: safety beats comfort;
+   * in REVERSING only, straight reversing legs at the current offset: a trapezoid
+     in reverse speed from the current one up to `reverse_speed_mps`, ending at rest
+     after the committed distance;
    * sample every `planning.dt_s` over `planning.horizon_s`, convert to
      Cartesian, compute yaw, curvature, acceleration.
 3. **Hard feasibility rejection** (recorded with reason, evaluated for all
@@ -272,6 +316,8 @@ reason string and the numeric triggers.
 J = w_collision*C_collision + w_clearance*C_clearance + w_smoothness*C_smooth
   + w_curvature*C_curv + w_progress*C_progress + w_boundary*C_boundary
   + w_speed*C_speed + w_uncertainty*C_uncert + w_lateral*C_lateral
+  + w_blocked*C_blocked + w_front_pass*C_front_pass + w_consistency*C_consistency
+  + w_jerk*C_jerk
 ```
 
 Each component is normalised to roughly [0, 1] and documented in
@@ -281,7 +327,11 @@ its route after an avoidance.
 
 5. **Beyond the horizon**: each surviving candidate is continued along the
    corridor at its terminal speed (frozen for a stop) up to `route_lookahead_s`
-   against constant-velocity extrapolations of all objects. A meeting before
+   against constant-velocity extrapolations of all objects. The continuation keeps
+   the lateral rate the candidate ended with, up to its target offset, instead of
+   freezing `d`: a wide shift outlasts the 4 s horizon, so freezing it would make
+   every candidate that is half-way around an obstacle look like it drives into
+   it. A meeting before
    `terminal_exposure_horizon_s` rejects the candidate (`TERMINAL_STATE_EXPOSED`:
    "do not stop where you will be hit, do not creep toward a blocked route");
    a later meeting adds the graded `blocked` cost. Near-stop candidates must
@@ -291,13 +341,30 @@ its route after an avoidance.
    first `collision_margin_grace_s` excuses the current pose.
 6. **Anti-freeze**: while the ego stands still under planner control, the
    progress weight grows with waiting time (`standstill_progress_gain`) so a
-   feasible bypass eventually outweighs waiting.
-7. **Selection**: minimum `J` among feasible candidates. If none is feasible
-   but some are collision-free and on the road (only margin, standoff or
-   beyond-horizon exposure violated) the cheapest of those is selected and
-   flagged `degraded=True`. Otherwise the maximum-deceleration stop trajectory
-   is returned flagged `fallback=True`; behaviour and safety supervisor treat
-   that as an emergency.
+   feasible bypass eventually outweighs waiting. The mirror image is the **creep
+   guard**: a candidate that violates a margin or the standoff is only admitted to
+   the degraded tier if it does not end closer to the object than simply holding
+   position would (allowing for the distance a comfortable stop needs). Without it
+   the degraded tier walks the ego into an obstacle a few centimetres per cycle and
+   hides the fact that it is stuck.
+7. **Boxed in**: at rest, within `boxed_in_range_m` of a static blocker, with every
+   progressing candidate aiming at an offset that still overlaps it, and yet room to
+   pass beside it, the planner reports no forward plan. That is what triggers the
+   reversing recovery in section 8. Candidates are judged by the offset they aim at,
+   not the one they have reached by the end of the horizon.
+8. **Selection**: minimum `J` among feasible candidates. The `consistency` term
+   (change of lateral end offset against the previously selected plan) is what keeps
+   the choice stable: neighbouring offsets differ by very little and the cost
+   landscape moves every cycle as tracks appear and drop, so without it the car
+   flips from one side of the road to the other several times a second. The previous
+   offset is remembered across hard-stop fallbacks, because the ego is still
+   physically on that line. If nothing is feasible but some candidates
+   are collision-free and on the road (only margin, standoff or beyond-horizon
+   exposure violated) the cheapest of those is selected and flagged `degraded=True`.
+   Otherwise the maximum-deceleration stop trajectory is returned flagged
+   `fallback=True`; behaviour and safety supervisor treat that as an emergency.
+   Reversing legs are selected ahead of forward candidates only while the behaviour
+   layer is in REVERSING.
 
 ## 10. Controller
 
@@ -386,3 +453,33 @@ Each package maps to one subsystem; `types.py` dataclasses map to Simulink
 buses; `behavior/state_machine.py` maps to a Stateflow chart; `world/` is
 replaced by RoadRunner + Automated Driving Toolbox sensors feeding a fusion
 block that implements `ObjectStateProvider`.
+
+## 16. Live dashboard sink
+
+`autonomy/telemetry/dashboard.py: DashboardSink` is the "WebSocket / REST"
+adapter box of section 2, implemented as one more `TelemetrySink` with the
+standard library only. It runs a `ThreadingHTTPServer` in a daemon thread and
+serves a self-contained HTML/JS/canvas page (`dashboard_page.py`), a
+Server-Sent-Events stream of compact frames (`/stream`, throttled to ~10 Hz
+wall-clock, one bounded queue per client, oldest frame dropped for slow
+clients), `/latest` and `/metrics`. Compact frames are derived from the
+dataclasses' own `to_dict()` methods (`compact_frame`); candidates are strided
+and reduced to their x/y polylines. `close()` flushes the final frame and a
+`done` event but keeps serving so the end state stays inspectable;
+`shutdown()` releases the port. `RealtimePacingSink` sleeps in `write()` so a
+run advances at wall-clock speed; it is registered last so every other sink has
+already seen the frame. Nothing in the core imports either sink; the loop is
+unchanged.
+
+## 17. MATLAB / Simulink export (untested in MATLAB)
+
+`matlab_export/` generates `matlab/` from the Python sources so the Stage 2
+Simulink model starts from the same contracts: `buses.m` (`Simulink.Bus`
+objects introspected from `VehicleState`, `ControlCommand`, `ObjectState`,
+`RiskSummary`, `SpeedPolicy`, `BehaviorDecision`, `SimulationMetrics`, with
+enums as `int32` and a code table), `behavior_transitions.{m,csv}` and
+`behavior_states.csv` (the FSM's `TRANSITIONS` table and `SEVERITY`, one
+Stateflow transition per row), and `replay_telemetry.m` (loads a JSONL log with
+`jsondecode`, plots speed / steering / state timeline / clearance and asserts
+the invariants of section 13). No MATLAB installation was available: the
+generated MATLAB code has not been executed and is labelled accordingly.

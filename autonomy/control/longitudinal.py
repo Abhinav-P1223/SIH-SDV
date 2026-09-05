@@ -46,6 +46,7 @@ class PIDSpeedController(LongitudinalController):
         self.hold_brake = hold_brake
         self.integral = 0.0
         self.prev_error: float | None = None
+        self.reversing = False
 
     def reset(self) -> None:
         self.integral = 0.0
@@ -53,8 +54,13 @@ class PIDSpeedController(LongitudinalController):
 
     def compute(self, ego: VehicleState, traj: Trajectory, now: float, dt: float) -> tuple[float, float, LongitudinalDebug]:
         v_ref = float(np.interp(now, traj.t, traj.velocity))
+        v_ahead = float(np.interp(now + self.cfg.preview_s, traj.t, traj.velocity))   # move-off detection
         a_ff = float(np.interp(now, traj.t, traj.acceleration)) if self.cfg.use_feedforward else 0.0
         v = ego.longitudinal_velocity
+        reversing = v_ref < -1e-6 or v_ahead < -1e-6 or (v < -0.05 and v_ref <= 0.0)
+        if reversing:
+            # track speed magnitudes; the tracker sets the reverse gear
+            v_ref, v_ahead, v, a_ff = -v_ref, -v_ahead, -v, -a_ff
         e = v_ref - v
 
         lim = self.cfg.integral_limit
@@ -67,11 +73,12 @@ class PIDSpeedController(LongitudinalController):
         if not saturated_same_sign:
             self.integral = max(-lim, min(lim, self.integral + e * dt))
 
-        if v_ref < self.stop_speed and v < self.stop_speed:
+        if max(v_ref, v_ahead) < self.stop_speed and v < self.stop_speed:      # genuine hold, not a move-off
             acc, brake = 0.0, self.hold_brake
             self.integral = 0.0
         elif u >= 0:
             acc, brake = u, 0.0
         else:
             acc, brake = 0.0, -u
+        self.reversing = reversing
         return acc, brake, LongitudinalDebug(v_ref, e, a_ff, self.integral, acc, brake)

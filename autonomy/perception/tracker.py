@@ -19,8 +19,9 @@ Measurement models:
 Association: gated global nearest neighbour on the Mahalanobis distance of
 the position innovation (gate chi2, 2 dof), greedy per sensor batch.
 Lifecycle: tentative on first detection, confirmed after `confirm_hits`
-hits, deleted after `max_misses` consecutive misses or `max_age_s` without an
-update. Class: confidence-weighted votes from camera detections; UNKNOWN when
+hits, deleted after `max_age_s` without an update (`tentative_max_age_s` for
+unconfirmed tracks); deletion is time-based so a 10 Hz LiDAR-only object
+survives the empty 50 Hz ingests between its frames. Class: confidence-weighted votes from camera detections; UNKNOWN when
 no camera has seen the object or the winning vote is below the floor.
 Dimensions: running mean of LiDAR extents (profile defaults otherwise).
 Heading: from velocity when moving, else from LiDAR, else last value.
@@ -47,8 +48,9 @@ class TrackerConfig:
     process_noise_accel_mps2: float = 1.5
     gate_chi2: float = 9.21
     confirm_hits: int = 3
-    max_misses: int = 6
+    max_misses: int = 100          # legacy guard; deletion is time-based (max_age_s / tentative_max_age_s)
     max_age_s: float = 1.0
+    tentative_max_age_s: float = 0.5
     init_velocity_std_mps: float = 3.0
     min_speed_for_heading_mps: float = 0.5
     class_confidence_floor: float = 0.35
@@ -204,8 +206,13 @@ class SensorFusionTracker(ObjectStateProvider):
                 tr.misses = 0
             else:
                 tr.misses += 1
-        self.tracks = [tr for tr in self.tracks
-                       if tr.misses <= self.cfg.max_misses and now - tr.last_update <= self.cfg.max_age_s]
+        # deletion is TIME based: a LiDAR-only object seen at 10 Hz must survive the 4 empty 50 Hz ingests
+        # between its frames and an occasional dropped frame; a confirmed track coasts for max_age_s
+        def alive(tr: Track) -> bool:
+            age = now - tr.last_update
+            limit = self.cfg.max_age_s if tr.hits >= self.cfg.confirm_hits else self.cfg.tentative_max_age_s
+            return tr.misses <= self.cfg.max_misses and age <= limit
+        self.tracks = [tr for tr in self.tracks if alive(tr)]
         self._merge_duplicates()
 
     def _merge_duplicates(self) -> None:

@@ -34,6 +34,7 @@ SEVERITY = {
     BehaviorState.CAUTION: 2,
     BehaviorState.AVOID: 3,
     BehaviorState.STOPPED: 4,
+    BehaviorState.REVERSING: 4,
     BehaviorState.EMERGENCY_BRAKE: 5,
 }
 
@@ -47,6 +48,7 @@ class DecisionContext:
     planner_feasible: bool          # did the last planning cycle find any feasible trajectory
     time_in_state: float
     standstill_s: float = 0.0       # seconds the ego has been stationary under planner control
+    reverse_count: int = 0          # reversing manoeuvres used in the current boxed-in episode
 
     @property
     def worst(self):
@@ -157,6 +159,23 @@ def g_stopped_to_avoid(c: DecisionContext) -> Optional[str]:
     return None
 
 
+def g_boxed_in(c: DecisionContext) -> Optional[str]:
+    if c.ego.longitudinal_velocity < c.cfg.stopped_speed_mps and c.standstill_s >= c.cfg.reverse_after_standstill_s \
+            and not c.planner_feasible and c.reverse_count < c.cfg.max_reverse_manoeuvres:
+        return (f"Boxed in for {c.standstill_s:.1f} s with no forward trajectory; reversing to create room "
+                f"(manoeuvre {c.reverse_count + 1}/{c.cfg.max_reverse_manoeuvres}).")
+    return None
+
+
+def g_reverse_done(c: DecisionContext) -> Optional[str]:
+    stopped = abs(c.ego.longitudinal_velocity) < c.cfg.stopped_speed_mps
+    if c.planner_feasible and c.time_in_state >= 0.5 and stopped:
+        return "Forward trajectory available again after reversing."
+    if c.time_in_state >= c.cfg.reverse_timeout_s and stopped:
+        return "Reversing manoeuvre timed out; holding."
+    return None
+
+
 def g_stopped_release(c: DecisionContext) -> Optional[str]:
     moving = c.ego.longitudinal_velocity >= c.cfg.stopped_speed_mps
     if c.risk.max_level.value <= RiskLevel.LOW.value:
@@ -177,10 +196,12 @@ S = BehaviorState
 
 # (from_states, to_state, guard). Order = priority.
 TRANSITIONS: list[tuple[tuple[BehaviorState, ...], BehaviorState, Guard]] = [
-    (tuple(s for s in ALL if s not in (S.EMERGENCY_BRAKE, S.STOPPED)), S.EMERGENCY_BRAKE, g_emergency),
+    (tuple(s for s in ALL if s not in (S.EMERGENCY_BRAKE, S.STOPPED, S.REVERSING)), S.EMERGENCY_BRAKE, g_emergency),
     ((S.EMERGENCY_BRAKE,), S.STOPPED, g_stopped),
     ((S.AVOID, S.CAUTION), S.STOPPED, g_planner_standstill),
     ((S.EMERGENCY_BRAKE,), S.CAUTION, g_eb_release),
+    ((S.STOPPED,), S.REVERSING, g_boxed_in),
+    ((S.REVERSING,), S.CAUTION, g_reverse_done),
     ((S.STOPPED,), S.AVOID, g_stopped_to_avoid),
     ((S.STOPPED,), S.CAUTION, g_stopped_release),
     ((S.CRUISE, S.FOLLOW, S.CAUTION), S.AVOID, g_avoid),
@@ -201,11 +222,12 @@ class BehaviorStateMachine:
         self.entered_at = 0.0
         self.last_reason = "Initial state."
         self.transition_count = 0
+        self.reverse_count = 0
 
     def decide(self, risk: RiskSummary, ego: VehicleState, now: float,
                planner_feasible: bool = True, standstill_s: float = 0.0) -> BehaviorDecision:
         ctx = DecisionContext(risk, ego, self.cfg, self.desired_speed, planner_feasible,
-                              now - self.entered_at, standstill_s)
+                              now - self.entered_at, standstill_s, self.reverse_count)
         previous = self.state
         reason = self.last_reason
         for from_states, to_state, guard in TRANSITIONS:
@@ -216,6 +238,10 @@ class BehaviorStateMachine:
                 continue
             fired = guard(ctx)
             if fired:
+                if to_state == BehaviorState.REVERSING:
+                    self.reverse_count += 1
+                if to_state == BehaviorState.CRUISE:
+                    self.reverse_count = 0                    # boxed-in episode over
                 self.state = to_state
                 self.entered_at = now
                 self.transition_count += 1
@@ -260,4 +286,7 @@ class BehaviorStateMachine:
             # stationary but not in danger: let the planner search for a clear path at caution speed;
             # the zero-speed candidate remains available if nothing is clear
             return SpeedPolicy(v * c.caution_speed_factor, True, False)
+        if state == BehaviorState.REVERSING:
+            # forward candidates stay allowed (a gap may open); reversing candidates are generated too
+            return SpeedPolicy(v * c.caution_speed_factor, True, False, allow_reverse=True)
         return SpeedPolicy(0.0, False, True)   # EMERGENCY_BRAKE

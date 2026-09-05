@@ -47,6 +47,18 @@ class PredictionConfig:
     dt_s: float = 0.1
     road_following_heading_tol_deg: float = 30.0   # a road-following class within this of the corridor (either way)
     lateral_velocity_decay_s: float = 1.0          # ... has its lateral velocity decay with this time constant
+    # acceleration estimated in the predictor from the velocity history of successive predict() calls
+    estimate_acceleration: bool = True
+    max_acceleration_mps2: float = 2.0             # |a| clamp of the estimate (noise bound)
+    max_acceleration_by_type: dict[str, float] = field(default_factory=dict)   # per-class override of the clamp
+    acceleration_horizon_s: float = 1.5            # constant acceleration this long, then constant velocity
+    velocity_history_s: float = 0.6                # window of velocity samples the estimate is fitted to
+    min_history_samples: int = 3                   # fewer samples -> zero acceleration (pure constant velocity)
+    acceleration_filter_s: float = 0.3             # first-order low-pass time constant on the estimate
+    # intent prior for free movers (classes without follows_road): along-heading uncertainty growth factor
+    intent_accel_threshold_mps2: float = 0.5       # |a_along| above this counts as braking / speeding up
+    intent_stopping_growth_factor: float = 0.6     # braking: about to stop, tighter along-heading growth
+    intent_accelerating_growth_factor: float = 1.4 # speeding up: committing to the crossing, wider growth
 
     @property
     def steps(self) -> int:
@@ -89,6 +101,9 @@ class BehaviorConfig:
     caution_exit_score: float = 0.1
     avoid_exit_score: float = 0.25
     standstill_to_stopped_s: float = 1.0
+    reverse_after_standstill_s: float = 3.0    # boxed in this long with no forward candidate -> REVERSING
+    max_reverse_manoeuvres: int = 3
+    reverse_timeout_s: float = 8.0
 
 
 @dataclass
@@ -101,10 +116,11 @@ class CostWeights:
     boundary: float = 0.6
     speed: float = 1.5
     uncertainty: float = 1.0
-    lateral: float = 1.2
+    lateral: float = 1.0
     blocked: float = 3.0
-    consistency: float = 0.3
+    consistency: float = 0.5
     front_pass: float = 1.5
+    jerk: float = 0.3
 
     def as_dict(self) -> dict[str, float]:
         return {f.name: getattr(self, f.name) for f in fields(self)}
@@ -119,11 +135,15 @@ class PlanningConfig:
     lateral_step_m: float = 0.5               # lattice of end offsets desired + k*step spanning the whole corridor
     lateral_cost_scale_m: float = 2.0         # normalisation of the lateral-deviation and consistency costs
     crossing_lateral_speed_mps: float = 0.3   # an object moving across the corridor faster than this is 'crossing'
+    reverse_speed_mps: float = 1.5            # reversing recovery manoeuvre speed
+    reverse_distances_m: list[float] = field(default_factory=lambda: [3.0, 6.0])
+    reverse_acceleration_mps2: float = 1.0
     exposure_sigma_cap_m: float = 1.5         # beyond-horizon checks inflate objects by min(meas sigma, cap)
     speed_fractions: list[float] = field(default_factory=lambda: [1.0, 0.75, 0.5, 0.25, 0.0])
     lateral_transition_time_s: float = 2.0
     min_lateral_transition_length_m: float = 10.0
     comfortable_deceleration_mps2: float = 3.0
+    max_jerk_mps3: float = 4.0                  # S-curve limit for comfortable speed profiles (hard stops exempt)
     max_lateral_acceleration_mps2: float = 3.5
     safety_margin_m: float = 0.5
     uncertainty_margin_gain: float = 1.0      # margin += gain * measured position std-dev of the object
@@ -135,6 +155,10 @@ class PlanningConfig:
     clearance_scale_m: float = 2.0
     clearance_saturation_m: float = 1.5       # clearance beyond margin+this costs nothing more
     standstill_speed_mps: float = 0.5
+    creep_guard_slack_m: float = 0.05           # tolerance of the creep guard (degraded tier may not inch closer)
+    progress_feasible_min_m: float = 1.0        # a degraded plan counts as a forward plan only if it advances this far
+    boxed_in_range_m: float = 10.0              # 'boxed in' only applies within this gap to the blocker: further
+                                                # away the ego is simply stopped, not stuck
     standstill_progress_gain: float = 0.5     # progress weight grows by this per second at standstill
     standstill_progress_max_factor: float = 6.0
     terminal_exposure_horizon_s: float = 7.0   # end pose must not be hit by CV-extrapolated objects before this
@@ -174,6 +198,8 @@ class PIDConfig:
     kd: float = 0.05
     integral_limit: float = 2.0
     use_feedforward: bool = True
+    preview_s: float = 0.2          # reference speed is also read this far ahead so a move-off from rest is not
+                                    # mistaken for a hold (the profile starts at exactly v = 0)
 
 
 @dataclass
@@ -194,6 +220,7 @@ class SafetyConfig:
     ttc_critical_s: float = 1.0
     hold_time_s: float = 0.5
     brake_mps2: float = 8.0
+    min_speed_for_ttc_override_mps: float = 1.5   # below this the planner's own stop suffices; no TTC override
 
 
 @dataclass
@@ -309,6 +336,7 @@ def vehicle_parameters_from_dict(data: dict[str, Any]) -> VehicleParameters:
         max_acceleration=float(v["max_acceleration_mps2"]),
         max_deceleration=float(v["max_deceleration_mps2"]),
         max_speed=float(v["max_speed_mps"]),
+        max_reverse_speed=float(v.get("max_reverse_speed_mps", 2.0)),
     )
 
 

@@ -72,11 +72,24 @@ class KinematicBicycleModel(VehicleModel):
         act = self.actuators.apply(command, state.steering_angle, dt)
         self.last_actuated = act
         delta = act.steering_angle
-        a_net = act.net_acceleration
-
-        # a vehicle at rest cannot be braked into reverse
-        if state.longitudinal_velocity <= 0.0 and a_net < 0.0:
-            a_net = 0.0
+        v0 = state.longitudinal_velocity
+        # signed longitudinal speed: forward > 0, reverse < 0. The gear is the command's `reverse` flag;
+        # a gear change is only honoured near standstill (|v| < 0.3 m/s), otherwise the command brakes.
+        if command.reverse:
+            if v0 > 0.3:
+                # still rolling forward: brake to a stop before the reverse gear engages
+                a_net = -min(max(command.brake, 1.0), p.max_deceleration)
+            else:
+                # reverse: "acceleration" pushes backwards, "brake" pulls |v| toward zero
+                a_net = -min(command.acceleration, p.max_acceleration) + min(command.brake, p.max_deceleration)
+                if v0 >= 0.0 and a_net > 0.0:
+                    a_net = 0.0
+        else:
+            a_net = act.net_acceleration
+            if v0 < -1e-9:                      # still rolling backwards: any forward command brakes first
+                a_net = min(command.brake if command.brake > 0 else max(command.acceleration, 1.0), p.max_deceleration)
+            elif v0 <= 0.0 and a_net < 0.0:     # a vehicle at rest cannot be braked into reverse
+                a_net = 0.0
 
         x, y, psi, v = state.x, state.y, state.yaw, state.longitudinal_velocity
         if self.integrator == "euler":
@@ -92,7 +105,11 @@ class KinematicBicycleModel(VehicleModel):
             psi += dt / 6.0 * (k1[2] + 2 * k2[2] + 2 * k3[2] + k4[2])
             v += dt / 6.0 * (k1[3] + 2 * k2[3] + 2 * k3[3] + k4[3])
 
-        v = min(max(v, 0.0), p.max_speed)
+        in_reverse_gear = command.reverse and v0 <= 0.3
+        if in_reverse_gear or v0 < -1e-9:
+            v = max(min(v, 0.0), -p.max_reverse_speed)          # reverse: v in [-v_rev_max, 0]
+        else:
+            v = min(max(v, 0.0), p.max_speed)                   # forward: v in [0, v_max]
         beta = math.atan(p.cg_to_rear_axle / p.wheelbase * math.tan(delta))
         yaw_rate = v * math.cos(beta) * math.tan(delta) / p.wheelbase
         realised_acc = (v - state.longitudinal_velocity) / dt if dt > 0 else 0.0

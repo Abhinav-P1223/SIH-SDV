@@ -98,6 +98,14 @@ class TelemetrySink(ABC):                             # autonomy/telemetry/telem
 * Every `BehaviorDecision` has a non-empty `reason` and numeric `triggers`.
 * Metrics are computed from executed `VehicleState`s and actual agent
   footprints, never from planner intent.
+* Longitudinal speed is signed: forward is positive, reverse negative. The gear
+  is `ControlCommand.reverse`, a gear change is honoured only near standstill,
+  and a forward command while rolling backwards brakes to rest rather than
+  adding forward speed (and vice versa). Reverse speed is capped separately by
+  `VehicleParameters.max_reverse_speed`.
+* Reversing candidates are generated only while the behaviour layer is in
+  `REVERSING`, are selected only over forward candidates in that state, and come
+  to rest by construction.
 
 ## Stage 2 mapping
 
@@ -109,3 +117,43 @@ class TelemetrySink(ABC):                             # autonomy/telemetry/telem
 | `KinematicBicycleModel` | dynamic bicycle / Vehicle Dynamics Blockset behind `VehicleModel` |
 | `BehaviorStateMachine.TRANSITIONS` | Stateflow chart, one state per `BehaviorState`, one transition per table row |
 | `TelemetryFrame` dicts | WebSocket / REST / MATLAB adapter as another `TelemetrySink` |
+
+## Dashboard frame JSON (`DashboardSink`, `/latest` and `/stream` events)
+
+Produced by `autonomy/telemetry/dashboard.py: compact_frame()` from the
+`to_dict()` methods above; non-finite floats become `null`.
+
+| Key | Content |
+|---|---|
+| `t`, `step`, `planning_cycle`, `perception_mode` | frame identity |
+| `vehicle` | `length`, `width`, `footprint_center_offset` (from `config/vehicle.yaml`) |
+| `ego` | `x`, `y`, `yaw`, `longitudinal_velocity`, `longitudinal_acceleration`, `steering_angle` |
+| `control` | `steering_angle`, `acceleration`, `brake`, `source` |
+| `objects[]` | `id`, `type`, `x`, `y`, `vx`, `vy`, `heading`, `length`, `width`, `confidence` |
+| `predictions[]` | `id`, strided `x[]`, `y[]` |
+| `agents[]` | ground truth for evaluation: `id`, `type`, `x`, `y`, `heading` |
+| `risk` | `max_level`, `max_score`, `min_ttc`, `min_ttc_current_speed`, `min_predicted_distance`, `worst_object_id`, `lead_object_id` |
+| `behavior` | `state`, `previous_state`, `reason`, `target_speed`, `time_in_state`, `allow_lateral_avoidance`, `force_stop` (or `null`) |
+| `plan` | `selected_id`, `latency_ms`, `feasible_count`, `rejected_count`, `candidate_count`, `rejection_histogram{}`, `selected{x[],y[],v[],total_cost,min_clearance,fallback,degraded}`, `candidates[]{x[],y[],feasible}` (or `null`) |
+| `safety` | `override_active`, `reason`, `activation_count` |
+| `metrics` | `minimum_obstacle_clearance`, `collision_count`, `emergency_brake_activations`, `termination_reason` |
+| `road` | `reference`, `left_boundary`, `right_boundary` polylines |
+
+`/metrics` returns the full `SimulationMetrics.to_dict()` of the newest frame.
+SSE events: `frame` (payload above) and `done` (metrics) when the run ends.
+
+## MATLAB bus mapping (`matlab_export/`, untested in MATLAB)
+
+| Python | MATLAB (`matlab/buses.m`) |
+|---|---|
+| `float` / `Optional[float]` | `double` (`NaN` for `None`) |
+| `int` / `Optional[int]` | `int32` (`-1` for `None`) |
+| `bool` | `boolean` |
+| `Enum` (`BehaviorState`, `RiskLevel`, `ObjectType`) | `int32`; int enums keep their value, string enums use declaration order; codes in the file header |
+| nested dataclass (`SpeedPolicy`) | `Bus: SpeedPolicy` |
+| `ObjectState.covariance` | `double` `[2 2]` |
+| `str`, `list`, `dict`, `tuple` | not a bus element; reported as a `skipped field` comment |
+
+`matlab/behavior_transitions.csv` columns: `priority`, `from_states`
+(`;`-separated), `to_state`, `guard`, `guard_doc`, `dwell_guarded_from`
+(from-states for which the row is a de-escalation subject to `min_dwell_s`).

@@ -41,4 +41,5 @@ class TrajectoryTracker:
         steer, ldbg = self.lateral.compute(ego, traj)
         acc, brake, gdbg = self.longitudinal.compute(ego, traj, now, dt)
         self.last_debug = TrackerDebug(ldbg, gdbg)
-        return ControlCommand(now, steer, acc, brake, source="tracker")
+        reverse = bool(getattr(self.longitudinal, "reversing", False))
+        return ControlCommand(now, steer, acc, brake, source="tracker", reverse=reverse)

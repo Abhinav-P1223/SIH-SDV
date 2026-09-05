@@ -82,6 +82,8 @@ class TrajectoryScorer:
         c["smoothness"] = float(0.5 * np.mean(a_lat) / self.cfg.max_lateral_acceleration_mps2
                                 + 0.5 * np.mean(np.abs(tr.acceleration)) / a_max)
         c["curvature"] = float(np.max(np.abs(tr.curvature)) / p.max_curvature)
+        jerk = np.abs(np.diff(tr.acceleration) / np.diff(rel_t))
+        c["jerk"] = float(min(np.mean(jerk) / self.cfg.max_jerk_mps3, 1.0)) if self.cfg.max_jerk_mps3 > 0 else 0.0
         max_progress = policy.target_speed * self.cfg.horizon_s
         c["progress"] = float(np.clip(1.0 - (s_end - s0) / max_progress, 0.0, 1.0)) if max_progress > 0 else 0.0
         c["boundary"] = float(math.exp(-cand.min_boundary_clearance / (0.5 * self.cfg.clearance_scale_m))) \

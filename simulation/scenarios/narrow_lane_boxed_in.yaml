@@ -1,0 +1,48 @@
+# NARROW_LANE_BOXED_IN
+# A 7 m unmarked market lane. The ego drives keep-left at 4 m/s. A pushcart is wheeled out of a side alley
+# when the ego is ~11 m away and is then abandoned across the ego's half of the lane.
+#
+# The geometry is the point of the scenario:
+#   * there IS a way past. The cart occupies d in [0.5, 2.5]; a 1.8 m car needs d <= -0.9 to clear it with the
+#     0.5 m safety margin, and the corridor allows down to d = -2.35. So a 1.45 m band on the right is free.
+#   * the ego cannot USE it from where it stops. Shifting from d = +1.75 to about d = -1.5 is a 3.2 m lateral
+#     move; the quintic's peak curvature limits that to roughly 9.3 m of forward travel, and the standoff
+#     leaves the ego only ~5 m in front of the cart. Every wide candidate still overlaps the cart inside the
+#     planning horizon and is rejected.
+# The only way out is to back up, buy the run-up, and then take the gap. Nothing about that is scripted: the
+# reversing must emerge from the planner reporting no forward plan and the behaviour layer reacting.
+name: NARROW_LANE_BOXED_IN
+description: A pushcart is abandoned across the ego's half of a narrow lane, too close to steer around from rest.
+seed: 11
+
+road:
+  lane_markings: NONE
+  reference:      [[-20.0, 0.0], [120.0, 0.0]]
+  left_boundary:  [[-20.0, 3.5], [120.0, 3.5]]
+  right_boundary: [[-20.0, -3.5], [120.0, -3.5]]
+
+ego:
+  x: 0.0
+  y: 1.75                     # keep-left on an unmarked road
+  yaw_deg: 0.0
+  speed_mps: 4.0              # ~15 km/h, market-lane speed
+  desired_speed_mps: 4.0
+  desired_lateral_offset_m: 1.75
+
+goal:
+  s_m: 100.0
+
+agents:
+  - id: cart_1
+    type: PUSHCART
+    x: 30.0
+    y: 3.2                    # waiting at the left edge, out of the ego's way
+    heading_deg: -90.0        # wheeled out toward -y, across the ego's half
+    speed_mps: 0.0
+    behavior: CROSSING
+    params:
+      trigger_distance_m: 11.0
+      crossing_speed_mps: 1.0
+      acceleration_mps2: 1.5
+      crossing_distance_m: 1.7   # ends centred at y = 1.5, spanning y in [0.5, 2.5]
+      stop_after: true

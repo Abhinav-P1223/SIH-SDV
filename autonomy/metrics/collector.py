@@ -102,6 +102,10 @@ class MetricsCollector:
             prev = self._prev_state
             ds = math.hypot(state.x - prev.x, state.y - prev.y)
             m.path_length += ds
+            if state.longitudinal_velocity < -0.05:
+                m.reverse_distance_m += ds
+                if prev.longitudinal_velocity >= -0.05:
+                    m.reverse_manoeuvres += 1
             m.max_acceleration = max(m.max_acceleration, state.longitudinal_acceleration)
             m.max_deceleration = max(m.max_deceleration, -state.longitudinal_acceleration)
             rate = abs(state.steering_angle - prev.steering_angle) / dt
