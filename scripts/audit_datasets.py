@@ -130,8 +130,11 @@ def audit_idd_lite(root: Path) -> None:
         raise SystemExit(f"not found: {root}")
 
     images = sorted(root.rglob("*_image.jpg")) or sorted(root.rglob("*leftImg8bit*"))
-    masks = sorted(root.rglob("*label*.png")) or sorted(root.rglob("*gtFine*"))
-    print(f"images {len(images)}   masks {len(masks)}")
+    # `*_label.png` is the SEMANTIC mask; `*_inst_label.png` is the instance mask shipped
+    # alongside it. Globbing `*label*` would double-count, so separate them explicitly.
+    masks = sorted(p for p in root.rglob("*_label.png") if not p.name.endswith("_inst_label.png"))
+    inst = sorted(root.rglob("*_inst_label.png"))
+    print(f"images {len(images)}   semantic masks {len(masks)}   instance masks {len(inst)}")
 
     splits: Counter = Counter()
     for p in images:
@@ -140,8 +143,18 @@ def audit_idd_lite(root: Path) -> None:
             if s in parts:
                 splits[s] += 1
                 break
-    print("split sizes: " + ", ".join(f"{k} {v}" for k, v in sorted(splits.items())) if splits
-          else "no train/val/test directories found")
+    if splits:
+        print("image split sizes: " + ", ".join(f"{k} {v}" for k, v in sorted(splits.items())))
+        labelled: Counter = Counter()
+        for p in masks:
+            parts = {q.name for q in p.parents}
+            for s_ in ("train", "val", "test"):
+                if s_ in parts:
+                    labelled[s_] += 1
+                    break
+        print("labelled (mask) sizes: " + ", ".join(f"{k} {v}" for k, v in sorted(labelled.items())))
+    else:
+        print("no train/val/test directories found")
 
     if not masks:
         print("\nNo masks found: check the archive layout before assuming the format.")
