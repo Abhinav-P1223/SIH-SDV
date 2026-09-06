@@ -12,3 +12,7 @@ logs/*
 *.mp4
 !docs/img/*.png
 !docs/img/*.gif
+
+# Datasets live inside the repo folder but must never enter git (nuScenes mini alone is 5.1 GB)
+Datasets/
+step3prompt
