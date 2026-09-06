@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 from autonomy.core.config import ObjectProfiles, PerceptionConfig
-from autonomy.core.types import Detection, ObjectType, SensorType, VehicleState
+from autonomy.core.types import Detection, ObjectState, ObjectType, SensorType, VehicleState
 from autonomy.perception.tracker import SensorFusionTracker, TrackerConfig
 from simulation.agents.agent import Agent
 from simulation.sensors.models import CameraModel, LidarModel, RadarModel, SensorConfig, SensorSuite
@@ -47,10 +47,15 @@ def test_noise_is_seeded_and_covariance_matches_geometry():
     d2 = CameraModel(cfg, np.random.default_rng(3)).sense([a], ego(), 0.0)[0]
     assert (d1.x, d1.y) == (d2.x, d2.y)                      # deterministic under seed
     assert (d1.x, d1.y) != (40.0, 0.0)                       # actually noisy
-    # object straight ahead: range error along x, bearing error along y => cov_xx = sr^2, cov_yy = (r sb)^2
-    sr = 0.02 * 40 + 0.2
-    assert d1.covariance[0, 0] == pytest.approx(sr ** 2, rel=1e-6)
-    assert d1.covariance[1, 1] == pytest.approx((40 * math.radians(1.0)) ** 2, rel=1e-6)
+    # The error ellipse is long along the line of sight (range error) and short across it
+    # (bearing error), both evaluated at the MEASURED range and bearing -- all the sensor knows.
+    # Using the true 40 m / true bearing here would be a ground-truth leak into the reported
+    # uncertainty, so assert on the eigenvalues, which are invariant to the ellipse's rotation.
+    r_meas = math.hypot(d1.x, d1.y)
+    sr = 0.02 * r_meas + 0.2
+    across, along = sorted(np.linalg.eigvalsh(d1.covariance))
+    assert along == pytest.approx(sr ** 2, rel=1e-6)
+    assert across == pytest.approx((r_meas * math.radians(1.0)) ** 2, rel=1e-6)
 
 
 def test_radar_radial_speed_relative_to_moving_sensor():
@@ -216,3 +221,89 @@ def test_lidar_only_track_survives_between_10hz_frames_and_a_dropped_frame():
     for k in range(150, 210):                 # object disappears for 1.2 s -> deleted
         tr.ingest([], k * 0.02, ego())
     assert tr.get_object_states(4.2) == []
+
+
+# ---------------------------------------------------------------- Phase 1 --
+def test_reported_covariance_is_computed_from_the_measurement_not_the_truth():
+    """A sensor cannot know the true range, so it cannot report a covariance derived from it.
+
+    Deriving the reported uncertainty from ground truth handed the Kalman filter an oracle for
+    the one quantity it is most sensitive to. The covariance must be reproducible from the
+    detection alone.
+    """
+    cfg = SensorConfig(rate_hz=20, latency_s=0.0, fov_deg=120, range_m=200, dropout_prob=0.0,
+                       bearing_std_deg=3.0, range_std_frac=0.30, range_std_min_m=0.5)
+    cam = CameraModel(cfg, np.random.default_rng(7))
+    e, a = ego(), agent("a", 40.0, 0.0)
+    worst = 0.0
+    for _ in range(200):
+        d = cam.measure(a, 0.0, 0.0, e, 0.0)
+        r_meas = math.hypot(d.x, d.y)
+        sr = cfg.range_std_frac * r_meas + cfg.range_std_min_m
+        sb = math.radians(cfg.bearing_std_deg)
+        small, large = sorted(np.linalg.eigvalsh(d.covariance))
+        worst = max(worst, abs(math.sqrt(large) - sr), abs(math.sqrt(small) - r_meas * sb))
+    assert worst < 1e-9, "reported covariance does not follow the measured range/bearing"
+
+
+def test_configured_sensor_rate_is_the_achieved_rate():
+    """Restarting the period from the current step ran a 20 Hz sensor at 16.7 Hz."""
+    for rate, dt in ((20.0, 0.02), (10.0, 0.02), (25.0, 0.02), (15.0, 0.01)):
+        cfg = SensorConfig(rate_hz=rate)
+        s = LidarModel(cfg, np.random.default_rng(0))
+        t, fires, steps = 0.0, 0, int(round(10.0 / dt))
+        for _ in range(steps):
+            if s.due(t):
+                fires += 1
+            t += dt
+        assert abs(fires / 10.0 - rate) <= 0.15, f"{rate} Hz sensor achieved {fires / 10.0} Hz"
+
+
+def _collector():
+    from autonomy.core.config import load_vehicle_parameters
+    from autonomy.metrics.collector import MetricsCollector
+    return MetricsCollector(load_vehicle_parameters(), 0.5)
+
+
+def _obj(id_, x, y):
+    return ObjectState(id_, ObjectType.CAR, 0.0, x, y, 0.0, 0.0, 0.0, 4.3, 1.8)
+
+
+def test_perception_metric_falls_when_objects_are_missed():
+    """The old metric iterated over TRACKS and kept only pairs within 3 m, so a stack that missed
+    an object -- or published nothing at all -- still scored a perfect error. Recall must drop."""
+    truth = [_obj("a", 10, 0), _obj("b", 20, 0), _obj("c", 30, 0)]
+    e = ego()
+
+    perfect = _collector()
+    perfect.on_perception([_obj("t1", 10, 0), _obj("t2", 20, 0), _obj("t3", 30, 0)], truth, None, 0, ego=e)
+    assert perfect.m.perception_recall == pytest.approx(1.0)
+    assert perfect.m.perception_missed_objects == 0
+
+    missing = _collector()
+    missing.on_perception([_obj("t1", 10, 0)], truth, None, 0, ego=e)          # two objects missed
+    assert missing.m.perception_recall == pytest.approx(1 / 3)
+    assert missing.m.perception_missed_objects == 2
+
+    blind = _collector()
+    blind.on_perception([], truth, None, 0, ego=e)                             # published nothing
+    assert blind.m.perception_recall == pytest.approx(0.0)
+    assert blind.m.perception_missed_objects == 3
+
+
+def test_perception_metric_falls_on_ghost_tracks():
+    """Tracks matching no real object must cost precision, and duplicates on one object must not
+    all count as matches."""
+    truth = [_obj("a", 10, 0)]
+    c = _collector()
+    c.on_perception([_obj("t1", 10, 0), _obj("t2", 10.2, 0), _obj("t3", 60, 20)], truth, None, 0, ego=ego())
+    assert c.m.perception_recall == pytest.approx(1.0)       # the real object was found
+    assert c.m.perception_precision == pytest.approx(1 / 3)  # but two of three tracks are spurious
+    assert c.m.perception_false_tracks == 2
+
+
+def test_objects_beyond_sensor_reach_are_not_counted_as_misses():
+    c = _collector()
+    c.on_perception([], [_obj("far", 500, 0)], None, 0, ego=ego(), eval_range_m=80.0)
+    assert c.m.perception_missed_objects == 0
+    assert c.m.perception_recall is None                     # nothing was observable to score

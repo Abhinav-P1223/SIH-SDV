@@ -43,11 +43,10 @@ risk:
   margin_grace_s: 0.3             # being inside the margin (no overlap) before this is the current pose, not a hit
   closing_epsilon_m: 0.05         # the physical (emergency) view only escalates while the gap is still shrinking:
                                   # sitting inside the margin alongside a parked obstacle is not an emergency
-  levels:                         # risk_score thresholds (after type weighting)
-    low: 0.05
-    medium: 0.20
+  levels:                         # risk_score thresholds (after type weighting). The ladder tops out at
+    low: 0.05                     # HIGH on purpose: CRITICAL is raised only by the physical TTC view, so a
+    medium: 0.20                  # stopped ego facing an obstacle is HIGH, not an emergency.
     high: 0.45
-    critical: 0.80
 
 behavior:
   min_dwell_s: 0.3                # minimum time in a state before leaving it (hysteresis)
@@ -113,6 +112,9 @@ planning:
   stop_standoff_m: 5.0            # do not come to rest closer than this to any object (now or predicted): room
                                   # to steer around it from standstill (no reversing in Stage 1)
   stop_standoff_speed_mps: 1.0
+  exposure_resume_speed_mps: 2.0  # the continuation never crawls slower than this, so a candidate that ends at
+                                  # rest is still judged on the route ahead of it rather than scoring blocked = 0
+  exposure_step_s: 0.2            # sampling step of the beyond-horizon continuation (straight lines out there)
   exposure_proximity_scale_m: 1.0 # beyond-horizon exposure is graded: severity falls to 0 this far outside the margin
   exposure_reject_slack_m: 0.2    # ... and a candidate is only rejected outright once it comes this far inside it,
                                   # so a graze at long range costs something instead of deleting the candidate

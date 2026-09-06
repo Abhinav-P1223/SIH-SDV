@@ -105,7 +105,7 @@ def polygon_distance(corners_a: np.ndarray, corners_b: np.ndarray) -> np.ndarray
 
 def box_sequence_distance(ax: np.ndarray, ay: np.ndarray, ayaw: np.ndarray, alen: float, awid: float,
                           bx: np.ndarray, by: np.ndarray, byaw: np.ndarray, blen: float, bwid: float,
-                          exact_within: float = 3.0) -> np.ndarray:
+                          exact_within: float = 3.0, a_corners: np.ndarray | None = None) -> np.ndarray:
     """Distance between paired boxes A_i and B_i for i in range(N) -> (N,).
 
     Exact (0 when overlapping) whenever the pair could be within `exact_within`
@@ -122,7 +122,9 @@ def box_sequence_distance(ax: np.ndarray, ay: np.ndarray, ayaw: np.ndarray, alen
     out = centre - ra - rb
     near = out <= exact_within
     if np.any(near):
-        ca = box_corners(ax[near], ay[near], ayaw[near], alen, awid)
+        # `a_corners` lets a caller that compares ONE sequence of A-boxes against several different
+        # B-objects build the A corners once instead of once per object.
+        ca = box_corners(ax[near], ay[near], ayaw[near], alen, awid) if a_corners is None             else a_corners[near]
         cb = box_corners(bx[near], by[near], byaw[near], blen, bwid)
         out[near] = polygon_distance(ca, cb)
     return out

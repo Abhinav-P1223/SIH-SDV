@@ -2,8 +2,10 @@
 
 Every value in `SimulationMetrics` is derived from actual ego states, actual
 agent footprints, actual planner outputs and actual safety activations.
-Stage 2 hooks (jerk, path smoothness, prediction error) are computed where the
-data already exists; perception latency stays None until sensors exist.
+Jerk, path smoothness and prediction error come from the same executed data. Perception
+recall/precision, tracking error and perception latency are populated in sensors mode by
+`on_perception`, which is an EVALUATION path: it is the only place simulator ground truth is
+read, and nothing it computes ever reaches the autonomy stack.
 """
 from __future__ import annotations
 
@@ -21,6 +23,7 @@ from autonomy.vehicle.models import footprint_for
 
 
 class MetricsCollector:
+    PERCEPTION_GATE_M = 3.0        # a track this far from an object is not that object
     def __init__(self, params: VehicleParameters, safety_margin: float, prediction_eval_horizon_s: float = 1.0):
         self.params = params
         self.safety_margin = safety_margin
@@ -53,8 +56,15 @@ class MetricsCollector:
         if self._last_selection is not None and sel != self._last_selection:
             m.plan_change_count += 1
         self._last_selection = sel
+        # Two different questions, both worth reporting, never conflated:
+        #   minimum_ttc            route view - how close the SITUATION came (counterfactual: assumes
+        #                          the ego kept going along the corridor at desired speed)
+        #   minimum_ttc_experienced physical view - how close the VEHICLE actually came, at its real
+        #                          heading and speed. This is the honest "what happened" number.
         if math.isfinite(risk.min_ttc):
             m.minimum_ttc = min(m.minimum_ttc, risk.min_ttc)
+        if math.isfinite(risk.min_ttc_current_speed):
+            m.minimum_ttc_experienced = min(m.minimum_ttc_experienced, risk.min_ttc_current_speed)
         # behaviour bookkeeping
         name = decision.state.value
         if self._last_state_name is None:
@@ -85,14 +95,32 @@ class MetricsCollector:
         m = self.m
         ego_fp = footprint_for(self.params, state.x, state.y, state.yaw)
         colliding = False
-        for o in objects:
+        # Exact branch and bound. `centre - r_ego - r_obj` (half-diagonals) is a lower bound on the
+        # true footprint distance, so once an object's bound exceeds the best exact distance found
+        # so far, neither it nor anything behind it in the ordering can be nearer. The answer is
+        # identical to evaluating every object exactly; it just stops evaluating polygons that
+        # cannot win. This loop runs at 50 Hz for the whole run and was ~19% of total runtime.
+        r_ego = 0.5 * math.hypot(self.params.length, self.params.width)
+        cx = state.x + self.params.footprint_center_offset * math.cos(state.yaw)
+        cy = state.y + self.params.footprint_center_offset * math.sin(state.yaw)
+        bounded = sorted(
+            ((math.hypot(o.x - cx, o.y - cy) - r_ego - 0.5 * math.hypot(o.length, o.width), o)
+             for o in objects), key=lambda t: t[0])
+        best = math.inf
+        nearest_id = None
+        for bound, o in bounded:
+            if bound >= best:
+                break                       # every remaining object is at least this far away
             d = box_distance(ego_fp, OrientedBox(o.x, o.y, o.heading, o.length, o.width))
-            m.minimum_obstacle_clearance = min(m.minimum_obstacle_clearance, d)
-            if d <= 0.0:
+            if d < best:
+                best, nearest_id = d, o.id
+        if bounded:
+            m.minimum_obstacle_clearance = min(m.minimum_obstacle_clearance, best)
+            if best <= 0.0:
                 colliding = True
                 if not self._in_collision:
                     m.collision_count += 1
-                    self.collision_events.append((state.timestamp, o.id))
+                    self.collision_events.append((state.timestamp, nearest_id))
         self._in_collision = colliding
 
         if not inside_corridor:
@@ -123,8 +151,26 @@ class MetricsCollector:
         m.emergency_brake_activations = safety.activation_count
 
     def on_perception(self, tracks: list[ObjectState], truth: list[ObjectState], latency_s: Optional[float],
-                      n_detections: int) -> None:
-        """Sensors mode: compare published tracks with simulator truth (evaluation only)."""
+                      n_detections: int, ego: Optional[VehicleState] = None,
+                      eval_range_m: float = 80.0) -> None:
+        """Sensors mode: score published tracks against simulator truth (EVALUATION ONLY).
+
+        This is a detection evaluation, not a curve fit over whatever happened to match. Three
+        things are counted, so the metric can genuinely fail:
+
+          recall     matched / observable truth objects. Drops when the stack MISSES an object it
+                     should have seen. The previous implementation iterated over tracks and kept
+                     only pairs within 3 m, so missed objects were invisible and a tracker that
+                     published nothing scored a perfect error.
+          precision  matched / published tracks. Drops on ghost tracks.
+          error      mean |track - truth| over matched pairs only.
+
+        Association is greedy one-to-one by distance, so N tracks on one object cost precision
+        instead of all scoring as matches. "Observable" means within `eval_range_m` of the ego;
+        an object outside every sensor's reach is not a perception failure. Objects inside that
+        radius but occluded DO count as misses, which is correct: the system did not know about
+        them.
+        """
         m = self.m
         m.detections_total += n_detections
         if latency_s is not None:
@@ -132,17 +178,41 @@ class MetricsCollector:
         self._track_counts = getattr(self, "_track_counts", [])
         self._track_counts.append(len(tracks))
         m.track_count_mean = float(np.mean(self._track_counts))
-        if not tracks or not truth:
-            return
+
+        observable = truth if ego is None else [
+            o for o in truth if math.hypot(o.x - ego.x, o.y - ego.y) <= eval_range_m]
+
+        # greedy one-to-one association, nearest pair first
+        pairs: list[tuple[float, int, int]] = []
+        for i, o in enumerate(observable):
+            for j, tr in enumerate(tracks):
+                d = math.hypot(o.x - tr.x, o.y - tr.y)
+                if d < self.PERCEPTION_GATE_M:
+                    pairs.append((d, i, j))
+        pairs.sort()
+        used_truth: set[int] = set()
+        used_track: set[int] = set()
         pe = getattr(self, "_pos_err", [])
         ve = getattr(self, "_vel_err", [])
-        for tr in tracks:
-            best = min(truth, key=lambda o: math.hypot(o.x - tr.x, o.y - tr.y))
-            d = math.hypot(best.x - tr.x, best.y - tr.y)
-            if d < 3.0:
-                pe.append(d)
-                ve.append(math.hypot(best.vx - tr.vx, best.vy - tr.vy))
+        for d, i, j in pairs:
+            if i in used_truth or j in used_track:
+                continue
+            used_truth.add(i)
+            used_track.add(j)
+            o, tr = observable[i], tracks[j]
+            pe.append(d)
+            ve.append(math.hypot(o.vx - tr.vx, o.vy - tr.vy))
         self._pos_err, self._vel_err = pe, ve
+
+        self._n_observable = getattr(self, "_n_observable", 0) + len(observable)
+        self._n_matched = getattr(self, "_n_matched", 0) + len(used_truth)
+        self._n_tracks = getattr(self, "_n_tracks", 0) + len(tracks)
+        m.perception_missed_objects += len(observable) - len(used_truth)
+        m.perception_false_tracks += len(tracks) - len(used_track)
+        if self._n_observable:
+            m.perception_recall = self._n_matched / self._n_observable
+        if self._n_tracks:
+            m.perception_precision = self._n_matched / self._n_tracks
         if pe:
             m.tracking_position_error_m = float(np.mean(pe))
             m.tracking_velocity_error_mps = float(np.mean(ve))

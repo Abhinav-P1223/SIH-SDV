@@ -235,9 +235,10 @@ class RiskEngine:
 
     def _level(self, score: float, ttc: float) -> RiskLevel:
         lv = self.cfg.levels
-        if score >= lv.critical:
-            level = RiskLevel.CRITICAL
-        elif score >= lv.high:
+        # The score ladder tops out at HIGH. CRITICAL is raised only by the physical view
+        # (evaluate(), from the current-heading TTC), so a stopped ego facing an obstacle is
+        # HIGH rather than an emergency. There is deliberately no score threshold for it.
+        if score >= lv.high:
             level = RiskLevel.HIGH
         elif score >= lv.medium:
             level = RiskLevel.MEDIUM
@@ -245,8 +246,6 @@ class RiskEngine:
             level = RiskLevel.LOW
         else:
             level = RiskLevel.NONE
-        if level == RiskLevel.CRITICAL:
-            level = RiskLevel.HIGH                     # CRITICAL is reserved for the physical view
         if ttc < self.cfg.ttc_high_s and level.value < RiskLevel.HIGH.value:
             level = RiskLevel.HIGH
         return level

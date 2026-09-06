@@ -87,7 +87,11 @@ def metrics_table(m, cfg):
         ("Max jerk [m/s^3] (hook)", fmt(m.max_jerk, 1)),
         ("Path smoothness, mean d(kappa)^2 (hook)", fmt(m.path_smoothness, 8) if m.path_smoothness is not None else "n/a"),
         ("Prediction error @1 s [m] (hook)", fmt(m.prediction_error_m, 3)),
-        ("Perception latency (hook)", "n/a (no sensors in Stage 1)"),
+        ("Perception latency [ms]", fmt(m.perception_latency_ms, 1)),
+        ("Perception recall / precision", (f"{m.perception_recall:.3f} / {m.perception_precision:.3f}"
+                                           if m.perception_recall is not None else "n/a (ground-truth mode)")),
+        ("Perception missed / false tracks", f"{m.perception_missed_objects} / {m.perception_false_tracks}"),
+        ("Min TTC, experienced [s]", fmt(m.minimum_ttc_experienced, 2)),
     ]
     lines = ["| Metric | Value |", "|---|---|"]
     lines += [f"| {k} | {v} |" for k, v in rows]
@@ -226,12 +230,17 @@ def main() -> int:
 
     # known limitations
     out.append("## Known limitations\n")
-    out.append("- Constant-velocity prediction (with anisotropic uncertainty) lags accelerating agents; see the dart results.\n"
-               "- Sensors are simulated models, not rendered images or point clouds; no learned detector exists and none is claimed.\n"
-               "- No reversing: when an agent stops right in front of a stationary ego the ego waits (standoff logic keeps this rare).\n"
-               "- Jerk is not constrained; `max_jerk` is reported.\n"
-               "- Planner latency (tens of ms in pure Python/numpy) is measured and logged, not hard real-time.\n"
-               "- No MATLAB/Simulink artefact yet; the module boundaries are designed for that port.\n")
+    out.append(
+               "- Sensors are simulated models, not rendered images or point clouds; no learned detector\n"
+               "  exists and none is claimed. Classes come from the camera model's noisy classifier.\n"
+               "- Traffic agents react to the ego only through one-shot proximity triggers; they do not\n"
+               "  yield, negotiate gaps or follow the ego continuously.\n"
+               "- The planner receives the simulator's exact drivable corridor. There is no drivable-space\n"
+               "  perception yet, so the hardest unstructured-road problem is not solved here.\n"
+               "- The ego knows its own pose exactly: no localisation error, odometry drift or IMU/GPS noise.\n"
+               "- Planner latency is a Python/numpy soft budget measured against 10 Hz, not hard real-time.\n"
+               "- MATLAB export artefacts are generated but have never been executed in MATLAB; no Simulink\n"
+               "  model or Stateflow chart exists.\n")
 
     (ROOT / "docs" / "STAGE1_RESULTS.md").write_text("\n".join(out), encoding="utf-8")
     print("wrote docs/STAGE1_RESULTS.md")

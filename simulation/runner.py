@@ -65,11 +65,15 @@ class Simulation:
 
         # perception: ground truth (Stage 1 baseline) or simulated sensors -> tracker/fusion
         self.perception = perception or PerceptionConfig(mode="ground_truth")
+        self.perception_eval_range_m = 80.0
         self.sensors: Optional[SensorSuite] = None
         self.fusion: Optional[SensorFusionTracker] = None
         if self.perception.mode == "sensors":
             self.sensors = SensorSuite.from_config(self.perception.sensors, scenario.seed)
             self.fusion = SensorFusionTracker(TrackerConfig(**self.perception.tracker), profiles)
+            # Recall is scored against objects the suite could plausibly have seen at all, i.e. the
+            # reach of its longest-range sensor. Anything beyond that is out of scope, not a miss.
+            self.perception_eval_range_m = max(s.cfg.range_m for s in self.sensors.sensors)
         self.object_provider = self.fusion if self.fusion is not None else self.world.object_provider
         self.last_detections = []
 
@@ -120,7 +124,8 @@ class Simulation:
             self.next_plan_time = t + self.cfg.planning.period_s
             self.metrics.on_plan(self.plan, self.decision, self.risk, self.predictions, objects, t)
             if self.fusion is not None:
-                self.metrics.on_perception(objects, truth, self.fusion.mean_latency_s(), 0)
+                self.metrics.on_perception(objects, truth, self.fusion.mean_latency_s(), 0,
+                                           ego=self.ego, eval_range_m=self.perception_eval_range_m)
 
         nominal = self.tracker.track(self.ego, self.plan.selected.trajectory, t, dt)
         control, self.safety_status = self.safety.check(nominal, self.risk, self.plan, self.ego, t)
@@ -134,7 +139,12 @@ class Simulation:
                               np.array([self.ego.y + self.params.footprint_center_offset * math.sin(self.ego.yaw)]),
                               np.array([self.ego.yaw]), self.params.length, self.params.width)
         inside = bool(self.road.footprint_inside(corners, 0.0)[0])
-        self.metrics.update(self.ego, truth, self.safety_status, inside, dt)   # collisions/clearance vs TRUTH
+        # `truth` above was sampled at t, but the ego has since been integrated to t+dt and
+        # world.update has moved every agent. Scoring collisions and clearance across that
+        # half-step mismatch was worth up to 0.4 m at highway closing speeds -- larger than the
+        # margin some scenarios report. Re-sample so both sides are at the same instant.
+        truth_now = self.world.object_provider.get_object_states(self.time)
+        self.metrics.update(self.ego, truth_now, self.safety_status, inside, dt)   # vs TRUTH, same t
 
         self._check_termination()
         frame = TelemetryFrame(

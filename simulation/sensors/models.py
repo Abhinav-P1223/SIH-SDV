@@ -84,9 +84,19 @@ class SensorModel:
                 ego.y + self.cfg.mount_x_m * math.sin(ego.yaw))
 
     def due(self, t: float) -> bool:
+        """Fire on the first sim step at or after the next nominal sample time.
+
+        The period is ACCUMULATED, not restarted from `t`. Restarting from `t` rounds every
+        period up to the next simulation step and then adds a full period, which silently ran a
+        sensor configured at 20 Hz at 16.7 Hz when dt = 0.02 s. Accumulating keeps the long-run
+        rate exactly as configured; the remaining sub-step jitter is honest sampling jitter.
+        """
         if not self.cfg.enabled or t + 1e-9 < self.next_sample_t:
             return False
-        self.next_sample_t = t + 1.0 / self.cfg.rate_hz
+        period = 1.0 / self.cfg.rate_hz
+        self.next_sample_t += period
+        if self.next_sample_t <= t:            # first sample, or resuming after a long gap
+            self.next_sample_t = t + period
         return True
 
     def visible(self, sx: float, sy: float, ego: VehicleState, agent: Agent, others: list[Agent]) -> bool:
@@ -145,17 +155,22 @@ class CameraModel(SensorModel):
         dx, dy = a.x - sx, a.y - sy
         rng = math.hypot(dx, dy)
         bearing_w = math.atan2(dy, dx)
+        # The NOISE magnitude depends on the true range (that is the physics), but the REPORTED
+        # covariance must be computed from what the sensor actually measured. Deriving it from the
+        # true range/bearing handed the tracker an oracle it could never have in reality, and the
+        # covariance is the one number a Kalman filter is most sensitive to.
         sr = self.cfg.range_std_frac * rng + self.cfg.range_std_min_m
         sb = math.radians(self.cfg.bearing_std_deg)
         r_m = max(0.5, rng + self.rng.normal(0.0, sr))
         b_m = bearing_w + self.rng.normal(0.0, sb)
+        sr_reported = self.cfg.range_std_frac * r_m + self.cfg.range_std_min_m
         if self.rng.random() < self.cfg.class_accuracy:
             cls, conf = a.object_type, float(np.clip(self.rng.normal(0.85, 0.08), 0.4, 0.99))
         else:
             choices = [o for o in ObjectType if o not in (a.object_type, ObjectType.UNKNOWN)]
             cls, conf = choices[int(self.rng.integers(len(choices)))], float(np.clip(self.rng.normal(0.55, 0.1), 0.3, 0.8))
         return Detection(SensorType.CAMERA, t, sx + r_m * math.cos(b_m), sy + r_m * math.sin(b_m),
-                         _polar_to_cov(rng, bearing_w, sr, sb), object_type=cls, class_confidence=conf)
+                         _polar_to_cov(r_m, b_m, sr_reported, sb), object_type=cls, class_confidence=conf)
 
 
 class LidarModel(SensorModel):
@@ -189,7 +204,7 @@ class RadarModel(SensorModel):
         ego_vx, ego_vy = ego.longitudinal_velocity * math.cos(ego.yaw), ego.longitudinal_velocity * math.sin(ego.yaw)
         v_rad = (a.vx - ego_vx) * ux + (a.vy - ego_vy) * uy + self.rng.normal(0.0, self.cfg.radial_speed_std_mps)
         return Detection(SensorType.RADAR, t, sx + r_m * math.cos(b_m), sy + r_m * math.sin(b_m),
-                         _polar_to_cov(rng, bearing_w, sr, sb), radial_speed=v_rad,
+                         _polar_to_cov(r_m, b_m, sr, sb), radial_speed=v_rad,   # measured, not true
                          radial_speed_std=self.cfg.radial_speed_std_mps)
 
 

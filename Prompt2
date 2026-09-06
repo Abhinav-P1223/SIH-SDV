@@ -1,0 +1,904 @@
+BRO — STOP ARCHITECTURE DRIFT.
+
+From this point onward, this repository is being developed exclusively toward SIH26037:
+
+“Adaptive Path Planning and Collision Avoidance for Autonomous Vehicles on Unstructured Indian Roads.”
+
+We are NOT restarting the project.
+We are NOT creating another architecture.
+We are NOT adding disconnected demos.
+We are NOT building UI features before the autonomy stack is complete.
+
+LOCK THIS ARCHITECTURE:
+
+WORLD / ROAD
+→ CAMERA + LiDAR + RADAR
+→ ML PERCEPTION + DRIVABLE-SPACE PERCEPTION
+→ SENSOR FUSION
+→ MULTI-OBJECT TRACKING
+→ SHORT-TERM MOTION PREDICTION
+→ RISK / TTC
+→ BEHAVIOR SUPERVISOR
+→ ADAPTIVE MULTI-CANDIDATE PATH PLANNER
+→ COLLISION VALIDATION
+→ SAFETY SUPERVISOR
+→ TRAJECTORY CONTROLLER
+→ VEHICLE DYNAMICS
+→ WORLD
+→ repeat every cycle.
+
+This is the only architecture.
+
+==================================================
+
+1. CORE DESIGN PRINCIPLE
+   ==================================================
+
+The vehicle must NOT think primarily in terms of lanes.
+
+This is the central SIH requirement.
+
+The planning question is:
+
+“What region of the currently observed road is safely traversable, and what trajectory gets the vehicle toward its goal while respecting dynamic obstacles, road boundaries, vehicle dynamics and uncertainty?”
+
+Therefore:
+
+CAMERA:
+semantic understanding / object classes / drivable-space cues
+
+LiDAR:
+3D geometry / obstacle position / range / free-space geometry
+
+RADAR:
+range / relative velocity / robust motion information
+
+FUSION:
+combine complementary observations into persistent world-model tracks
+
+PREDICTION:
+estimate where dynamic agents may move next
+
+RISK:
+estimate collision/TTC/clearance
+
+BEHAVIOR:
+decide CRUISE / FOLLOW / CAUTION / AVOID / EMERGENCY_BRAKE / STOP
+
+PLANNER:
+generate and score multiple collision-free trajectories
+
+CONTROL:
+track the selected trajectory
+
+VEHICLE DYNAMICS:
+determine actual resulting motion
+
+Then repeat.
+
+==================================================
+2. FIRST: HARDEN WHAT ALREADY EXISTS
+====================================
+
+Before adding major features, fix every real defect identified in the previous forensic audit.
+
+Specifically fix:
+
+1. Ground-truth leakage in sensor covariance.
+
+*sensor covariance must be calculated from measurements, not true simulator range/bearing.*
+
+2. blocked-cost structural zero.
+
+Rejected boundary/collision candidates must not artificially make the blocked cost zero and bias degraded-tier selection.
+
+3. Metrics timestamp mismatch.
+
+Metrics must compare ego state and ground truth at the same simulation timestamp.
+
+4. Dead risk configuration.
+
+Remove/reconcile the dead critical threshold configuration and ensure risk levels are internally consistent.
+
+5. Dataclass/YAML default drift.
+
+There must be ONE authoritative configuration path.
+
+6. Stale results documentation.
+
+Regenerate results and remove contradictory Stage-1 statements.
+
+7. Counterfactual TTC.
+
+Report both:
+
+* route-view / desired-speed TTC where useful
+* actual-current-speed TTC
+
+Do not present counterfactual TTC as observed vehicle behavior.
+
+8. Perception metric that cannot fail.
+
+Fix matching/evaluation so false negatives can actually reduce the metric.
+
+9. Planner latency tail.
+
+Profile and vectorize the trajectory scorer.
+
+Target:
+
+10 Hz planning cycle
+p95 < 100 ms
+and minimize worst-case spikes.
+
+10. Sensor-rate quantization.
+
+Fix scheduling so configured rates such as 20 Hz actually behave as 20 Hz.
+
+Do this FIRST.
+
+Run the complete test suite after every major fix.
+
+==================================================
+3. ML PERCEPTION — MAKE IT REAL
+===============================
+
+The ML component must be genuine.
+
+Do NOT create a fake YOLO demonstration.
+
+Do NOT render simulator rectangles and then claim ML detected them.
+
+Use Indian-road data, preferably IDD, for the object detector.
+
+Required semantic classes should map to our internal ObjectType:
+
+PEDESTRIAN
+BICYCLE
+MOTORCYCLE
+AUTO_RICKSHAW
+CAR
+BUS
+TRUCK
+CATTLE
+PUSHCART
+
+Train/fine-tune a lightweight detector.
+
+The exact model is secondary.
+
+What matters is:
+
+DATA
+→ TRAIN
+→ HELD-OUT VALIDATION
+→ CONFUSION MATRIX
+→ PER-CLASS AP/RECALL
+→ RANGE/SIZE PERFORMANCE
+→ DEPLOYABLE INFERENCE
+→ OUTPUT INTO OUR EXISTING PERCEPTION CONTRACT.
+
+The detector must NOT directly control the vehicle.
+
+Its output goes into the perception/fusion/tracking stack.
+
+The detector must produce:
+
+class
+confidence
+bounding box
+timestamp
+
+Then convert this into the internal perception representation.
+
+==================================================
+4. CAMERA + LiDAR + RADAR
+=========================
+
+Do not pretend these sensors are identical.
+
+Maintain explicit modality roles.
+
+CAMERA:
+semantic classification and visual localization.
+
+LiDAR:
+3D geometry and range.
+
+RADAR:
+range and relative velocity.
+
+The fusion layer must consume modality-specific measurements and produce a unified tracked object:
+
+Track:
+id
+class
+position
+velocity
+acceleration estimate
+covariance
+confidence
+source modalities
+timestamp
+
+Use real association/gating mathematics.
+
+Do not use simulator ground truth to silently repair missing measurements.
+
+==================================================
+5. 3D LOCALIZATION
+==================
+
+Object detection alone is not enough.
+
+For planning, objects must exist in vehicle/world coordinates.
+
+Implement:
+
+image detection
+→ geometric localization / depth source
+→ vehicle-frame position
+→ world-frame position
+
+Where LiDAR/radar measurements exist, use them as geometric depth/range sources.
+
+Do not invent precise depth from a 2D bounding box without uncertainty.
+
+Every estimated position should carry uncertainty.
+
+==================================================
+6. DRIVABLE-SPACE PERCEPTION
+============================
+
+THIS IS CRITICAL.
+
+The planner must eventually stop receiving the simulator's exact road corridor as privileged ground truth.
+
+Create a perception-side local drivable corridor representation.
+
+Input:
+camera/LiDAR observations
+
+Output:
+left/right traversable boundaries or free-space polygon within sensor range.
+
+The planner consumes THIS representation.
+
+Not the simulator's exact road geometry.
+
+Initially, a geometric LiDAR/free-space implementation is acceptable.
+
+The architecture must support learned visual drivable-space estimation later.
+
+The objective is:
+
+SENSE ROAD
+→ ESTIMATE FREE SPACE
+→ PLAN INSIDE ESTIMATED FREE SPACE.
+
+==================================================
+7. TRACKING
+===========
+
+Maintain persistent object IDs.
+
+Implement robust sensor association using:
+
+position
+velocity
+class compatibility
+Mahalanobis distance/gating
+
+Use:
+
+KF for Cartesian tracking
+EKF where nonlinear/radar measurement models require it.
+
+Propagate state covariance properly.
+
+Do not calculate prediction uncertainty independently while ignoring available tracking covariance.
+
+==================================================
+8. MOTION PREDICTION
+====================
+
+DO NOT waste time implementing a neural Transformer/LSTM trajectory predictor.
+
+Our prediction model should be:
+
+Constant Acceleration
++
+Intent / behavior prior
++
+uncertainty propagation.
+
+For example:
+
+PEDESTRIAN:
+crossing / stopping / continuing
+
+CATTLE:
+unpredictable crossing / slow movement
+
+MOTORCYCLE:
+lateral drift / overtaking
+
+AUTO:
+informal merge / lateral movement
+
+CAR:
+follow / merge / stop
+
+TRUCK/BUS:
+slow movement / constrained maneuver.
+
+Prediction must output multiple possible future states where appropriate.
+
+Uncertainty must grow with prediction horizon.
+
+==================================================
+9. REACTIVE INDIAN TRAFFIC
+==========================
+
+This is a major differentiator.
+
+Traffic agents must react to the ego vehicle.
+
+Implement a compact explainable interaction model.
+
+Longitudinal behavior:
+IDM-style following.
+
+Conflict behavior:
+gap-acceptance FSM:
+
+APPROACH
+→ YIELD
+→ COMMIT
+
+Use:
+
+ego position
+ego velocity
+ego heading
+agent position
+agent velocity
+reaction delay
+conflict point
+time gap
+critical gap.
+
+Different classes should have different parameters.
+
+Examples:
+
+pedestrian:
+high lateral unpredictability
+
+cattle:
+slow but highly uncertain
+
+motorcycle:
+small footprint + aggressive lateral movement
+
+auto-rickshaw:
+informal merging
+
+car:
+more structured following
+
+truck/bus:
+slow acceleration and large footprint.
+
+The agent behavior must be continuously evaluated, not just a one-shot proximity trigger.
+
+Create metrics:
+
+agent_yields
+agent_commits
+minimum_gap
+interaction_count
+deadlock_count.
+
+==================================================
+10. RISK ENGINE
+===============
+
+Risk must be computed against predicted dynamic obstacles and actual vehicle geometry.
+
+Use:
+
+footprint collision
+clearance
+relative motion
+TTC
+predicted trajectory intersection
+uncertainty margin.
+
+Do NOT use simplistic:
+
+distance / speed
+
+as the only TTC calculation.
+
+Risk output should contain:
+
+risk level
+minimum clearance
+TTC
+collision probability / risk score
+threatening object ID
+reason.
+
+==================================================
+11. BEHAVIOR SUPERVISOR
+=======================
+
+Behavior states:
+
+CRUISE
+FOLLOW
+CAUTION
+AVOID
+EMERGENCY_BRAKE
+STOPPED
+
+Use hysteresis to prevent oscillation.
+
+Behavior decisions must be based on risk and environment.
+
+Stateflow can eventually mirror this exact supervisor.
+
+The Python implementation remains the executable reference.
+
+==================================================
+12. ADAPTIVE PATH PLANNER — HERO COMPONENT
+==========================================
+
+THIS IS THE HEART OF SIH26037.
+
+Do not reduce this to “find a path around an obstacle.”
+
+Implement a multi-candidate trajectory planner.
+
+Generate multiple feasible trajectories using quintic/lattice-style trajectory generation.
+
+Candidate dimensions should include combinations of:
+
+lateral offset
+target speed
+trajectory duration
+curvature profile.
+
+Every candidate must satisfy:
+
+vehicle dynamics constraints
+steering limits
+steering-rate limits
+acceleration limits
+road-boundary constraints.
+
+Then evaluate:
+
+collision risk
+minimum clearance
+TTC
+progress
+smoothness
+curvature
+lateral acceleration
+jerk
+speed tracking
+road-boundary clearance
+uncertainty
+behavior compatibility.
+
+The planner must adapt its weights based on context.
+
+Examples:
+
+NORMAL:
+maximize progress + comfort
+
+DENSE_TRAFFIC:
+increase clearance/risk penalties
+
+PEDESTRIAN:
+increase lateral safety margin
+
+CATTLE:
+increase uncertainty margin
+
+NARROW_ROAD:
+reduce aggressive lateral motion
+
+EMERGENCY:
+prioritize survival over progress.
+
+The selected trajectory must change when the environment changes.
+
+This adaptivity MUST be demonstrated experimentally.
+
+==================================================
+13. COLLISION VALIDATION
+========================
+
+Every candidate trajectory must be validated against:
+
+vehicle footprint
+static obstacles
+predicted dynamic obstacle footprints
+road boundaries.
+
+Use polygon/footprint collision mathematics.
+
+Never trust the planner's cost alone.
+
+Planner:
+
+generate
+→ score
+→ validate
+→ reject unsafe
+→ select safest feasible candidate.
+
+==================================================
+14. SAFETY SUPERVISOR
+=====================
+
+The safety supervisor is independent of normal planner optimization.
+
+If:
+
+TTC becomes critically low
+AND
+no safe trajectory exists
+
+then:
+
+reduce speed
+→ emergency braking
+→ STOP.
+
+Emergency braking must not depend exclusively on the planner selecting a trajectory.
+
+==================================================
+15. VEHICLE CONTROL + DYNAMICS
+==============================
+
+Do not teleport the ego vehicle.
+
+Vehicle state evolves through the vehicle model.
+
+At minimum:
+
+x
+y
+yaw
+velocity
+acceleration
+steering angle
+steering rate
+
+Use kinematic bicycle dynamics now.
+
+Keep the architecture ready for dynamic bicycle modeling.
+
+Controller:
+
+Stanley lateral tracking
++
+PID longitudinal control
++
+steering-rate limitation
++
+actuator saturation.
+
+The controller tracks the selected trajectory.
+
+The trajectory determines the command.
+
+The vehicle model determines the resulting motion.
+
+==================================================
+16. CLOSED LOOP
+===============
+
+The following must execute repeatedly:
+
+1. advance world
+2. acquire sensor measurements
+3. detect objects
+4. estimate drivable space
+5. fuse observations
+6. update tracks
+7. predict motion
+8. calculate risk
+9. select behavior
+10. generate candidate trajectories
+11. collision-check candidates
+12. select trajectory
+13. control vehicle
+14. apply vehicle dynamics
+15. record telemetry
+16. repeat.
+
+NO SCRIPTED EGO PATH.
+
+NO WAYPOINT TELEPORTATION.
+
+NO GROUND-TRUTH SHORTCUTS.
+
+==================================================
+17. REQUIRED SIH SCENARIOS
+==========================
+
+The five official scenario categories must be genuine:
+
+1. UNMARKED_VILLAGE_ROAD
+2. UNSIGNALIZED_URBAN_INTERSECTION
+3. HIGHWAY_SLOW_VEHICLE_MERGE
+4. DENSE_MARKET_MIXED_TRAFFIC
+5. SUDDEN_CATTLE_CROSSING
+
+The intersection must actually contain crossing/conflicting traffic geometry.
+
+A straight corridor with four agents is NOT sufficient.
+
+Add interaction scenarios if time permits:
+
+6. UNPROTECTED_TURN
+7. NARROW_LANE_MUTUAL_YIELD
+
+==================================================
+18. ADAPTIVITY EXPERIMENT
+=========================
+
+For every flagship scenario run:
+
+BASELINE
+→ obstacle introduced
+→ planner replans
+→ environment changes
+→ planner replans again.
+
+Record:
+
+replanning time
+trajectory change
+minimum clearance
+TTC
+speed
+steering
+lateral deviation
+jerk
+collision result
+behavior state.
+
+We need evidence that the planner is actually adaptive.
+
+==================================================
+19. MATPLOTLIB
+==============
+
+Use Matplotlib for technical evidence.
+
+Required visualizations:
+
+1. bird's-eye-view trajectory
+2. road/free-space corridor
+3. dynamic objects
+4. predicted trajectories
+5. candidate trajectories
+6. selected trajectory
+7. vehicle footprint
+8. collision margins
+9. TTC/risk timeline
+10. speed/steering timeline
+11. planner latency
+12. before-vs-after replanning comparison.
+
+These are engineering plots, not decorative UI.
+
+==================================================
+20. MATLAB / SIMULINK / STATEFLOW
+=================================
+
+Do NOT stop Python development while waiting for MATLAB.
+
+Once MATLAB is available:
+
+MATLAB:
+telemetry replay + independent metrics/plots
+
+Simulink:
+vehicle dynamics + controller cross-validation
+
+Stateflow:
+behavior supervisor representation
+
+Do NOT rewrite the entire Python planner in Simulink.
+
+The Python system remains the primary implementation.
+
+MathWorks components provide independent validation and demonstrate alignment with the MathWorks problem statement.
+
+If RoadRunner is available and time permits, use it for one high-quality unstructured Indian-road scenario.
+
+Do not block the project on RoadRunner.
+
+==================================================
+21. TESTING
+===========
+
+Every subsystem must have unit tests.
+
+Also maintain:
+
+scenario tests
+stress tests
+adaptivity tests
+regression tests
+deterministic replay.
+
+Important invariants:
+
+* ego moves only through vehicle dynamics
+* planner never accesses simulator ground truth
+* sensor models never access truth except internally for generating simulated measurements
+* perception outputs measurements, not truth
+* tracker only sees measurements
+* planner only sees estimated world model
+* metrics can access ground truth ONLY for evaluation
+* random seeds are deterministic.
+
+==================================================
+22. PERFORMANCE TARGET
+======================
+
+Target:
+
+10 Hz closed-loop planning.
+
+Measure:
+
+mean
+p50
+p95
+max
+
+for:
+
+perception
+fusion
+tracking
+prediction
+risk
+planning
+control
+whole autonomy cycle.
+
+Do not hide worst-case latency.
+
+Optimize the real bottleneck.
+
+==================================================
+23. IMPLEMENTATION ORDER
+========================
+
+DO NOT implement everything randomly.
+
+Execute in this order:
+
+PHASE 1
+Harden existing architecture and fix all forensic defects.
+
+PHASE 2
+Implement reactive traffic.
+
+PHASE 3
+Implement genuine Indian-road ML perception and connect it to the perception contract.
+
+PHASE 4
+Implement drivable-space perception so planner stops consuming exact simulator road geometry.
+
+PHASE 5
+Strengthen 3D localization + fusion + covariance propagation.
+
+PHASE 6
+Fix the five SIH scenarios, especially real intersection geometry.
+
+PHASE 7
+Build the adaptivity/stress experiment suite.
+
+PHASE 8
+MATLAB replay + Simulink vehicle/controller + Stateflow when environment is available.
+
+PHASE 9
+Create the final technical visualization/demo.
+
+==================================================
+24. ABSOLUTE PROHIBITIONS
+=========================
+
+DO NOT:
+
+* create fake ML
+* use simulator ground truth as perception
+* use ground truth road geometry as planner input once corridor perception is implemented
+* script ego behavior
+* teleport vehicle state
+* fake sensor measurements
+* fabricate metrics
+* create decorative AI labels
+* add random neural networks without measurable benefit
+* implement neural trajectory prediction just for presentation
+* rewrite the entire planner in Simulink
+* spend time polishing frontend before autonomy is solid
+* add features merely because they sound impressive
+* create multiple competing architectures.
+
+==================================================
+25. DEFINITION OF DONE
+======================
+
+The system is DONE only when we can demonstrate:
+
+REAL INDIAN-ROAD PERCEPTION
++
+MULTI-SENSOR FUSION
++
+PERSISTENT TRACKING
++
+UNCERTAINTY-AWARE PREDICTION
++
+REACTIVE TRAFFIC
++
+RISK/TTC
++
+ADAPTIVE MULTI-CANDIDATE PLANNING
++
+COLLISION VALIDATION
++
+SAFETY SUPERVISION
++
+REAL VEHICLE DYNAMICS
++
+CLOSED-LOOP CONTROL
++
+REAL-TIME REPLANNING
++
+FIVE SIH SCENARIOS
++
+QUANTITATIVE METRICS
++
+TECHNICAL MATPLOTLIB EVIDENCE.
+
+The final demo should make one thing obvious:
+
+THE VEHICLE DOES NOT FOLLOW A PREDEFINED LANE OR SCRIPT.
+
+IT PERCEIVES THE UNSTRUCTURED ROAD,
+UNDERSTANDS DYNAMIC ROAD USERS,
+PREDICTS THEIR MOTION,
+ESTIMATES RISK,
+GENERATES MULTIPLE SAFE TRAJECTORIES,
+SELECTS THE BEST ONE,
+EXECUTES IT THROUGH VEHICLE DYNAMICS,
+AND REPLANS WHEN THE WORLD CHANGES.
+
+That is the system we are building.
+
+Now execute PHASE 1 immediately.
+
+Before writing major new code:
+
+1. inspect the current repository,
+2. map existing modules to the locked architecture,
+3. identify exactly what already works,
+4. implement the Phase-1 forensic fixes,
+5. run all tests,
+6. report what changed,
+7. only then proceed to Phase 2.
+
+Do not ask me to redesign the architecture again.

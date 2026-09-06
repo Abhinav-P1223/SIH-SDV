@@ -67,10 +67,12 @@ class PredictionConfig:
 
 @dataclass
 class RiskLevelsConfig:
+    """Thresholds on the weighted risk score. There is deliberately no `critical`:
+    CRITICAL is raised only by the physical TTC view (risk_engine._physical), never by a
+    score, so a stopped ego facing an obstacle is HIGH rather than an emergency."""
     low: float = 0.05
     medium: float = 0.2
     high: float = 0.45
-    critical: float = 0.8
 
 
 @dataclass
@@ -110,7 +112,7 @@ class BehaviorConfig:
 @dataclass
 class CostWeights:
     collision: float = 6.0
-    clearance: float = 2.0
+    clearance: float = 1.5
     smoothness: float = 0.8
     curvature: float = 0.5
     progress: float = 2.5
@@ -140,9 +142,9 @@ class PlanningConfig:
     reverse_distances_m: list[float] = field(default_factory=lambda: [3.0, 6.0])
     reverse_acceleration_mps2: float = 1.0
     exposure_sigma_cap_m: float = 1.5         # beyond-horizon checks inflate objects by min(meas sigma, cap)
-    speed_fractions: list[float] = field(default_factory=lambda: [1.0, 0.75, 0.5, 0.25, 0.0])
+    speed_fractions: list[float] = field(default_factory=lambda: [1.0, 0.8, 0.6, 0.4, 0.2, 0.0])
     lateral_transition_time_s: float = 2.0
-    min_lateral_transition_length_m: float = 10.0
+    min_lateral_transition_length_m: float = 6.0
     comfortable_deceleration_mps2: float = 3.0
     max_jerk_mps3: float = 4.0                  # S-curve limit for comfortable speed profiles (hard stops exempt)
     max_lateral_acceleration_mps2: float = 3.5
@@ -153,8 +155,8 @@ class PlanningConfig:
     tracking_margin_error_cap_m: float = 0.3    # margin += min(|current cross-track error|, cap)
     boundary_margin_m: float = 0.25
     boundary_margin_grace_s: float = 0.5
-    clearance_scale_m: float = 2.0
-    clearance_saturation_m: float = 1.5       # clearance beyond margin+this costs nothing more
+    clearance_scale_m: float = 0.7
+    clearance_saturation_m: float = 2.0       # clearance beyond margin+this costs nothing more
     standstill_speed_mps: float = 0.5
     creep_guard_slack_m: float = 0.05           # tolerance of the creep guard (degraded tier may not inch closer)
     progress_feasible_min_m: float = 1.0        # a degraded plan counts as a forward plan only if it advances this far
@@ -164,6 +166,10 @@ class PlanningConfig:
     standstill_progress_max_factor: float = 6.0
     terminal_exposure_horizon_s: float = 7.0   # end pose must not be hit by CV-extrapolated objects before this
     route_lookahead_s: float = 15.0            # continuation checked this far for the graded 'blocked' cost
+    exposure_resume_speed_mps: float = 2.0     # the beyond-horizon continuation never crawls slower than this:
+                                               # a candidate that ends at rest still has a route ahead of it
+    exposure_step_s: float = 0.2               # sampling step of the beyond-horizon continuation (both bodies
+                                               # move in straight lines there, so this can be coarse)
     exposure_proximity_scale_m: float = 1.0    # beyond-horizon exposure grades to zero this far outside the margin
     exposure_reject_slack_m: float = 0.2       # ... and only rejects outright when it comes this far inside it
     stop_standoff_m: float = 5.0               # a near-stop end state behind a blocked route keeps this gap

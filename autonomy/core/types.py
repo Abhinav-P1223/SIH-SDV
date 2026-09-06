@@ -575,7 +575,11 @@ class SimulationMetrics:
     emergency_brake_activations: int = 0
     reverse_manoeuvres: int = 0
     reverse_distance_m: float = 0.0
-    minimum_ttc: float = math.inf
+    minimum_ttc: float = math.inf                # ROUTE view: TTC if the ego proceeded along the
+                                                 # corridor at its desired speed. A counterfactual,
+                                                 # useful for 'how close did the situation get'.
+    minimum_ttc_experienced: float = math.inf    # PHYSICAL view: TTC at the ego's actual heading and
+                                                 # speed. This is what the vehicle really experienced.
     behavior_state_durations: dict[str, float] = field(default_factory=dict)
     behavior_transitions: int = 0
     # Stage 2 hooks (computed where possible, None otherwise)
@@ -584,7 +588,12 @@ class SimulationMetrics:
     scenario_success_rate: Optional[float] = None
     perception_latency_ms: Optional[float] = None
     prediction_error_m: Optional[float] = None
-    tracking_position_error_m: Optional[float] = None   # mean |track - truth| for matched tracks (sensors mode)
+    tracking_position_error_m: Optional[float] = None   # mean |track - truth| over MATCHED pairs (sensors mode)
+    perception_recall: Optional[float] = None           # matched / observable truth objects: falls when the
+                                                        # stack misses objects it should have seen
+    perception_precision: Optional[float] = None        # matched / published tracks: falls on ghost tracks
+    perception_missed_objects: int = 0                  # observable truth objects with no track
+    perception_false_tracks: int = 0                    # published tracks matching no observable object
     tracking_velocity_error_mps: Optional[float] = None
     track_count_mean: Optional[float] = None
     detections_total: int = 0

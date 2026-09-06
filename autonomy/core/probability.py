@@ -32,8 +32,13 @@ def norm_cdf(z: np.ndarray | float) -> np.ndarray:
 
 
 def band_collision_probability(distance: np.ndarray, sigma: np.ndarray, margin: float,
-                               band_width: float) -> np.ndarray:
-    """P(object inside the ego collision band) per time step; 1 where footprints overlap the margin."""
+                               band_width: np.ndarray | float) -> np.ndarray:
+    """P(object inside the ego collision band) per time step; 1 where footprints overlap the margin.
+
+    Fully elementwise: `distance` and `sigma` may be any common shape, and `band_width` may be a
+    scalar or anything that broadcasts against them (e.g. (M,1) for M objects), so a whole block
+    of objects x time steps is scored in one call.
+    """
     distance = np.asarray(distance, dtype=float)
     sigma = np.maximum(np.asarray(sigma, dtype=float), 1e-6)
     gap = np.maximum(distance - margin, 0.0)

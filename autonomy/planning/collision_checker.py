@@ -145,12 +145,16 @@ class CollisionChecker:
                 s_o, d_o, h_o = self.road.project(float(pr.x[0]), float(pr.y[0]))
                 obj_s[j], obj_d[j] = s_o, d_o
                 obj_vl[j] = -float(pr.vx[0]) * np.sin(h_o) + float(pr.vy[0]) * np.cos(h_o)
+            # The ego footprint corners are identical for every object, so build them once instead
+            # of once per object inside box_sequence_distance.
+            ego_corners = box_corners(FX, FY, FYAW, p.length, p.width)
             for j, pred in enumerate(predictions):
                 ox = np.interp(T, pred.times, pred.x).ravel()
                 oy = np.interp(T, pred.times, pred.y).ravel()
                 oh = np.interp(T, pred.times, np.unwrap(pred.heading)).ravel()
                 dist[j] = box_sequence_distance(FX, FY, FYAW, p.length, p.width,
-                                                ox, oy, oh, pred.length, pred.width).reshape(C, N)
+                                                ox, oy, oh, pred.length, pred.width,
+                                                a_corners=ego_corners).reshape(C, N)
                 # directional sigma: interpolate the covariance onto the candidate grid, then project
                 Pxx = np.interp(T, pred.times, pred.covariances[:, 0, 0]).ravel()
                 Pyy = np.interp(T, pred.times, pred.covariances[:, 1, 1]).ravel()
@@ -237,20 +241,38 @@ class CollisionChecker:
                         alive[i] = False
 
             # 5. terminal exposure: continue each surviving candidate beyond the horizon along the corridor
-            #    at its terminal speed (frozen for a stop) and extrapolate objects at constant velocity
+            #    at its terminal speed (frozen for a stop) and extrapolate objects at constant velocity.
+            #    This runs for every candidate that will be SCORED, not only the still-feasible ones.
+            #    Restricting it to `alive` left the graded `blocked` cost at exactly 0.0 for every
+            #    candidate rejected in sections 3 and 4 (0 of 2113 boundary-rejected and 0 of 1420
+            #    collision-rejected ever scored non-zero, against 61% of feasible ones). Since that
+            #    weight is 3.0, the degraded tier was handing squeezed candidates an advantage of up
+            #    to 3.0 purely from the order in which rejections happen.
             T_end = float(rel_t[0, -1])
             idx = np.zeros(0, dtype=int)
-            if cfg.route_lookahead_s > T_end + 1e-9 and alive.any():
-                ext_dt = 2.0 * cfg.dt_s                                                       # coarser beyond the horizon
+            scorable = np.array([alive[i] or cands[i].margin_only for i in range(C)])
+            if cfg.route_lookahead_s > T_end + 1e-9 and scorable.any():
+                # Both bodies travel in straight lines out here (constant velocity from the end
+                # state), so the continuation is sampled coarsely: a finer grid costs time
+                # linearly and tells us nothing a linear interpolation would not.
+                ext_dt = cfg.exposure_step_s
                 ext = np.arange(T_end + ext_dt, cfg.route_lookahead_s + 1e-9, ext_dt)               # (E,)
                 # reversing candidates end at rest away from the blocker by construction: collision check only
-                idx = np.array([i for i in np.nonzero(alive)[0] if not cands[i].id.startswith("reverse_")], dtype=int)
+                idx = np.array([i for i in np.nonzero(scorable)[0] if not cands[i].id.startswith("reverse_")], dtype=int)
                 E = len(ext)
             if len(idx) > 0:
                 if all(cands[i].trajectory.s is not None for i in idx):
                     s_end = np.array([cands[i].trajectory.s[-1] for i in idx])
                     d_end = np.array([cands[i].trajectory.d[-1] for i in idx])
-                    v_end = np.array([cands[i].trajectory.velocity[-1] for i in idx])
+                    # A candidate that ends at rest would otherwise extrapolate to a standstill and
+                    # meet nothing at all, scoring `blocked` = 0 by construction. That is the same
+                    # structural zero as the one above, mirrored: it made stopping the cheapest
+                    # option the moment moving candidates started carrying the cost honestly. The
+                    # ego does not stay stopped for ever, so the continuation resumes at a walking
+                    # pace and the term measures where the candidate LEAVES you, not the fact that
+                    # it stopped. Coming to rest too close is the stop-standoff rule's job, below.
+                    v_end = np.maximum(np.array([cands[i].trajectory.velocity[-1] for i in idx]),
+                                       cfg.exposure_resume_speed_mps)
                     s_grid = s_end[:, None] + v_end[:, None] * (ext - T_end)[None, :]              # (I,E)
                     # the lateral transition usually outlasts the horizon (a wide shift needs ~9 m of travel).
                     # Continue it at the rate the candidate ended with, up to its target offset, instead of
@@ -272,14 +294,21 @@ class CollisionChecker:
                     ey = np.repeat(FY.reshape(C, N)[idx, -1], E)
                     eyaw = np.repeat(YAW[idx, -1], E)
                 t_abs = (T[idx, 0][:, None] + ext[None, :]).ravel()
+                ext_corners = box_corners(ex, ey, eyaw, p.length, p.width)
                 for j, pred in enumerate(predictions):
                     dt_ext = t_abs - pred.times[-1]
                     ox = pred.x[-1] + pred.vx[-1] * dt_ext
                     oy = pred.y[-1] + pred.vy[-1] * dt_ext
                     oh = np.full_like(ox, pred.heading[-1])
+                    # Coarse by construction: constant-velocity extrapolation 4-15 s ahead with the
+                    # object already inflated by its measured sigma. Exact polygon refinement out
+                    # here is spurious precision and was the single largest cost in the planner, so
+                    # only pairs within 1 m of contact get it. The fallback bound UNDER-estimates
+                    # distance, so this errs toward more exposure, never less.
                     dist_ext = box_sequence_distance(ex, ey, eyaw, p.length, p.width,
-                                                     ox, oy, oh, pred.length + 2 * infl[j], pred.width + 2 * infl[j]
-                                                     ).reshape(len(idx), E)
+                                                     ox, oy, oh, pred.length + 2 * infl[j], pred.width + 2 * infl[j],
+                                                     exact_within=1.0,
+                                                     a_corners=ext_corners).reshape(len(idx), E)
                     # Grade the exposure instead of testing a binary "does it meet". Beyond the horizon the
                     # object is extrapolated for many seconds from a noisy tracked velocity, so a yes/no test
                     # sitting on the margin flips from cycle to cycle and takes whole groups of candidates in

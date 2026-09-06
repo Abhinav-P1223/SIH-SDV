@@ -1,0 +1,1196 @@
+================================================================================
+SIH26037 — DEEP TECHNICAL GAP ANALYSIS AND IMPLEMENTATION PLAN
+Adaptive Path Planning and Collision Avoidance for Autonomous Vehicles
+on Unstructured Indian Roads
+================================================================================
+Repository : D:\SIH
+Commit     : 699f0e9 (working tree clean at time of analysis)
+Date       : 2026-09-06
+Method     : Three independent read-only forensic audits of the codebase.
+             The previous self-audit was NOT trusted; every claim was
+             re-verified against the actual implementation.
+Status     : NO CODE WAS MODIFIED DURING THIS ANALYSIS.
+
+================================================================================
+PART 1 — CURRENT SYSTEM FORENSICS
+================================================================================
+
+HEADLINE NUMBERS — VERIFIED HONEST
+----------------------------------
+  164 tests pass in 208 s          (re-run twice, identical, exit 0)
+  8 scenario YAML files            (ls simulation/scenarios/*.yaml)
+  0 collisions across all batteries
+  16 scenario x perception-mode runs, 22 adaptivity runs, 24 stress cases
+
+The system is NOT a facade. Every subsystem in scope has a real
+implementation with real mathematics.
+
+
+WHAT IS GENUINELY ENGINEERED
+----------------------------
+* Quintic lattice solves a real 3x3 boundary-value system via np.linalg.solve
+  (candidate_generator.py:52-64) and seeds d''(0) from the actual steering
+  angle rather than zero (line 141). Transition length is sized from three
+  real constraints: steering limit, lateral acceleration, and v0*T_lat.
+
+* Collision checking is a correct separating-axis test (core/geometry.py:67-80),
+  with true polygon-polygon distance (95-103) and a conservative circumscribed
+  radius bound. Genuinely batched: all C candidates x N steps stacked into one
+  array, looping only over M objects.
+
+* All 13 cost weights are live and consumed. scorer.py:65-114 populates
+  collision, uncertainty, clearance, smoothness, curvature, jerk, progress,
+  boundary, speed, lateral, consistency, front_pass, blocked — exactly
+  matching CostWeights. No decorative weights.
+
+* Four selection tiers all exercised in practice. Measured on
+  dense_market_mixed_traffic: 21 degraded selections, 5 fallbacks. On
+  narrow_lane_boxed_in: 38 degraded, 48 fallback, 53 reverse selections.
+
+* Prediction is genuinely constant-acceleration with a self-estimated
+  acceleration: a real least-squares slope over velocity history
+  (predictor.py:121-129), low-passed, magnitude-clamped per class. Below
+  min_history_samples it returns exactly zero and reduces exactly to CV.
+
+* Risk engine computes three real views against real SAT footprint distances.
+  TTC is not d/v_dot: first_overlap_time (58-70) is the earliest step where
+  footprints truly overlap OR come inside the margin WHILE STILL CLOSING.
+  CRITICAL is decided in exactly one place, from the physical view only.
+
+* Behaviour FSM is genuinely declarative: state_machine.py:198-213 is a single
+  ordered list of (from_states, to_state, guard) tuples, interpreted by a
+  generic 17-line loop. No hidden if-ladder. Two independent hysteresis
+  mechanisms: asymmetric dwell (escalations bypass min_dwell_s) and split
+  entry/exit thresholds.
+
+* Stanley is the genuine law with front-axle reference, signed cross-track via
+  heading projection, real arc-length look-ahead, and curvature feed-forward.
+  PID has correct CONDITIONAL anti-windup (longitudinal.py:72-74) — textbook,
+  not decorative.
+
+* Actuator saturation includes steering RATE limiting (actuators.py:38-43),
+  which most prototypes omit. Control cannot bypass it: models.py:72 calls
+  actuators.apply() unconditionally.
+
+* Kalman filter has correct constant-acceleration process noise
+  Q = q^2*[[dt^4/4, dt^3/2],[dt^3/2, dt^2]], not a fudged diagonal. Radar
+  radial-speed update is a genuine EKF that linearises about the sensor-track
+  unit vector and correctly subtracts ego velocity. Real Mahalanobis gating
+  against chi2 = 9.21.
+
+* Metrics computed from executed states against TRUE agent footprints, using
+  exact SAT distance with correct edge-triggering.
+
+* Frenet corridor accurate to sub-millimetre laterally. Measured on the R=60 m
+  curve: arc length error 1 mm; round-trip max |dd| = 0.0004 m; lateral bounds
+  error 0.4 mm. Cross-checked against an independent reference implementation.
+
+* Determinism: bit-identical seeded replay asserted on full float lists.
+
+POSE-MUTATION INVARIANT HOLDS
+-----------------------------
+A grep across autonomy/, simulation/, scripts/, visualization/ for assignments
+to ego x/y/yaw/velocity/steering finds exactly three sites:
+  autonomy/vehicle/models.py:117    the model's own return
+  simulation/runner.py:128          "the only place the ego moves"
+  simulation/scenarios/loader.py:85,88   initial state construction
+autonomy/ never imports simulation/. In sensors mode the planner sees only
+trk_* identifiers; no scenario identity survives. Verified empirically on
+HIGHWAY_MERGE_SLOW_VEHICLES: ground_truth mode yields {auto_shoulder, bus_onc,
+car_shoulder, truck_1}; sensors mode yields {trk_1, trk_2, trk_6, trk_10,
+trk_15, trk_17, trk_29}.
+
+
+DEFECTS FOUND, RANKED BY DAMAGE A JUDGE COULD DO
+------------------------------------------------
+
+1. GROUND-TRUTH LEAKAGE INTO THE SENSOR COVARIANCE
+   simulation/sensors/models.py:157,192
+   _polar_to_cov() is called with the TRUE range and TRUE bearing, not the
+   measured ones. The tracker is handed an oracle-derived uncertainty — the
+   single number a filter is most sensitive to. Verified with an exaggerated
+   config: true range 40 m, measurement landed at 74 m, reported cov_yy =
+   12.18 where a real sensor reports 41.70. Small at production noise levels,
+   but it is literally on the project's own automatic-penalty list.
+
+2. THE `blocked` COST IS STRUCTURALLY ZERO FOR TWO REJECTION CLASSES
+   collision_checker.py:247 / 296
+   route_block_severity is computed only for candidates still alive at
+   section 5. Candidates rejected for boundary margin (section 3) or collision
+   margin (section 4) never reach it. Measured over a full dense-market run:
+
+     rejection class            scored   blocked>0
+     FEASIBLE                     9300   5701 (61.3%)
+     TERMINAL_STATE_EXPOSED       3950   1868 (47.3%)
+     OUTSIDE_DRIVABLE_SPACE       2113      0 ( 0.0%)
+     PREDICTED_COLLISION          1420      0 ( 0.0%)
+
+   That weight is 3.0, second only to collision (6.0). Inside the degraded
+   tier this hands squeezed candidates a systematic advantage of up to 3.0
+   purely from evaluation order. THIS IS THE MOST CONSEQUENTIAL BUG FOUND.
+
+3. THE METRICS COLLECTOR COMPARES MISMATCHED TIMESTAMPS
+   simulation/runner.py:137
+   Scores the ego pose AFTER vehicle.step (line 128) against truth captured
+   BEFORE it (line 102), and world.update (line 129) has since moved every
+   agent. Error up to 0.2 m at 10 m/s, 0.4 m at 20 m/s. Reported minimum
+   clearances of 0.59 m and 0.67 m sit inside that band, and several tests
+   assert clearance >= 0.5 m.
+
+4. risk.levels.critical: 0.80 IS A PROVABLY DEAD CONFIG KEY
+   risk_engine.py:239 assigns CRITICAL; lines 248-249 unconditionally
+   downgrade it to HIGH. Verified by direct execution:
+     score=0.30 -> MEDIUM   score=0.50 -> HIGH
+     score=0.85 -> HIGH     score=10.0 -> HIGH
+   Changing config/autonomy.yaml:50 has zero observable effect.
+
+5. DATACLASS DEFAULTS HAVE DRIFTED FROM THE SHIPPED YAML
+     field                              YAML    dataclass default
+     clearance_scale_m                   0.7          2.0
+     clearance_saturation_m              2.0          1.5
+     min_lateral_transition_length_m     6.0         10.0
+     speed_fractions            [1,.8,.6,.4,.2,0]  [1,.75,.5,.25,0]
+     weights.clearance                   1.5          2.0
+   Any code path constructing PlanningConfig() directly gets materially
+   different planner behaviour — a ~2.9x difference in clearance-cost decay.
+
+6. THE RESULTS DOCUMENT CONTRADICTS ITSELF EIGHT TIMES
+   scripts/generate_results.py:90 hard-codes "n/a (no sensors in Stage 1)"
+   into the metrics table of a document whose every section header ends
+   "(sensors mode)". That string appears 8 times in docs/STAGE1_RESULTS.md
+   (lines 60,146,219,298,413,487,558,634). Line 231 hard-codes the limitation
+   "No reversing: when an agent stops right in front of a stationary ego the
+   ego waits" — reproduced verbatim at STAGE1_RESULTS.md:731, in the same
+   document that reports NARROW_LANE_BOXED_IN as PASS with a reversing
+   recovery. The numbers are honest; the prose has rotted.
+
+7. minimum_ttc IS A COUNTERFACTUAL
+   metrics/collector.py:56 records risk.min_ttc, the ROUTE view, which assumes
+   the ego proceeds at desired speed along the corridor. That is deliberately
+   not what the vehicle did — in a module whose docstring opens "never from
+   planner intent". The experienced value, min_ttc_current_speed, is collected
+   nowhere.
+
+8. THE PERCEPTION-QUALITY METRIC CANNOT FAIL
+   metrics/collector.py:139-144 associates tracks to truth with a 3 m gate
+   that silently discards unmatched tracks, and line 135 returns early when
+   there are no tracks. A tracker publishing nothing, or publishing garbage
+   far from any object, leaves tracking_position_error_m < 0.8 green. That
+   assertion is the main evidence that perception is in the loop.
+
+9. LATENCY EXCEEDS THE BUDGET IN THE TAIL
+     scenario                    n     mean    p50    p95     max
+     dense_market_mixed_traffic  430   53.9   53.0   77.9   210.4 ms
+     narrow_lane_boxed_in        442   30.4   30.7   43.9   277.8 ms
+     sudden_cattle_crossing      157   33.8   31.7   46.8    67.2 ms
+   Budget is 100 ms at 10 Hz. Cause is precise: scorer.py:66 runs a Python
+   list comprehension over objects for every candidate — 159,751 calls to
+   band_collision_probability in 430 cycles, 8.9 s = 70% of all scoring time,
+   over arrays that CheckResult already holds as (M,N). Trivially vectorisable.
+
+   Profile over a 72.7 s dense_market run:
+     Planner.plan               31.9 s  (44%)
+     box_sequence_distance      30.6 s  (46,579 calls)  <- true hot spot
+     scorer.score               12.8 s  (16,783 calls)
+     collision_checker.check_all 11.8 s (430 calls)
+     band_collision_probability  9.1 s  (159,751 calls)
+     metrics.update             13.5 s  (18.6%, non-planner)
+
+10. SENSOR RATE IS SILENTLY QUANTISED
+    models.py:86-90 schedules next_sample_t from CURRENT sim time rather than
+    accumulating the nominal period. With dt = 0.02 s, camera and radar
+    configured at 20 Hz actually run at 16.7 Hz (measured over 10 s).
+
+
+WHAT IS DECORATIVE OR THINNER THAN ADVERTISED
+---------------------------------------------
+ "Camera"          A geometric oracle. No pixels, no projection, no intrinsics,
+                   no lens, no exposure. Class confusion is UNIFORM over all
+                   other types — verified over 2000 draws, a cow is mislabelled
+                   BUS / PEDESTRIAN / CAR / TRUCK / MOTORCYCLE / BICYCLE /
+                   PUSHCART / AUTO_RICKSHAW at ~12.5% each. No similarity
+                   structure. Accuracy is independent of range, occlusion and
+                   object size — the three things that actually drive error.
+
+ Occlusion         One centre-to-centre ray (models.py:100-108). The geometry
+                   is real (proper segment-quad intersection) but binary and
+                   centre-only. VERIFIED: an 11 m x 2.5 m bus placed directly
+                   between the LiDAR and a car, offset so its footprint
+                   straddles but does not cross the centre line, occludes
+                   NOTHING. No partial occlusion, no reduced detection
+                   probability, no truncated extent. The ego itself is never
+                   an occluder. Radar occlusion is disabled in config.
+
+ Detection realism Exactly one detection per object per sensor. Zero clutter,
+                   zero false positives, no split/merge, no ground returns,
+                   perfect instance separation, range-independent P_d.
+                   Undocumented 0.5 m blind sphere (models.py:95).
+
+ "Unsignalized     NO INTERSECTION EXISTS IN THE ROAD MODEL. No cross-corridor,
+  intersection"    no junction polygon, no conflict region. It is a straight
+                   corridor with four agents that happen to traverse it.
+
+ Road geometry     Six of eight corridors are straight rectangles. Only two are
+                   non-trivial: the R=60 m curve and the variable-width village
+                   road.
+
+ Prediction        A parametric growth model from class constants. The
+ uncertainty       tracker's KF velocity covariance is NEVER propagated;
+                   SensorFusionTracker.velocity_covariance() (tracker.py:280)
+                   has no production caller. A badly-converged track produces
+                   the same predictive uncertainty as a well-converged one.
+
+ Track             get_object_states dead-reckons a track forward up to
+ extrapolation     max_age_s (1.0 s) but publishes covariance UNAGED
+                   (tracker.py:272), understating uncertainty exactly when it
+                   matters most.
+
+ LiDAR noise       Isotropic N(0,sigma^2) applied lazily in x/y, not native
+                   coordinates. Same 0.10 m sigma at 2 m and at 79 m. Extent
+                   noise independent of how many points would hit the object.
+
+ MATLAB artefacts  Would fail on 100% of logs (see Part 6).
+
+
+UNUSED CODE IN autonomy/
+------------------------
+  CollisionChecker.check()                collision_checker.py:63-64  zero callers
+  points_to_polyline_distance             core/geometry.py:146-152    zero callers
+  OrientedBox.half_diagonal               core/geometry.py:36-38      zero callers
+  box_overlap                             core/geometry.py:139-140    tests only
+  SensorFusionTracker.velocity_covariance perception/tracker.py:280   tests only
+  TrajectoryTracker.reset / Stanley.reset / PID.reset                 zero prod callers
+  Planner.last_boxed_in                   planner.py:135              write-only
+  MetricsCollector.boundary_violations    collector.py:40             write-only
+  MetricsCollector.collision_events       collector.py:41             write-only
+  RiskAssessment.ttc_kinematic            risk_engine.py:225          telemetered only
+  RiskAssessment.relative_speed           risk_engine.py:222          telemetered only
+  collision_checker.py:112-113 world-frame boundary path              unreachable
+
+No TODO / FIXME / NotImplementedError / placeholder anywhere in autonomy/.
+
+
+DEAD OR MISLEADING CONFIG
+-------------------------
+  risk.levels.critical: 0.80    provably no effect (risk_engine.py:248-249)
+  planning.lateral_offsets_m    legacy; only reachable if the road lacks
+                                lateral_bounds_at
+  tracker.max_misses: 100       can never bind (time-based deletion kills a
+                                track at ~50 misses)
+
+
+MOST IMPORTANT UNCONFIGURED LITERALS IN DECISION PATHS
+------------------------------------------------------
+   1. collision_checker.py:179  dist < d0 - 0.05  (closing epsilon; duplicates
+                                risk.closing_epsilon_m which exists in config)
+   2. risk_engine.py:59 + :210  closing_eps=0.05 default silently used for the
+                                route/plan views instead of the config value
+   3. longitudinal.py:42        hold_brake = 2.0  (standing brake force,
+                                appears in NO config file, never overridden)
+   4. state_machine.py:172      time_in_state >= 0.5  (minimum reversing leg)
+   5. state_machine.py:277      2.0 m minimum follow gap
+   6. predictor.py:165          speed < 3.0  (UNKNOWN road-following gate)
+   7. predictor.py:240          speed < 0.2  (static-object gate)
+   8. risk_engine.py:267-268    cos > 0.5, speed > 0.5  (lead detection)
+   9. candidate_generator.py:236-237, planner.py:102, models.py:79,108
+                                FIVE separate 0.3 m/s reverse-engagement
+                                literals for ONE concept
+  10. lateral.py:81             if v > 1.0  (lateral-accel steering cap)
+  11. collision_checker.py:244  ext_dt = 2.0 * cfg.dt_s
+  12. collector.py:70           <= 0.026 s;  :142  d < 3.0 m
+
+
+WEAK OR TAUTOLOGICAL TESTS
+--------------------------
+  test_parameter_sweep.py:16-18   PURE TAUTOLOGY. Asserts len(cells)==6 and
+                                  that 6 override tuples are distinct — a
+                                  property of itertools.product over the test's
+                                  own constant. Drags in a 35 s fixture to
+                                  assert nothing about the system.
+  test_parameter_sweep.py:33-40   Name and docstring promise a monotonic
+                                  TTC relationship. Body sorts by crossing
+                                  speed (DEAD CODE — result never used) then
+                                  asserts only all(c.min_ttc < 4.0).
+  test_required_scenarios.py:72-82  Asserts on YAML strings, not behaviour.
+                                  Five scenarios could be behaviourally
+                                  identical and pass.
+  test_required_scenarios.py:28-34  detections_total > 100 is trivially met
+                                  (measured 2026 on highway); the tracking
+                                  error assertion cannot be degraded by missed
+                                  detections or ghost tracks (see defect 8).
+  test_required_scenarios.py:50-59  Dead line 55 (dr,dl computed then
+                                  overwritten); samples frames[::5] so brief
+                                  excursions are invisible.
+  test_geometry_and_road.py:73-75   DEBRIS. Contains "... if False else ..."
+                                  and requests a fixture it never uses.
+  test_sensors_and_tracker.py:194-199  Source-text grep standing in for a
+                                  behavioural invariant. A method defined
+                                  above ingest could read truth_id and pass.
+  test_dashboard.py:88-93         12x-wide tolerance (0.08 to 1.0 s for a
+                                  nominal 0.1 s).
+  test_matlab_export.py (all 4)   String-matches a generator against itself.
+                                  Never executed in MATLAB (honestly labelled).
+  test_agents.py:16-19            Passes road=None, making MergingBehavior's
+                                  follow_road branch, the yield_gap gate and
+                                  the MERGED road-following branch COMPLETELY
+                                  UNTESTED. The most interactive code in the
+                                  repo has zero coverage.
+  20 of 55 scenario tests         Silently inherit perception mode from the
+                                  mutable config default (config/sensors.yaml:7).
+                                  Flipping one line changes what 20 tests
+                                  exercise with no test detecting it.
+
+TESTS THAT ARE GENUINELY STRONG
+-------------------------------
+  test_mixed_traffic_curve.py:43-48   bit-identical seeded replay on full
+                                      float lists
+  test_planning.py:156-174            Frenet fast path vs exact polygon
+  test_geometry_and_road.py:121-132   fast containment vs even-odd reference
+  test_vehicle.py:45-56,66-78         analytic turn radius; saturation step
+                                      count from first principles
+  test_narrow_lane_boxed_in.py        asserts an EMERGENT MANOEUVRE (reverse
+                                      gear engaged >95% of the backing leg,
+                                      one contiguous episode, ends past the
+                                      blocker) — best file in the repo
+  test_sensors_and_tracker.py:202-218 track survives 50 Hz empty ingests plus
+                                      a dropped frame without id churn
+
+
+OTHER STRUCTURAL OBSERVATIONS
+-----------------------------
+* THE EGO STATE IS SIMULATOR-EXACT EVERYWHERE. self.ego from vehicle.step goes
+  unfiltered into the planner, risk engine, controller, safety supervisor AND
+  the sensor models. There is no localisation, no odometry drift, no IMU noise,
+  no GPS. The stack knows its own pose to machine precision.
+
+* THE DRIVABLE CORRIDOR IS HANDED OVER AS THE SIMULATOR'S OWN OBJECT.
+  runner.py:78,81,113 pass the identical DrivableSpace instance the world uses
+  into the predictor, planner and risk engine. For a problem statement about
+  UNSTRUCTURED roads, the hardest perception task — inferring where the
+  drivable space is, without markings — is skipped entirely.
+
+* ERRATIC HAS NO CORRIDOR CONTAINMENT. Measured over 60 s on
+  unmarked_village_road's cattle_1: y wandered from +2.29 to -11.59 on a road
+  whose boundaries are +/-2.3 m, ending at d = -3.34, OUTSIDE the corridor,
+  having also drifted 11 m backwards in x. A Brownian particle, not an animal.
+
+* boundary_clearance returns EXACTLY 0.0 for anything outside (road.py:165),
+  so the planner cannot distinguish "1 cm over the line" from "10 m into a
+  field". No signed distance, no gradient to recover along.
+
+* FEASIBILITY FED TO THE FSM IS ONE CYCLE STALE. runner.py:111 computes
+  had_feasible from the PREVIOUS cycle's plan. g_emergency and g_boxed_in act
+  on 100 ms-old feasibility.
+
+* THE SAFETY SUPERVISOR IS STRUCTURALLY SILENT BELOW 1.5 m/s. Triggers 2 and 3
+  are gated on min_speed_for_ttc_override_mps. Below that, only the fallback
+  trigger can fire. Defensible (stopping distance < 0.2 m at crawl) but must
+  be stated to a jury rather than letting them find it.
+
+* SCENARIOS ARE TUNED TO THE STACK'S CAPABILITY, and the tuning is documented
+  in the YAML comments themselves (sudden_pedestrian_dart.yaml:7-10 states
+  outright that 19 m is "the survivable threshold"). That is scenario
+  engineering, not ego scripting — but a jury should know. The repo does keep
+  the 14 m failure on record, which is to its credit.
+
+* NOTHING ABOUT THE EGO IS SCRIPTED. EgoSetup carries exactly three things:
+  initial_state, desired_speed, desired_lateral_offset. No waypoints, no timed
+  commands, no trigger-based ego actions, no override hooks anywhere. This
+  claim survives scrutiny.
+
+
+================================================================================
+PART 2 — SIH26037 REQUIREMENT MATRIX
+================================================================================
+Requirements from Prompt.txt:35-42 (stated final architecture) and the problem
+statement. Importance against the rubric in jury.txt:971-1012:
+  A. Problem Alignment 15 | B. Closed-Loop Autonomy 20 | C. Adaptive Planning 15
+  D. Multi-Sensor Perception/Fusion 10 | E. Prediction/Irregular Behaviour 10
+  F. Indian-Road Realism 10 | G. MATLAB/Simulink 5 | H. Validation/Metrics 5
+  I. Engineering Quality 5 | J. Demo/Explainability 5
+
+REQUIREMENT            IMPLEMENTATION            EVIDENCE                STATUS      GAP                                    IMPORTANCE
+---------------------------------------------------------------------------------------------------------------------------------------
+Closed-loop execution  Full loop, single ego     runner.py:99-153        FULL        FSM feasibility one cycle stale        Critical (B,20)
+                       writer, 10 Hz/50 Hz
+Vehicle dynamics       Kinematic bicycle at CG,  vehicle/models.py:      FULL        No tyre slip, no dynamic model         Critical
+                       Euler + RK4, actuator     61-125
+                       saturation incl. rate
+Trajectory generation  Quintic lattice, jerk-    candidate_generator.py: FULL        —                                      Critical (C,15)
+                       limited S-curves,         52-255
+                       3-constraint transition
+Trajectory tracking    Stanley + curvature FF,   control/                FULL        reset() never called                   High
+                       PID with anti-windup
+Collision checking     SAT, batched, horizon-    collision_checker.py    FULL        blocked-cost bias (Part 1 #2)          Critical
+                       wide, beyond-horizon
+Trajectory prediction  Const-accel, estimated    predictor.py:97-258     FULL        KF velocity covariance not propagated  High (E,10)
+                       accel, intent prior
+Irregular movement     ERRATIC, anisotropic      behaviors.py:149-163    PARTIAL     Unbounded walk, exits corridor         High (E,10)
+                       uncertainty, per-class
+Risk / TTC             3 views, closing-gated    risk_engine.py:110-275  FULL        Dead levels.critical key               High
+                       TTC, real SAT distances
+Decision logic         Declarative 7-state /     state_machine.py:       FULL        3 unconfigured guard constants         High
+                       14-transition FSM         198-213
+Camera                 Geometric oracle, FOV/    models.py:141-158       SIMULATED   No image, no learned detector,         Critical (D,10)
+                       range/occlusion/noise                                         uniform confusion
+LiDAR                  Range/extent/heading      models.py:161-171       SIMULATED   Isotropic x/y noise, no range          High
+                                                                                     degradation, no point cloud
+Radar                  Polar noise, radial       models.py:174-193       SIMULATED   Occlusion disabled in config           High
+                       speed, size-gated dropout
+Sensor fusion          KF + EKF radial update,   perception/tracker.py:  FULL        Covariance not aged on extrapolation   Critical (D,10)
+                       gating, GNN, lifecycle    96-284
+Object detection       NONE                      —                       MISSING     No learned detector anywhere; no ML    Critical
+                                                                                     dependency in requirements.txt
+Unstructured roads     Corridor with explicit    world/road.py           PARTIAL     Planner receives the simulator's       Critical (A,F)
+                       boundaries, no lane logic                                     EXACT road object; 6/8 corridors
+                                                                                     are straight rectangles
+Real-time replanning   10 Hz, mean 30-54 ms      logs/*_summary.csv      PARTIAL     p95 78 ms, max 210-278 ms > budget     High
+Five required          All present and passing   simulation/scenarios/   FULL        Intersection has no intersection       High (H,5)
+scenarios                                                                            geometry
+MATLAB                 Three generated .m files  matlab/                 UNVERIFIED  Never executed; replay script fails    Medium (G,5)
+                                                                                     on every log
+Simulink               NONE                      —                       MISSING     No .slx anywhere                       Medium
+Stateflow              Transition topology as    matlab/behavior_        PARTIAL     13/14 guards export empty semantics;   Medium
+                       CSV/table                 transitions.*                       no actions, hierarchy, initial state
+RoadRunner             NONE                      —                       MISSING     No scene, no OpenDRIVE                 Medium
+Mixed traffic types    9 object classes with     config/object_          FULL        —                                      High (F,10)
+                       per-class profiles        profiles.yaml
+Interactive traffic    One-shot proximity        behaviors.py:61-146     PARTIAL     See Part 5 — the one continuous-       Critical (F,10)
+                       latches                                                       feedback agent NEVER FIRES
+Metrics / validation   Generated from real runs, scripts/                FULL        2 counterfactual metrics, 1            Medium (H,5)
+                       3 audit scripts                                               unfailable
+Visualization          Debug view + live SSE     visualization/,         FULL        —                                      Medium (J,5)
+                       dashboard                 dashboard.py
+
+
+================================================================================
+PART 3 — DATASET INVESTIGATION
+================================================================================
+
+RESULT: THERE IS NO DATASET. NONE.
+Nothing to train on and nothing to validate against.
+
+EVIDENCE
+--------
+* Prompt.txt (1079 lines) and jury.txt (1164 lines) contain ZERO mentions of a
+  dataset, data files, images, video, annotations, a download link, a portal,
+  or any SIH-provided resource. The word "hardware" appears zero times.
+  The only 'data' hits are the phrases "data structures" and "data flow".
+  jury.txt mentions datasets only as things a judge should LOOK FOR
+  (lines 98, 99, 321, 859, 1100), never as things provided.
+
+* Repo-wide search for IDD, India Driving Dataset, BDD100K, nuScenes, KITTI,
+  Waymo, Cityscapes, COCO, Argoverse, Lyft, ApolloScape, Mapillary, TuSimple,
+  CULane returns NINE raw matches, all of which are the substring "idd" inside
+  the ordinary English words "middle" and "hidden".
+
+* EVERY http/https URL in the repository:
+    README.md:54                        http://127.0.0.1:8765/
+    autonomy/telemetry/dashboard.py:197 http://{host}:{port}/
+    scripts/run_scenario.py:5           http://127.0.0.1:8765/
+    scripts/run_scenario.py:54          http://127.0.0.1:PORT/
+  All four are the local telemetry dashboard. No external link of any kind.
+
+* No torch, tensorflow, keras, sklearn, onnx, yolo, .pt, .pth, .onnx,
+  pretrained or checkpoint anywhere. requirements.txt is four lines:
+  numpy>=1.26, PyYAML>=6.0, matplotlib>=3.8, pytest>=8.0
+
+* Every file over 1 MB (total ~632 MB) is simulator OUTPUT — JSONL telemetry
+  written by JsonLinesSink, plus nine matplotlib renders in docs/img/.
+  Zero input data.
+
+* .gitignore excludes no data path. No data/, datasets/, weights/, models/,
+  checkpoints/, assets/, media/, raw/, images/ or video/ directory exists or
+  is referenced. Git history shows no dataset was ever committed and removed.
+
+* No dataset loader, no download script, nothing referenced-but-absent. Every
+  filesystem read resolves to config/*.yaml, simulation/scenarios/*.yaml, or
+  logs/*.jsonl — all of which exist.
+
+* The repo's own documents already say so:
+    docs/JURY_AUDIT.md:148  "Model: none. Dataset: none. Training: none.
+                             Inference: none."
+    README.md:10-11         "no machine learning: object classes come from the
+                             simulated camera's noisy classifier"
+
+WHAT IS MISSING, PRECISELY
+--------------------------
+Three distinct things are needed, and no single dataset gives all three:
+
+  NEED                          WHY                              CANDIDATE
+  ------------------------------------------------------------------------------
+  Annotated Indian road         Train and evaluate the detector  IDD (India
+  imagery with 2D boxes         in the right domain; get the     Driving Dataset),
+                                real class-confusion structure   IIIT Hyderabad +
+                                                                 Intel. The only
+                                                                 major dataset with
+                                                                 an 'autorickshaw'
+                                                                 class, plus animal,
+                                                                 rider, cart.
+                                                                 Registration and a
+                                                                 research licence
+                                                                 required.
+
+  Range-resolved 3D ground      Convert detector output into     KITTI or nuScenes.
+  truth                         the position-error-versus-range  Neither is Indian,
+                                curve the camera model needs     but geometry error
+                                                                 vs range is a
+                                                                 sensor-and-optics
+                                                                 property, not a
+                                                                 cultural one.
+
+  A short Indian road clip      Show the detector running end    A dashcam clip, or
+                                to end in the presentation       IDD's own sequences
+
+LICENSING CAUTION
+-----------------
+IDD, KITTI and nuScenes are all non-commercial or research-use licences. Fine
+for a hackathon submission but MUST be stated on the slide. Verify current
+terms at download time; do not assert them from memory.
+
+MINIMUM VIABLE ACQUISITION
+--------------------------
+IDD-Detection only, a subset of a few thousand images, plus one KITTI sequence
+for range calibration. Do NOT download the full multi-terabyte sets.
+
+
+================================================================================
+PART 4 — LEARNED PERCEPTION STRATEGY
+================================================================================
+
+THE STRUCTURAL PROBLEM, STATED PLAINLY
+--------------------------------------
+THE SIMULATOR HAS NO IMAGES. CameraModel.measure takes the true (x,y),
+converts to range/bearing, adds Gaussian noise, converts back. There is no
+pixel anywhere in the system. So "add a detector to the loop" has no natural
+insertion point, and the two obvious approaches are both bad:
+
+  * Rendering synthetic images and detecting rectangles you drew yourself is
+    circular. It is exactly the "FAKE ML" automatic penalty in the project's
+    own rubric (jury.txt:1024).
+  * Bolting a COCO-pretrained detector onto a matplotlib render produces
+    garbage and invites a devastating question.
+
+THE APPROACH THAT ACTUALLY WORKS
+--------------------------------
+Split the claim into two halves, each independently true and checkable.
+
+HALF ONE — OFFLINE AND REAL
+  Fine-tune a detector on IDD, evaluate on a held-out split, and run it live on
+  an Indian road clip during the demo. This makes "camera observations are
+  processed by a learned object detector" literally true, demonstrated on real
+  footage, with a measured mAP.
+
+HALF TWO — CLOSE THE LOOP
+  Take the detector's MEASURED statistics and replace the simulator's invented
+  camera model with them:
+
+    MEASURED FROM THE DETECTOR       REPLACES THE CURRENT INVENTION
+    ---------------------------------------------------------------------------
+    Per-class confusion matrix       Uniform draw over all other classes (a cow
+                                     currently becomes a bus as often as a
+                                     pushcart)
+    Recall vs range and object size  Hard cutoff at 60 m with range-independent
+                                     5% dropout
+    False-positive rate              Zero clutter today
+    Confidence distribution given    An unconditioned Gaussian draw
+    correct/incorrect
+    Localisation error vs range      A hand-chosen sigma_r = frac*r + min
+    (from KITTI 3D)
+
+  That converts FIVE of the sensor defects in Part 1 into measured quantities
+  in one move, and produces a stronger sentence than the one requested:
+
+    "The camera error model is not invented; it is measured from a learned
+     detector evaluated on Indian road imagery."
+
+  A judge can check it.
+
+MODEL SELECTION — NOT YOLO BY DEFAULT
+-------------------------------------
+Criteria that matter here: tooling maturity, fine-tuning cost on a modest
+machine, and licence.
+
+  OPTION                  TRAIN COST   INFERENCE  FINE-TUNE   LICENCE      VERDICT
+  ---------------------------------------------------------------------------------------
+  YOLO11n / v8n           Lowest.      Fastest    Best in     AGPL-3.0     RECOMMENDED,
+  (Ultralytics)           Hours on 1              class, one               with the licence
+                          consumer GPU            command                  stated on the slide
+  YOLOX-tiny              Comparable   Fast       Moderate    Apache-2.0   Best if AGPL is
+                                                  (MMDet)                  unacceptable
+  RT-DETR-R18             Higher       Moderate   Moderate    Apache-2.0   Better small-object
+                                                                           accuracy; not worth
+                                                                           the extra time
+  RTMDet-tiny             Higher       Fast       Heavier     Apache-2.0   Good, but setup
+                                                  toolchain                cost is real
+  torchvision SSDlite /   Moderate     Moderate   Easy        BSD          Weakest accuracy;
+  FCOS                                                                     only if blocked
+  Faster R-CNN            High         Slow       Easy        BSD          NO. Wrong speed class
+
+CLASSES
+  Map IDD to the nine ObjectType values already in the enum: PEDESTRIAN,
+  BICYCLE, MOTORCYCLE, AUTO_RICKSHAW, CAR, BUS, TRUCK, CATTLE (animal),
+  PUSHCART (cart). The mapping is close to one-to-one, which is precisely why
+  IDD is the right dataset.
+
+ARE PRETRAINED WEIGHTS SUFFICIENT? NO.
+  COCO has no auto-rickshaw and no pushcart, and those two classes are the
+  entire Indian-road argument. Fine-tuning is necessary, but cheap: start from
+  COCO weights, freeze the backbone for the first epochs, train the head.
+
+MINIMUM TRAINING
+  One fine-tune run on roughly 5,000-10,000 IDD images at 640 px, on the order
+  of 20-50 epochs. Target mAP@0.5 around 0.35-0.50.
+  THE GOAL IS NOT THE BENCHMARK. A modest mAP with an honest confusion matrix
+  is worth more here than a high score, because the confusion matrix is the
+  deliverable.
+
+VALIDATION METHODOLOGY
+  * Held-out IDD split; report per-class AP and the FULL confusion matrix
+  * Recall bucketed by box height as a range proxy
+  * False positives per image
+  * Separate KITTI pass for localisation error vs true 3D range
+  * Publish all of it, INCLUDING the classes it does badly on
+
+INTEGRATION POINT — TWO OF THEM
+  1. simulation/sensors/models.py CameraModel.measure consumes the measured
+     tables instead of its current constants.
+  2. A new standalone perception_demo path runs video frames through the
+     detector into the EXISTING tracker, proving the tracker accepts real
+     detector output unchanged.
+
+LEARNED TRAJECTORY PREDICTION — DO NOT DO IT
+--------------------------------------------
+  * No trajectory dataset in the repo
+  * Worse than the current model out of domain
+  * Fake-ML penalty risk in a category (E, 10 pts) already largely earned
+  * The current CA + intent model is defensible and its error is measured
+
+THE HIGH-VALUE PREDICTION WORK IS A REAL BUG, NOT A MODEL:
+  The tracker's velocity covariance is computed (velocity_covariance(),
+  tracker.py:280-284) and NEVER propagated into prediction, so a
+  badly-converged track produces the same predictive uncertainty as a
+  well-converged one. Fixing that is a few hours and is genuinely defensible.
+
+
+================================================================================
+PART 5 — REACTIVE TRAFFIC
+================================================================================
+
+THE INTERFACE IS THE BLOCKER
+----------------------------
+  AgentBehavior.update(agent, ego_xy, dt, road)      behaviors.py:42-43
+  World.update passes (ego.x, ego.y) ONLY            world.py:37-41
+
+TWO FLOATS ABOUT THE EGO. No behaviour can observe ego speed, heading,
+acceleration, braking or intent, because the information does not cross the
+boundary. NO NUMBER OF NEW BEHAVIOUR CLASSES FIXES THAT.
+
+CURRENT STATE, QUANTIFIED ACROSS ALL 26 AGENTS IN THE 8 SCENARIOS
+-----------------------------------------------------------------
+  16 agents  ZERO ego-dependence (STATIC x4, CONSTANT_VELOCITY x10, ERRATIC x2)
+  10 agents  Exactly ONE bit: a one-shot proximity latch that fires once and
+             never re-evaluates
+   1 agent   Configured with continuous feedback (auto_shoulder,
+             highway_merge_slow_vehicles.yaml:37-50, yield_gap_m: 25.0)
+
+AND THAT ONE NEVER FIRES. Structurally, not by luck: trigger_distance_m = 60.0
+is GREATER than yield_gap_m = 25.0, so the latch at behaviors.py:113-114 always
+fires while the gap is still 60 m, and the 0 < s_a - s_e < 25 test at line 121
+can never be true afterwards. Phase log confirms: APPROACH -> MERGING -> MERGED,
+never WAITING.
+
+There is NO TEST anywhere for yield_gap (grep returns nothing), and
+test_agents.py:16-19 passes road=None, which makes both road-dependent branches
+unreachable in unit tests. THE MOST INTERACTIVE PIECE OF AGENT CODE IN THE REPO
+IS COMPLETELY UNTESTED AND, IN PRACTICE, DEAD.
+
+UNMARKED_VILLAGE_ROAD — the flagship SIH scenario #1 — has four agents and NOT
+ONE of them knows the ego exists.
+
+DESIGN: TWO MECHANISMS, BOTH TEXTBOOK
+-------------------------------------
+Resist building a traffic simulator. Two orthogonal, explainable mechanisms
+cover every case.
+
+MECHANISM 1 — LONGITUDINAL: THE INTELLIGENT DRIVER MODEL
+  Five parameters, ~20 lines, universally recognised. Any agent with the ego
+  (or another agent) ahead in its own path follows it:
+
+    a = a_max * [ 1 - (v/v0)^4 - (s*/s)^2 ]
+    s* = s0 + v*T + v*dv / (2*sqrt(a_max*b))
+
+MECHANISM 2 — LATERAL/CROSSING: A THREE-STATE GAP-ACCEPTANCE FSM
+    APPROACH -> YIELD -> COMMIT
+  Decided on a time gap at the conflict point against a per-class critical gap.
+  Commitment is ONE-WAY, which is what humans actually do.
+
+STATE VARIABLES PER AGENT
+  mode              CRUISE, FOLLOW, YIELD, COMMIT, EVADE
+  perceived_ego     Ego state delayed by reaction_time_s (a small ring buffer)
+  committed         Latched true on entering COMMIT; never re-opens
+  conflict_s        Arc-length of the crossing point on the agent's own path
+  gap_at_decision   Recorded for telemetry and for explaining the decision
+
+DECISION RULES
+  1. Project the ego to the conflict point at its current speed -> t_ego.
+     Project the agent -> t_agent.
+  2. gap = t_ego - t_agent. If |gap| > critical_gap -> COMMIT and stop
+     reacting to the ego.
+  3. If 0 < gap < critical_gap and not committed -> YIELD: decelerate at
+     b_comfort to stop before the conflict point.
+  4. If the ego is ahead in the agent's own corridor -> FOLLOW under IDM.
+  5. If TTC to the ego drops below emergency_ttc_s -> EVADE: hard brake, and
+     for pedestrians and cattle, reverse the crossing direction.
+  6. ALL of the above act on perceived_ego, never on instantaneous truth.
+
+PER-CLASS PARAMETERS  (six numbers per class in config/object_profiles.yaml)
+  CLASS           v0    T(gap)  critical_gap  reaction  b_comfort  YIELDS?
+  ---------------------------------------------------------------------------
+  Pedestrian      1.4     —        2.5 s       0.6 s       —       Usually;
+                                                                   darts on a
+                                                                   large gap
+  Cattle          0.8     —        6.0 s       2.5 s       —       Rarely;
+                                                                   mostly ignores
+  Motorcycle     12.0   0.8 s      1.2 s       0.4 s      3.5      Assertive,
+                                                                   small gaps
+  Auto-rickshaw   9.0   1.0 s      1.5 s       0.5 s      3.0      Assertive
+  Car            12.0   1.5 s      2.5 s       0.8 s      2.5      Normal
+  Truck / bus     9.0   2.0 s      4.0 s       1.2 s      1.5      Sluggish,
+                                                                   large gaps
+
+THAT IS THE WHOLE MODEL.
+
+THE GUARD THAT MATTERS MOST
+---------------------------
+Add `interactive: true|false` PER AGENT and a GLOBAL switch, then run every
+scenario in both modes and report both. Without this, a judge will correctly
+ask whether the traffic is rescuing the ego. With it, you answer with a table.
+Add a metric counting agent-initiated yields so you can show the ego is not
+relying on them.
+
+TESTS
+  Unit: yields below the critical gap; commits above it; commitment does not
+        oscillate; reaction delay is respected; cattle ignores the ego; IDM
+        following converges to the desired gap.
+  Scenario: every existing scenario still succeeds with reactivity ON and OFF.
+
+NEW SCENARIOS (only meaningful with interaction)
+  * An unprotected right turn across oncoming traffic that must be negotiated
+  * A narrow-lane mutual-yield standoff
+
+FIX WHILE IN THERE
+  * ERRATIC has no corridor containment (measured d = -3.34 on a +/-2.3 m
+    road). Clamp it.
+  * MergingBehavior:117 defaults yield_gap_m to None while :131 defaults it to
+    0.0 — inconsistent.
+  * MergingBehavior:129 would AttributeError on road.project if WAITING were
+    reached with road=None.
+
+
+================================================================================
+PART 6 — MATLAB / SIMULINK STRATEGY
+================================================================================
+
+WHAT ACTUALLY EXISTS
+--------------------
+Three .m files. NO .slx, NO .sfx, NO .mat, NO RoadRunner scene.
+  D:\SIH\matlab\behavior_transitions.m
+  D:\SIH\matlab\buses.m
+  D:\SIH\matlab\replay_telemetry.m
+  D:\SIH\matlab_export\templates\replay_telemetry.m  (byte-identical copy)
+
+buses.m — 160 lines, 7 buses, 79 elements
+  Generated by GENUINE dataclass introspection (typing.get_type_hints +
+  dataclasses.fields). Syntax looks valid; the script-local helper function is
+  correctly last (valid R2016b+); all 79 element names are valid identifiers.
+
+  BUT IT DESCRIBES A DIFFERENT SERIALISATION FROM THE ONE THE CODE EMITS:
+    buses.m:104  declares `state` as int32   -> JSON writes the STRING "CRUISE"
+    buses.m:67   declares max_level as int32 -> JSON writes the STRING "NONE"
+    buses.m:106  declares speed_policy as a nested bus
+                 -> JSON FLATTENS it into four sibling keys
+    buses.m:46   names the field object_type -> JSON key is `type`
+  ObjectState.id is DROPPED, so a bus of tracked objects has no track identity.
+  RiskSummary.assessments is dropped (the entire per-object risk detail).
+  NO buses for Trajectory, TrajectoryPoint, CandidateTrajectory, PlannerOutput,
+  ObjectPrediction, RiskAssessment or VehicleParameters — i.e. the planner and
+  prediction interfaces, which is what a Simulink model would most need.
+  Requires a SIMULINK LICENCE to run at all.
+
+behavior_transitions.m / .csv / behavior_states.csv
+  14 data rows of real topology from TRANSITIONS; 7 state rows with int code,
+  severity and a prose speed-policy description. MATLAB syntax valid.
+
+  BUT: 13 of 14 guards export an EMPTY guard_doc, because the exporter scrapes
+  the first '#' comment block and only g_avoid has one. The actual conditions
+  live only in Python. There are NO actions, NO entry/during/exit, NO
+  hierarchy, NO parallelism, NO default transition, NO initial state, and the
+  dwell timer is PROSE. The exported speed_policy column is English prose, e.g.
+  'min(desired, lead speed + gap error / follow_time_gap_s); lateral avoidance
+  allowed' — not an expression. YOU GET A GRAPH, NOT A CHART.
+  The SPEED_POLICY dict in matlab_export/behavior.py:14-22 is HARD-CODED prose
+  that only "mirrors" _policy and can silently drift.
+
+replay_telemetry.m — 145 lines
+  Reads JSONL with fgetl + jsondecode; plots four linked panels (speed,
+  steering, behaviour timeline, clearance) with shaded override intervals;
+  asserts seven safety invariants. Field names VERIFIED CORRECT against the
+  real writer. The inf -> null handling is right (0 occurrences of
+  Infinity/NaN across all 8 logs). The hand-rolled YAML reader works against
+  the real configs.
+
+  IT WOULD RUN, AND THEN FAIL, ON EVERY LOG THE PYTHON CODE WRITES.
+  metrics.finalize() is called AFTER the last telemetry frame is published
+  (runner.py:165-171; collector.py:150-154). JsonLinesSink serialises at write
+  time, so nothing on disk ever sees the finalised values. Confirmed on the
+  LAST LINE of all 8 logs:
+
+    log                          frames  scenario_completed  termination_reason
+    ------------------------------------------------------------------------
+    dense_market_mixed_traffic     2149      False                ''
+    highway_merge_slow_vehicles    1432      False                ''
+    narrow_lane_boxed_in           2208      False                ''
+    mixed_traffic_curve            1315      False                ''
+    unmarked_village_road          1786      False                ''
+    unsignalized_intersection       924      False                ''
+    sudden_cattle_crossing          782      False                ''
+    sudden_pedestrian_dart          624      False                ''
+
+  assert(completed, ...) at line 91 errors with an EMPTY reason string on 8/8.
+  Five more metrics are permanently zero/null in the JSONL for the same reason:
+  average_speed, mean_abs_curvature, path_smoothness, max_jerk,
+  scenario_success_rate, time_to_completion.
+
+  This file is 100% HARD-CODED — exporter.py:77 is a shutil.copyfile of a
+  template. Nothing about the telemetry schema is derived from telemetry.py,
+  which is exactly why the mismatch went unnoticed.
+
+MINIMUM VIABLE REAL VALIDATION, IN EVIDENCE-PER-HOUR ORDER
+-----------------------------------------------------------
+TIER 1 — HALF A DAY: MAKE THE REPLAY SCRIPT PASS
+  Publish one final telemetry frame after finalize(), then run
+  replay_telemetry.m in MATLAB against a real log.
+  EVIDENCE: a MATLAB figure and a console transcript showing seven safety
+  assertions passing on data the Python stack produced.
+  The cheapest genuine MATLAB artefact in existence. Converts an embarrassment
+  into a checkable claim.
+
+TIER 2 — ONE DAY: SIMULINK CROSS-VALIDATION OF VEHICLE + CONTROLLER
+  Build a small model: bicycle equations, actuator saturation block, Stanley,
+  PID. Drive it with a logged planner trajectory. Compare the resulting path
+  against the Python execution; report max position and heading deviation.
+  THE STRONGEST MATHWORKS EVIDENCE AVAILABLE PER HOUR, because it is a genuine
+  independent re-implementation agreeing with the original, not a screenshot.
+
+TIER 3 — ONE DAY: A REAL STATEFLOW CHART
+  Requires first exporting guard EXPRESSIONS, which do not currently exist.
+  Then feed the chart the logged risk and planner signals and assert it
+  reproduces the Python state sequence exactly. An equivalence test, not a
+  picture.
+
+TIER 4 — HALF TO ONE DAY, ONLY IF LICENSED: ROADRUNNER
+  Author one unstructured Indian road, export OpenDRIVE, import the centreline
+  and boundaries into the existing corridor model. The road geometry then
+  genuinely ORIGINATES in RoadRunner. DrivableSpace.from_segments already
+  accepts polylines, so the import is small.
+
+WHAT STAYS IN PYTHON
+  The planner, prediction, risk and perception. Re-implementing those in
+  Simulink is weeks of work for no additional judging credit.
+
+BLOCKERS BEFORE ANYTHING RUNS
+  1. A MATLAB installation (matlab/README.md:4-5 states none was available)
+  2. A Simulink licence for buses.m
+  3. Fix the scenario_completed / termination_reason gap
+  4. Reconcile the two serialisations (buses vs JSONL)
+  5. Guard expressions for Stateflow
+  6. State actions / entry / during / exit, hierarchy, default transition,
+     min_dwell_s timer
+  7. Buses for the planner and prediction contracts
+  8. logs/ is .gitignored, so a fresh clone has no telemetry to replay
+
+
+================================================================================
+PART 7 — WHAT NOT TO BUILD
+================================================================================
+
+DO NOT BUILD                       WHY
+--------------------------------------------------------------------------------
+Steered reversing                  One scenario needs reversing and straight-line
+                                   already solves it. Adds a two-dimensional
+                                   search to the planner for zero new rubric
+                                   coverage.
+
+Photorealistic rendering /         Consumes days, adds no rubric points, and
+game-engine visuals                actively invites the "UI-ONLY IMPLEMENTATION"
+                                   automatic penalty.
+
+Neural trajectory prediction       No trajectory data, worse than the current
+                                   model out of domain, and a FAKE ML penalty
+                                   risk in a category already largely earned.
+
+A Simulink port of the planner     Weeks of work. The cross-validation in Part 6
+                                   Tier 2 earns the same points in one day.
+
+More scenarios beyond eight        Marginal. Two INTERACTIVE scenarios are worth
+                                   more than six more static ones. Depth over
+                                   count.
+
+More sensor types                  Three sensors already satisfy the requirement.
+(IMU, GPS, ultrasonic)             A fourth adds config surface and no credit.
+
+Chasing the last four emergency    Already collision-free and goal-reaching. Deep
+brakes in the boxed-in scenario    tuning for an invisible gain.
+
+Multi-agent reinforcement          Enormous, unstable, unexplainable, and directly
+learning                           contrary to "compact and explainable".
+
+A richer web frontend              The dashboard already shows live backend state.
+                                   Beyond that is decoration.
+
+Full semantic segmentation of      The RIGHT idea (see the P1 corridor-perception
+drivable space                     item) but the full version is a research
+                                   project. Take the cheap version instead.
+
+
+================================================================================
+PART 8 — PRIORITIZATION
+================================================================================
+
+FEATURE                                    JUDGING TECH EFFORT RISK CLASS RECOMMENDATION
+------------------------------------------------------------------------------------------------
+Fix judge-visible forensic defects            8     9     3     2   P0   Do first. Defends 82
+(blocked-cost bias, covariance truth                                     points already earned
+leak, metrics timestamp, dead config                                     and removes three
+key, YAML drift, stale doc strings,                                      automatic-penalty
+weak tests)                                                              triggers
+
+Reactive traffic (IDM + gap acceptance)       9     8     6     4   P0   Biggest visible realism
+                                                                         gap; only interactive-
+                                                                         traffic path
+
+Learned detector + measured camera            9     7     7     6   P0   Only way to answer
+error model                                                              "where is the AI"; also
+                                                                         fixes five sensor defects
+
+Vectorise the scorer's per-object loop        5     7     2     1   P0   Two hours. Removes the
+                                                                         tail-latency defeater of
+                                                                         the real-time claim
+
+Simulink cross-validation of vehicle          7     6     5     5   P1   Strongest MathWorks
++ controller                                                             evidence per hour. Needs
+                                                                         a licence
+
+Corridor perception (planner stops            8     8     5     5   P1   Directly answers the core
+receiving the exact road)                                                "unstructured roads"
+                                                                         question
+
+Stateflow chart with real guards              6     5     6     5   P1   Needs guard expressions
++ equivalence test                                                       exported first
+
+Propagate KF velocity covariance              5     7     2     2   P1   Cheap, real, closes a
+into prediction                                                          documented gap
+
+Real intersection geometry for the            6     5     3     2   P1   Currently a straight road
+intersection scenario                                                    called an intersection
+
+Fix yield_gap parameterisation and            4     5     1     1   P1   An hour. Removes two
+ERRATIC containment                                                      embarrassments
+
+RoadRunner scene -> OpenDRIVE -> corridor     6     4     5     7   P2   Only if a licence exists
+
+Two interaction-only scenarios                5     5     3     2   P2   After reactive traffic
+                                                                         lands
+
+Ego localisation error (odometry noise)       4     6     4     5   P2   Honest, but may
+                                                                         destabilise tuning late
+
+Clutter and false positives in sensors        4     6     3     4   P2   Falls out of the detector
+                                                                         work for free
+
+Steered reversing                             2     3     6     5   P3   Do not
+
+Photorealistic rendering                      2     1     9     6   P3   Do not
+
+Neural trajectory prediction                  3     3     8     8   P3   Do not
+
+Simulink port of the planner                  3     4    10     8   P3   Do not
+
+
+================================================================================
+PART 9 — TARGET ARCHITECTURE
+================================================================================
+
+  RoadRunner scene ──(OpenDRIVE)──▶ World / DrivableSpace   [MATHWORKS → SIMULATION]
+                                          │
+                                          ▼
+                          Reactive traffic agents            [RULE-BASED]
+                          (IDM + gap acceptance, per-class)
+                                          │
+                                          ▼
+                    Camera ▸ LiDAR ▸ Radar sensor models     [SIMULATION,
+                                          │                   error model
+                                          │                   LEARNED-CALIBRATED]
+                      ┌───────────────────┴───────────────────┐
+                      ▼                                       ▼
+        Learned detector (offline + demo)          Detections in the loop
+        IDD-fine-tuned, real footage               (statistics measured
+                  [LEARNED]                         from the detector)
+                                                              │
+                                                              ▼
+                        Sensor fusion / KF + EKF tracker      [REAL IMPLEMENTATION]
+                                                              │
+                                                              ▼
+                        Corridor perception (sensed boundaries) [SIMULATION → REAL]
+                                                              │
+                                                              ▼
+                        Trajectory prediction (CA + intent)   [REAL IMPLEMENTATION]
+                             covariance from the KF
+                                                              │
+                                                              ▼
+                        Risk / TTC (route ▸ physical ▸ plan)  [REAL IMPLEMENTATION]
+                                                              │
+                                                              ▼
+                        Behaviour FSM (7 states, 14 trans.)   [RULE-BASED ⇄
+                                                               MATHWORKS Stateflow]
+                                                              │
+                                                              ▼
+                        Adaptive lattice planner              [REAL IMPLEMENTATION]
+                                                              │
+                                                              ▼
+                        Safety supervisor (independent)       [REAL IMPLEMENTATION]
+                                                              │
+                                                              ▼
+                        Trajectory controller (Stanley + PID) [REAL ⇄
+                                                               MATHWORKS Simulink]
+                                                              │
+                                                              ▼
+                        Vehicle dynamics (bicycle + actuators)[REAL ⇄
+                                                               MATHWORKS Simulink]
+                                                              │
+                                                              └────▶ back to World
+
+  Every stage ──▶ TelemetryPublisher ──▶ [dashboard | JSONL | CSV | debug view]
+                                                              [REAL, independent branch]
+
+TWO COMPONENTS ARE DELIBERATELY DUAL-IMPLEMENTED (⇄): the behaviour FSM and the
+vehicle-plus-controller loop exist in BOTH Python and MathWorks, and THEIR
+AGREEMENT IS THE MATHWORKS EVIDENCE.
+
+
+================================================================================
+PART 10 — FINAL BUILD ROADMAP
+================================================================================
+
+STAGE 1 — HARDEN WHAT EXISTS
+  Goal        Fix the blocked-cost bias, the sensor covariance truth leak, the
+              metrics timestamp mismatch, the dead levels.critical key, the
+              dataclass/YAML drift, the stale generated strings, the unfailable
+              perception metric; vectorise the scorer.
+  Files       collision_checker.py, sensors/models.py, runner.py,
+              risk_engine.py, core/config.py, generate_results.py,
+              metrics/collector.py, scorer.py
+  Depends on  Nothing
+  Test        Full suite plus all three batteries, and a NEW test that the
+              tracking-error metric degrades when detections are dropped
+  Evidence    Before/after latency table showing p95 inside budget
+  Impact      Defends every existing point
+  Complexity  LOW
+
+STAGE 2 — REACTIVE TRAFFIC
+  Goal        Widen the behaviour interface to carry ego velocity and heading;
+              add IDM and the gap-acceptance FSM; per-class parameters; the
+              `interactive` flag; the agent-yields metric
+  Files       simulation/agents/*, world.py, object_profiles.yaml, all scenario
+              YAMLs
+  Depends on  Stage 1
+  Test        Six unit tests, plus every scenario passing with reactivity ON
+              and OFF
+  Evidence    Side-by-side table and a dashboard clip of an auto-rickshaw
+              yielding
+  Impact      HIGH, category F
+  Complexity  MEDIUM
+
+STAGE 3 — LEARNED PERCEPTION
+  Goal        Acquire IDD; fine-tune the detector; measure the confusion matrix
+              and recall-versus-range; feed them into the camera model; build
+              the standalone video demo into the existing tracker
+  Files       new perception_ml/, sensors/models.py, config/sensors.yaml
+  Depends on  Stage 1
+  Test        Detector evaluation reproducible from a script; a test that the
+              camera model's confusion matrix matches the measured file
+  Evidence    mAP table, confusion matrix, video of the detector feeding the
+              real tracker
+  Impact      HIGH, category D
+  Complexity  HIGH
+
+STAGE 4 — MATHWORKS
+  Goal        Publish the final telemetry frame; make the replay script pass;
+              build the Simulink vehicle-and-controller model and
+              cross-validate; export guard expressions; build the Stateflow
+              chart with an equivalence test
+  Files       runner.py, matlab/, matlab_export/, new .slx
+  Depends on  Stage 1
+  Test        MATLAB console transcripts; a deviation assertion in CI if MATLAB
+              is available
+  Evidence    Deviation plot and state-sequence comparison
+  Impact      Category G from 2 to 4-5
+  Complexity  MEDIUM, gated on licence
+
+STAGE 5 — CORRIDOR PERCEPTION AND INTERACTION SCENARIOS
+  Goal        Replace the planner's exact road object with a corridor estimated
+              from sensed boundary points within sensor range; add the two
+              interaction-only scenarios and real intersection geometry
+  Files       new autonomy/perception/corridor.py, runner.py, scenarios
+  Depends on  Stages 2 and 3
+  Test        The planner never receives the simulator's road instance;
+              scenarios still pass
+  Evidence    Debug view showing estimated versus true corridor
+  Impact      HIGH, categories A and F
+  Complexity  MEDIUM-HIGH
+
+
+================================================================================
+FINAL ANSWER — THE EXACT NEXT FIVE THINGS, IN STRICT ORDER
+================================================================================
+
+1. FIX THE EIGHT JUDGE-VISIBLE FORENSIC DEFECTS AND VECTORISE THE SCORER.
+   ONE DAY.
+   Nothing else on this list matters if a judge finds the covariance truth
+   leak, the results document that says "no sensors in Stage 1" eight times,
+   or the 210 ms planning tail. This defends the 82 points you already have
+   and removes three automatic-penalty triggers.
+
+2. MAKE TRAFFIC REACTIVE: IDM PLUS GAP ACCEPTANCE, SIX PARAMETERS PER CLASS,
+   WITH AN ON/OFF SWITCH AND BOTH RESULTS REPORTED.
+   TWO TO THREE DAYS.
+   Sixteen of your twenty-six agents cannot see the ego and the one that can
+   never fires. This is the most visible weakness in any live demo and the only
+   route into the interactivity half of a ten-point category.
+
+3. FINE-TUNE A DETECTOR ON IDD AND USE ITS MEASURED STATISTICS AS THE CAMERA
+   ERROR MODEL.
+   THREE TO FOUR DAYS INCLUDING DATA ACQUISITION.
+   This is the only honest way to answer "where is the learning", it makes the
+   requested sentence literally true, and as a by-product it replaces five
+   invented sensor constants with measured ones.
+
+4. PUBLISH THE FINAL TELEMETRY FRAME, MAKE THE MATLAB REPLAY PASS, THEN
+   CROSS-VALIDATE THE VEHICLE AND CONTROLLER IN SIMULINK.
+   ONE AND A HALF DAYS, GATED ON A LICENCE.
+   Your MATLAB artefacts currently fail on every log you produce. Turning that
+   into an independent re-implementation that agrees with Python is the
+   strongest MathWorks evidence per hour available.
+
+5. STOP HANDING THE PLANNER THE SIMULATOR'S EXACT ROAD.
+   TWO DAYS.
+   For a problem statement whose title is "unstructured Indian roads", the
+   hardest perception task is currently skipped: the planner receives a perfect
+   map with exact boundaries. Even a modest estimated corridor, built from
+   sensed boundary points inside sensor range, changes the answer to the single
+   most obvious hostile question a judge can ask.
+
+================================================================================
+END OF ANALYSIS — no code was modified. Working tree clean at commit 699f0e9.
+================================================================================
