@@ -37,6 +37,7 @@ class AgentBehaviorType(str, Enum):
     CROSSING = "CROSSING"
     MERGING = "MERGING"
     ERRATIC = "ERRATIC"
+    INTERACTIVE = "INTERACTIVE"     # ego-aware: IDM following + gap acceptance (Phase 2, opt-in)
 
 
 class RiskLevel(int, Enum):

@@ -28,6 +28,8 @@ ERRATIC            : heading_sigma_rad (0.35), speed_sigma_mps (0.5),
 from __future__ import annotations
 
 import math
+
+import numpy as np
 from abc import ABC, abstractmethod
 
 from autonomy.core.geometry import wrap_angle
@@ -35,6 +37,7 @@ from autonomy.core.interfaces import RoadModel
 from autonomy.core.types import AgentBehaviorType
 
 from .agent import Agent
+from .interaction import APPROACH, COMMIT, EgoView, GapAcceptance, YIELD, idm_acceleration, time_to_point
 
 
 class AgentBehavior(ABC):
@@ -174,3 +177,132 @@ BEHAVIORS: dict[AgentBehaviorType, AgentBehavior] = {
 
 def behavior_for(agent: Agent) -> AgentBehavior:
     return BEHAVIORS[agent.behavior_type]
+
+
+class InteractiveBehavior(AgentBehavior):
+    """Ego-aware agent: IDM along its own path, gap acceptance at a conflict point.
+
+    Opt-in. Nothing else in the repository uses it, so the eight existing scenarios are
+    untouched. Parameters (all optional):
+
+        desired_speed_mps   free-flow speed                              (agent.speed or 8.0)
+        a_max_mps2          IDM acceleration limit                       (1.5)
+        b_comf_mps2         IDM comfortable deceleration                 (2.0)
+        min_gap_m           IDM standstill gap                           (2.0)
+        headway_s           IDM desired time headway                     (1.5)
+        conflict_x/y        the point this agent's path crosses the ego's (none -> follow only)
+        critical_gap_s      time gap demanded before crossing            (2.5)
+        hysteresis_s        extra gap needed to stop yielding            (0.8)
+        reaction_time_s     age of the ego state the agent acts on       (0.5)
+        follow_ego          treat the ego as a lead vehicle when ahead   (True)
+
+    With `interactive_traffic` disabled the agent falls back to constant velocity, which is the
+    Phase-1 baseline, so the ablation is a genuine A/B of the same scenario.
+    """
+
+    @staticmethod
+    def _keep_side(agent: Agent, p: dict, road: RoadModel | None, dt: float) -> None:
+        """Steer toward a corridor offset at a bounded yaw rate. Lane discipline, not interaction:
+        it does not read the ego, so it applies in the baseline too."""
+        keep = p.get("keep_offset_m")
+        if keep is None or road is None:
+            return
+        _, d_a, h_ref = road.project(agent.x, agent.y)
+        reverse = abs(wrap_angle(agent.heading - h_ref)) > math.pi / 2
+        want = h_ref + math.pi if reverse else h_ref
+        aim = math.atan(max(-1.0, min(1.0, (float(keep) - d_a) / max(agent.speed, 1.0) / 2.0)))
+        want += -aim if reverse else aim
+        rate = float(p.get("yaw_rate_rad_s", 0.5))
+        step = max(-rate * dt, min(rate * dt, float(wrap_angle(want - agent.heading))))
+        agent.heading = float(wrap_angle(agent.heading + step))
+
+    def update(self, agent: Agent, ego_xy, dt: float, road: RoadModel | None = None) -> None:
+        p = agent.behavior_params
+        # Receiving a bare (x, y) tuple means `simulation.interactive_traffic` is off: the runner
+        # withholds the ego's speed and heading, so there is nothing to interact with and the
+        # agent falls back to the non-reactive Phase-1 baseline. That is what makes the ablation
+        # a genuine A/B rather than the same behaviour with a different label.
+        interactive = isinstance(ego_xy, EgoView) and p.get("interactive", True)
+        ego = ego_xy if isinstance(ego_xy, EgoView) else EgoView(ego_xy[0], ego_xy[1])
+
+        if not interactive:
+            # Baseline: keep to your own side and stay on the road -- neither depends on the ego --
+            # but do NOT brake for it or judge its gaps. The A/B then isolates ego-awareness alone
+            # rather than confounding it with lane discipline.
+            self._keep_side(agent, p, road, dt)
+            agent.phase = "MOVING"
+            agent.advance(dt)
+            return
+
+        v0 = float(p.get("desired_speed_mps", agent.speed if agent.speed > 0 else 8.0))
+        a_max = float(p.get("a_max_mps2", 1.5))
+        b_comf = float(p.get("b_comf_mps2", 2.0))
+
+        gate = agent.memory.get("gap")
+        if gate is None:
+            gate = GapAcceptance(critical_gap_s=float(p.get("critical_gap_s", 2.5)),
+                                 hysteresis_s=float(p.get("hysteresis_s", 0.8)),
+                                 reaction_time_s=float(p.get("reaction_time_s", 0.5)))
+            agent.memory["gap"] = gate
+        seen = gate.perceive(ego, agent.elapsed)          # delayed view: no instant reactions
+
+        # --- conflict handling: how long until each of us reaches the crossing point ----------
+        gap_obstruction = math.inf
+        cx, cy = p.get("conflict_x"), p.get("conflict_y")
+        if cx is not None and cy is not None:
+            t_agent = time_to_point(agent.x, agent.y, agent.speed, agent.heading, float(cx), float(cy))
+            t_ego = time_to_point(seen.x, seen.y, seen.speed, seen.heading, float(cx), float(cy))
+            d_conflict = math.hypot(float(cx) - agent.x, float(cy) - agent.y)
+            past = t_agent < 0.0 or d_conflict < 0.5
+            if past:
+                gate.release()                            # conflict behind us; next one decides afresh
+            else:
+                state = gate.decide(t_agent if math.isfinite(t_agent) else 1e6,
+                                    t_ego if t_ego >= 0.0 else math.inf)
+                if state == YIELD:
+                    # Hold short of the conflict point: IDM treats it as a stopped obstruction.
+                    gap_obstruction = max(d_conflict - float(p.get("min_gap_m", 2.0)), 0.0)
+                agent.memory["gap_state"] = state
+
+        # --- following: the ego as a lead vehicle when it is ahead in our own path ------------
+        if p.get("follow_ego", True):
+            along = (seen.x - agent.x) * math.cos(agent.heading) + (seen.y - agent.y) * math.sin(agent.heading)
+            lateral = abs(-(seen.x - agent.x) * math.sin(agent.heading) + (seen.y - agent.y) * math.cos(agent.heading))
+            if along > 0.0 and lateral < float(p.get("follow_lateral_m", 2.5)):
+                gap_obstruction = min(gap_obstruction, along - 0.5 * (agent.length + 4.2))
+
+        dv = agent.speed - (seen.speed if math.isfinite(gap_obstruction) else 0.0)
+        if math.isfinite(gap_obstruction) and agent.memory.get("gap_state") == YIELD:
+            dv = agent.speed                              # yielding to a fixed point, not a mover
+        acc = idm_acceleration(agent.speed, v0, gap_obstruction, dv, a_max=a_max, b_comf=b_comf,
+                               s0=float(p.get("min_gap_m", 2.0)), headway_s=float(p.get("headway_s", 1.5)))
+
+        self._keep_side(agent, p, road, dt)
+
+        # --- road containment: brake to a stop rather than driving off the corridor -------------
+        # A motion command, not a position clamp: the agent decelerates as it runs out of road and
+        # comes to rest at the edge, which is what a driver does.
+        if road is not None and p.get("stay_on_road", True):
+            # Look ahead by the distance it would take to stop, not one step: braking a step
+            # before the edge cannot physically bring the agent to rest on the road.
+            # Measured to the NOSE, not the centre: a driver stops with the whole vehicle on
+            # the road, not with the bonnet over the edge.
+            look = (agent.speed * dt + agent.speed ** 2 / (2.0 * max(b_comf, 0.1))
+                    + 0.5 * agent.length + float(p.get("road_margin_m", 0.3)))
+            nx = agent.x + look * math.cos(agent.heading)
+            ny = agent.y + look * math.sin(agent.heading)
+            if not bool(road.contains_points(np.array([[nx, ny]]))[0]):
+                acc = min(acc, -b_comf)
+                if agent.speed + acc * dt <= 0.0:
+                    agent.speed = 0.0
+                    agent.phase = "EDGE"
+                    agent.elapsed += dt
+                    return
+
+        agent.speed = max(0.0, agent.speed + acc * dt)
+        agent.phase = agent.memory.get("gap_state", "MOVING")
+        agent.advance(dt)
+
+
+# Registered after the class body: the dict above is declared before it.
+BEHAVIORS[AgentBehaviorType.INTERACTIVE] = InteractiveBehavior()

@@ -1,0 +1,49 @@
+# NARROW_LANE_MUTUAL_YIELD
+# A 5.5 m lane. Two 1.8 m vehicles can pass only if BOTH commit to their own side and one of
+# them gives way on speed; driving through the middle at 6 m/s does not work. The ego travels +x; an oncoming
+# car travels -x on a converging line. Someone has to give way.
+#
+# The car is ego-aware: it watches the closing gap and pulls up short rather than driving through
+# the ego. The ego, independently, plans around whatever the car actually does. Neither is told
+# what the other will do, and neither is scripted to act at a particular time. The test is that
+# the pair does not deadlock and does not collide.
+name: NARROW_LANE_MUTUAL_YIELD
+description: Ego and an oncoming car meet in a lane too narrow for both; one must yield.
+seed: 37
+
+road:
+  lane_markings: NONE
+  reference:      [[-20.0, 0.0], [140.0, 0.0]]
+  left_boundary:  [[-20.0, 2.75], [140.0, 2.75]]
+  right_boundary: [[-20.0, -2.75], [140.0, -2.75]]
+
+ego:
+  x: 0.0
+  y: 1.0
+  yaw_deg: 0.0
+  speed_mps: 6.0
+  desired_speed_mps: 6.0
+  desired_lateral_offset_m: 1.0
+
+goal:
+  s_m: 110.0
+
+agents:
+  - id: car_oncoming
+    type: CAR
+    x: 70.0
+    y: 1.2                    # starts in the EGO's half, head-on
+    heading_deg: 180.0
+    speed_mps: 6.0
+    behavior: INTERACTIVE
+    params:
+      desired_speed_mps: 6.0
+      a_max_mps2: 1.2
+      b_comf_mps2: 2.5
+      min_gap_m: 6.0          # a car will not close to less than this on an oncoming vehicle
+      headway_s: 1.5
+      follow_ego: true        # the ego is straight ahead in its path: treat it as an obstruction
+      follow_lateral_m: 2.5
+      reaction_time_s: 0.6
+      keep_offset_m: -1.6       # pulls hard to its own side to leave the ego room to pass
+      yaw_rate_rad_s: 0.10      # pulls over slowly, so it is still in the ego's half as they close

@@ -41,6 +41,7 @@ from autonomy.telemetry.telemetry import (ConsoleSink, CsvSummarySink, InMemoryS
                                           TelemetryFrame, TelemetryPublisher)
 from autonomy.vehicle.models import KinematicBicycleModel, VehicleModel
 from simulation.scenarios.loader import Scenario, load_scenario
+from simulation.agents.interaction import EgoView
 from simulation.sensors.models import SensorSuite
 
 
@@ -131,7 +132,14 @@ class Simulation:
         control, self.safety_status = self.safety.check(nominal, self.risk, self.plan, self.ego, t)
 
         self.ego = self.vehicle.step(self.ego, control, dt)          # the only place the ego moves
-        self.world.update(dt, (self.ego.x, self.ego.y))
+        # What a road user can see of the ego: where it is, how fast and which way it faces.
+        # Never its future commands. With interactive traffic disabled only the position is
+        # passed, which is exactly the Phase-1 baseline.
+        if self.cfg.simulation.interactive_traffic:
+            ego_view = EgoView(self.ego.x, self.ego.y, self.ego.longitudinal_velocity, self.ego.yaw)
+        else:
+            ego_view = (self.ego.x, self.ego.y)
+        self.world.update(dt, ego_view)
         self.time += dt
         self.step_index += 1
 

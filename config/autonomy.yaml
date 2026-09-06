@@ -6,7 +6,9 @@ simulation:
   dt_s: 0.02                      # dynamics / control step
   max_duration_s: 60.0
   stop_on_collision: true
-  goal_tolerance_m: 2.0           # along-track distance to goal that counts as arrival
+  goal_tolerance_m: 2.0
+  interactive_traffic: true       # ego-aware agents (opt-in per agent) react to the ego; false restores
+                                  # the non-reactive baseline for an A/B comparison           # along-track distance to goal that counts as arrival
 
 prediction:
   horizon_s: 4.0

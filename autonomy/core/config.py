@@ -39,6 +39,8 @@ class SimulationConfig:
     max_duration_s: float = 60.0
     stop_on_collision: bool = True
     goal_tolerance_m: float = 2.0
+    interactive_traffic: bool = True    # agents that opt in receive the ego's speed and heading and
+                                        # run the gap-acceptance / IDM model. False = Phase-1 baseline.
 
 
 @dataclass

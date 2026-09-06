@@ -35,6 +35,9 @@ class World:
         return self._provider
 
     def update(self, dt: float, ego_xy: tuple[float, float]) -> None:
+        """Advance every agent. `ego_xy` may be a plain (x, y) tuple or an `EgoView` carrying the
+        ego's speed and heading as well; EgoView indexes as (x, y), so behaviours that only want
+        the position are unaffected. Agents never receive the ego's future control commands."""
         self.ego_xy = ego_xy
         for agent in self.agents:
             behavior_for(agent).update(agent, ego_xy, dt, self.road)

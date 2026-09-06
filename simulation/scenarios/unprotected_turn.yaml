@@ -1,0 +1,48 @@
+# UNPROTECTED_TURN
+# The ego drives straight along an unmarked road. An auto-rickshaw waits on the shoulder and
+# turns across the ego's path at x = 60, so the two paths share one conflict point.
+#
+# NOTHING about the auto's decision is scripted. It observes the ego's position, speed and
+# heading (delayed by its reaction time), estimates when each of them reaches the conflict point,
+# and yields or commits on the time gap alone. Change the ego's speed and the decision changes.
+# With `interactive_traffic: false` it ignores the ego entirely, which is the A/B baseline.
+name: UNPROTECTED_TURN
+description: An auto-rickshaw turns across the ego's path and must judge the gap for itself.
+seed: 31
+
+road:
+  lane_markings: NONE
+  reference:      [[-20.0, 0.0], [160.0, 0.0]]
+  left_boundary:  [[-20.0, 4.0], [160.0, 4.0]]
+  right_boundary: [[-20.0, -4.0], [160.0, -4.0]]
+
+ego:
+  x: 0.0
+  y: 1.75
+  yaw_deg: 0.0
+  speed_mps: 8.0
+  desired_speed_mps: 8.0
+  desired_lateral_offset_m: 1.75
+
+goal:
+  s_m: 150.0
+
+agents:
+  - id: auto_turn
+    type: AUTO_RICKSHAW
+    x: 60.0
+    y: -3.2                   # waiting on the far shoulder
+    heading_deg: 90.0         # about to cross toward +y, through the ego's half
+    speed_mps: 2.0
+    behavior: INTERACTIVE
+    params:
+      desired_speed_mps: 4.0
+      a_max_mps2: 1.5
+      b_comf_mps2: 2.5
+      conflict_x: 60.0        # where its path crosses the ego's line of travel
+      conflict_y: 1.75
+      critical_gap_s: 3.0     # an auto-rickshaw is assertive but not suicidal
+      hysteresis_s: 0.8
+      reaction_time_s: 0.5
+      follow_ego: false       # it crosses the ego's path, it does not follow it
+      stay_on_road: true      # brakes to a stop at the corridor edge rather than driving off it
