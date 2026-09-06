@@ -1,0 +1,82 @@
+{
+  "adapter_as_is": {
+    "synchronised": {
+      "scenes": 10,
+      "samples": 404,
+      "fused_objects": 17150,
+      "association_rate": 0.9869457330887906,
+      "matched": 18296,
+      "annotations": 18538,
+      "pos_err_median_m": 0.003374883871549982,
+      "pos_err_p90_m": 0.6151882829001691,
+      "vel_err_median_mps": 0.012188109122569474,
+      "vel_err_p90_mps": 0.25451528955648833,
+      "cov_trace_median": 0.08985800894060045,
+      "residual_median_m": 0.0032641501356396223,
+      "residual_p90_m": 0.590810460300242,
+      "ingest_ms_mean": 251.65527549357324,
+      "ingest_ms_p95": 1116.7108450317753,
+      "spread_ms_median": 66.78140163421631,
+      "spread_ms_max": 82.78608322143555
+    },
+    "temporal": {
+      "scenes": 10,
+      "samples": 404,
+      "fused_objects": 17040,
+      "association_rate": 0.9852195490344158,
+      "matched": 18264,
+      "annotations": 18538,
+      "pos_err_median_m": 0.004144366686009891,
+      "pos_err_p90_m": 0.6151845251629018,
+      "vel_err_median_mps": 0.01095600204912647,
+      "vel_err_p90_mps": 0.2435076022308611,
+      "cov_trace_median": 0.09533866003075017,
+      "residual_median_m": 0.0038580107978601706,
+      "residual_p90_m": 0.590810460300242,
+      "ingest_ms_mean": 261.6777316824761,
+      "ingest_ms_p95": 1121.5880700066896,
+      "spread_ms_median": 66.78140163421631,
+      "spread_ms_max": 82.78608322143555
+    }
+  },
+  "motion_consistent": {
+    "synchronised": {
+      "scenes": 10,
+      "samples": 404,
+      "fused_objects": 17105,
+      "association_rate": 0.9867299600819938,
+      "matched": 18292,
+      "annotations": 18538,
+      "pos_err_median_m": 0.0039802786226322134,
+      "pos_err_p90_m": 0.6159123314238719,
+      "vel_err_median_mps": 0.012299688068327872,
+      "vel_err_p90_mps": 0.24906062358612063,
+      "cov_trace_median": 0.08973839229470544,
+      "residual_median_m": 0.004641501618864152,
+      "residual_p90_m": 0.5964148202322672,
+      "ingest_ms_mean": 259.99538737578587,
+      "ingest_ms_p95": 1112.7082999999388,
+      "spread_ms_median": 66.78140163421631,
+      "spread_ms_max": 82.78608322143555
+    },
+    "temporal": {
+      "scenes": 10,
+      "samples": 404,
+      "fused_objects": 17011,
+      "association_rate": 0.9858129248031071,
+      "matched": 18275,
+      "annotations": 18538,
+      "pos_err_median_m": 0.004203547651627895,
+      "pos_err_p90_m": 0.6151845251629018,
+      "vel_err_median_mps": 0.011349316936014712,
+      "vel_err_p90_mps": 0.23911180366198734,
+      "cov_trace_median": 0.09526425237301604,
+      "residual_median_m": 0.005105424386787457,
+      "residual_p90_m": 0.6159123314238719,
+      "ingest_ms_mean": 263.6616371284149,
+      "ingest_ms_p95": 1105.0471999886197,
+      "spread_ms_median": 66.78140163421631,
+      "spread_ms_max": 82.78608322143555
+    }
+  }
+}

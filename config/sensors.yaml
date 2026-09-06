@@ -15,6 +15,11 @@ perception:
     init_velocity_std_mps: 3.0
     min_speed_for_heading_mps: 0.5     # below this, heading comes from LiDAR extent / last value
     class_confidence_floor: 0.35       # below this the type is reported as UNKNOWN
+    temporal_fusion: false             # Phase 4: predict each measurement to its own timestamp
+    update_order: precision            # precision (LiDAR, radar, camera) or time (ascending)
+    max_out_of_order_s: 0.2            # a measurement this far behind the state is dropped
+    max_measurement_age_s: 0.5         # a measurement staler than this is dropped outright
+    future_tolerance_s: 0.01           # a measurement stamped after now by more than this is dropped
 
 sensors:
   camera:
