@@ -15,9 +15,11 @@ dependencies = [
 [project.optional-dependencies]
 viz = ["matplotlib>=3.8"]
 test = ["pytest>=8.0"]
+perception = ["torch>=2.0", "torchvision>=0.15", "scipy>=1.11", "pillow>=10.0", "requests>=2.31"]
 
 [tool.setuptools.packages.find]
-include = ["autonomy*", "simulation*", "visualization*"]
+include = ["autonomy*", "simulation*", "visualization*",
+           "road_perception*", "perception_detector*", "dataset_adapters*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

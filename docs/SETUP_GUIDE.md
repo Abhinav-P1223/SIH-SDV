@@ -32,25 +32,24 @@ source .venv/bin/activate
 
 ## 3. Install
 
-`requirements.txt` covers the simulator only. The perception packages need four more, so install
-both lines:
+One command:
 
 ```bash
 pip install -r requirements.txt
-pip install torch torchvision scipy pillow requests
 ```
 
-CPU-only wheels are the default on Windows and macOS. On Linux, force CPU wheels to avoid a
-multi-gigabyte CUDA download:
+That covers everything: the simulator, the tests and the perception packages. It pulls PyTorch, so
+expect a few hundred megabytes and a few minutes.
+
+**Linux users, do this first.** The default index serves CUDA builds of PyTorch, which are several
+gigabytes and useless here because the project is CPU-only:
 
 ```bash
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
-pip install scipy pillow requests
+pip install -r requirements.txt
 ```
 
-**Do not run `pip install -e .`.** The packaging config only exposes `autonomy`, `simulation` and
-`visualization`; it omits `road_perception`, `perception_detector` and `dataset_adapters`. Run from
-the repository root instead, which is what every documented command does.
+Run commands from the repository root. `pip install -e .` also works now, but it is not needed.
 
 ## 4. Verify
 

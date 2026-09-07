@@ -58,11 +58,20 @@ cd SIH-SDV
 python -m venv .venv && .venv\Scripts\activate     # Linux/macOS: source .venv/bin/activate
 
 pip install -r requirements.txt
-pip install torch torchvision scipy pillow requests   # see the note below
 ```
 
-`requirements.txt` currently covers the simulator only; the perception packages need the second
-line. Run every command from the repository root rather than `pip install -e .`.
+That one command installs everything: numpy, PyYAML, matplotlib, pytest, torch, torchvision, scipy,
+pillow and requests. It pulls PyTorch, so expect a few hundred megabytes.
+
+**On Linux**, install CPU-only PyTorch first so pip does not fetch multi-gigabyte CUDA wheels you
+will never use:
+
+```bash
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+pip install -r requirements.txt
+```
+
+Run commands from the repository root.
 
 **Run a scenario** (about 20 seconds):
 

@@ -1,4 +1,25 @@
+# Everything needed to run the simulator, the full test suite and the perception work.
+# Install with:   pip install -r requirements.txt
+#
+# LINUX USERS: the default index serves CUDA builds of torch (multi-GB). This project is
+# CPU-only, so install the CPU wheels first, then this file:
+#     pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+#     pip install -r requirements.txt
+
+# --- core simulator: world, sensors, planner, control, config -------------------------------- #
 numpy>=1.26
 PyYAML>=6.0
+
+# --- plotting, telemetry views and figure generation ----------------------------------------- #
 matplotlib>=3.8
+
+# --- tests ------------------------------------------------------------------------------------ #
 pytest>=8.0
+
+# --- perception: segmentation (road_perception) and camera detection (perception_detector) ---- #
+# The full test suite imports these, so they are not optional if you run `pytest tests/`.
+torch>=2.0
+torchvision>=0.15
+scipy>=1.11            # connected components and distance transforms in road_perception
+pillow>=10.0           # image loading throughout the perception packages
+requests>=2.31         # dataset subset download in scripts/select_uvh26_subset.py

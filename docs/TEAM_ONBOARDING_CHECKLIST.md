@@ -15,14 +15,15 @@ worked. Full detail in [TEAM_HANDOFF.md](TEAM_HANDOFF.md), quick version in
 
 - [ ] **Python verified** — `python -V` prints 3.11 or newer
 - [ ] **Virtual environment active** — the prompt shows `.venv`
-- [ ] **Dependencies installed** — both lines, because `requirements.txt` alone is not enough:
+- [ ] **Dependencies installed** — one command installs everything:
   ```
   pip install -r requirements.txt
-  pip install torch torchvision scipy pillow requests
   ```
+  On Linux run `pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu`
+  first, so pip does not fetch CUDA wheels this CPU-only project never uses.
 - [ ] **Imports work** —
   `python -c "import numpy, yaml, matplotlib, torch, torchvision, scipy, PIL, requests; print('ok')"`
-- [ ] **You did NOT run `pip install -e .`** — it omits three packages. Run from the repository root
+- [ ] **You run commands from the repository root** — that is what every documented command assumes
 
 ## Local artifacts
 

@@ -83,29 +83,36 @@ Configuration comes from `config/autonomy.yaml`, `config/vehicle.yaml`, `config/
 | External tools | None. MATLAB export files are generated but were never run in MATLAB |
 | CI | **None.** There is no `.github/workflows` |
 
-### Dependencies, and a gap you must know about
+### Dependencies
 
-`requirements.txt` declares only `numpy>=1.26`, `PyYAML>=6.0`, `matplotlib>=3.8`, `pytest>=8.0`.
+`pip install -r requirements.txt` installs everything. The full list, with what each is for:
 
-**That is not enough.** A repository-wide import scan shows five more third-party packages in
-active use that no manifest declares:
-
-| Package | Used by | Declared? |
+| Package | Floor | Used for |
 |---|---|---|
-| `torch` | `perception_detector`, `road_perception`, scripts, tests | **no** |
-| `torchvision` | `perception_detector`, scripts | **no** |
-| `scipy` | `road_perception` | **no** |
-| `pillow` (`PIL`) | `perception_detector`, `road_perception`, scripts, tests | **no** |
-| `requests` | scripts | **no** |
+| `numpy` | 1.26 | Everything. All geometry, filtering and metrics |
+| `PyYAML` | 6.0 | Config and scenario loading |
+| `matplotlib` | 3.8 | Figures, the debug viewer |
+| `pytest` | 8.0 | The test suite |
+| `torch` | 2.0 | Both learned models. **The full test suite imports it**, so it is not optional |
+| `torchvision` | 0.15 | The detector architecture and its COCO weights |
+| `scipy` | 1.11 | Connected components and distance transforms in `road_perception` |
+| `pillow` | 10.0 | Image loading across the perception packages |
+| `requests` | 2.31 | Dataset subset download in `scripts/select_uvh26_subset.py` |
 
 Versions verified on the development machine: numpy 2.4.2, PyYAML 6.0.3, matplotlib 3.10.8,
-pytest 9.0.2, torch 2.11.0, torchvision 0.26.0, scipy 1.17.1, pillow 12.1.0, requests 2.32.5.
-None are pinned.
+pytest 9.0.2, torch 2.11.0, torchvision 0.26.0, scipy 1.17.1, pillow 12.1.0, requests 2.32.5. Only
+floors are declared, not exact pins.
 
-**Second gap:** `pyproject.toml`'s `packages.find.include` lists only `autonomy*`, `simulation*` and
-`visualization*`. It omits `road_perception`, `perception_detector` and `dataset_adapters`, so
-`pip install -e .` would not expose them. **Run from the repository root instead**, which is what
-every documented command does. Both gaps are recorded in section 14 as genuinely outstanding.
+**Linux:** install CPU-only PyTorch first, or pip will pull multi-gigabyte CUDA wheels that this
+CPU-only project never uses:
+
+```bash
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+pip install -r requirements.txt
+```
+
+`pip install -e .` now exposes all six packages, but it is not required; every documented command
+runs from the repository root.
 
 ---
 
@@ -120,10 +127,9 @@ python -m venv .venv
 .venv\Scripts\activate            # Windows
 source .venv/bin/activate         # Linux / macOS
 
-pip install -r requirements.txt
-pip install torch torchvision scipy pillow requests
-# Linux, to avoid a CUDA download you do not need:
+# Linux only, first, to avoid a CUDA download you do not need:
 #   pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+pip install -r requirements.txt
 
 python -c "import numpy, yaml, matplotlib, torch, torchvision, scipy, PIL, requests; print('ok')"
 
@@ -186,7 +192,7 @@ Run every command from the repository root.
 
 | Command | Does | Runtime | Needs local data |
 |---|---|---|---|
-| `pip install -r requirements.txt` then `pip install torch torchvision scipy pillow requests` | Install | 2 to 10 min | no |
+| `pip install -r requirements.txt` | Install everything | 2 to 10 min | no |
 | `python -m pytest tests/ -q` | Full suite, expect 348 passed | 15 to 25 min | datasets for 0 skips |
 | `python -m pytest tests/unit -q -m "not slow"` | 292 unit tests | about 3 min | no |
 | `python scripts/run_scenario.py <NAME> --quiet` | One scenario, writes `logs/` | about 20 s | no |
@@ -338,8 +344,7 @@ passed or how many skipped and why.
 | Symptom | Cause | Fix |
 |---|---|---|
 | `ModuleNotFoundError: autonomy` | Wrong working directory | Run from the repository root |
-| `ModuleNotFoundError: torch` / `scipy` / `PIL` | `requirements.txt` does not declare them | `pip install torch torchvision scipy pillow requests` |
-| `pip install -e .` then imports fail | Packaging omits three packages | Do not install as a package; run from the root |
+| `ModuleNotFoundError: torch` / `scipy` / `PIL` | Install skipped or partial | `pip install -r requirements.txt` |
 | Tests skip instead of passing | Datasets or checkpoints absent | Expected. See section 6 |
 | pip downloads gigabytes on Linux | Default index serves CUDA wheels | Use `--index-url https://download.pytorch.org/whl/cpu` |
 | First detector run stalls | torchvision is downloading COCO weights, 88 MB | Wait once; it caches |
@@ -352,13 +357,11 @@ passed or how many skipped and why.
 
 ## 15. Genuinely outstanding before a clean teammate can work
 
-1. **`requirements.txt` is incomplete.** Five packages in active use are undeclared. Until it is
-   fixed, follow the two-line install in section 5. Fixing it is a safe, non-autonomy change.
-2. **`pyproject.toml` omits three packages** from `packages.find.include`, so `pip install -e .` is
-   misleading. Also safe to fix.
-3. **No CI.** Nothing runs the tests automatically on push.
-4. **No dependency pinning.** Only floors are declared, so a future release could break the build.
-5. **The README was written at Stage 1** and said the project contains no machine learning, which
-   stopped being true at Phase 3B. Updated as part of this handoff.
-6. **UNVERIFIED:** the dashboard, the real-time pacing flag and the MATLAB export were not exercised
+1. **No CI.** Nothing runs the tests automatically on push.
+2. **No dependency pinning.** Only floors are declared, so a future release could break the build.
+3. **UNVERIFIED:** the dashboard, the real-time pacing flag and the MATLAB export were not exercised
    during this audit.
+
+Two gaps this audit found have since been **fixed**: `requirements.txt` now declares all nine
+packages, and `pyproject.toml` now includes all six source packages. A clean
+`pip install -r requirements.txt` is all a teammate needs.
