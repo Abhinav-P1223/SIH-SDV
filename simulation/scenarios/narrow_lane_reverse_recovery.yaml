@@ -1,0 +1,73 @@
+# NARROW_LANE_REVERSE_RECOVERY
+# Phase 5. A sibling of NARROW_LANE_BOXED_IN built for one purpose: to make the reversing recovery
+# necessary in BOTH perception modes, not only in ground truth.
+#
+# WHY THE EXISTING SCENARIO WAS NOT ENOUGH
+#   Measured on NARROW_LANE_BOXED_IN, the ego's first sustained standstill is:
+#     ground truth : 6.54 m short of the cart, at d = +0.07, with 1 feasible forward candidate
+#     sensors      : 7.60 m short of the cart, at d = -0.49, with 15 feasible forward candidates
+#   Under simulated sensors the ego slows earlier, which delays the cart's distance trigger and lets
+#   the ego drift right BEFORE it stops. It arrives already lined up with the gap, so it never needs
+#   to reverse. The reverse path was therefore only ever exercised in ground-truth mode.
+#
+# WHAT THIS SCENARIO ADDS
+#   A car parked hard against the right kerb at x = 18, which is the gate. Until the ego is past it
+#   the ego CANNOT drift right, so it arrives at the cart still keeping left. The cart then finishes
+#   its crossing 18 m further on, leaving a gap only on the right.
+#
+#   The arithmetic is the scenario. Shifting from d = +1.75 to about d = -1.5 is a 3.25 m lateral
+#   move, and the quintic's peak curvature bound (5.77 * shift / S^2 <= 0.8 * kappa_max, with
+#   kappa_max = 0.269 /m) needs roughly 9.4 m of forward travel to make it. The ego comes to rest
+#   about 6 m short of the cart. Every forward candidate that clears the cart is therefore generated
+#   too sharp and rejected, in both perception modes.
+#
+#   The way out is to back up, buy the run-up, and then take the gap. Nothing here is scripted: the
+#   reversing has to emerge from the planner reporting no feasible forward candidate and the
+#   behaviour layer reacting to the standstill. Removing the reverse candidates makes the manoeuvre
+#   fail, which `test_reverse_recovery.py` asserts directly rather than assuming.
+name: NARROW_LANE_REVERSE_RECOVERY
+description: A parked car blocks the right, then a pushcart blocks the left; only reversing lines up the gap.
+seed: 11
+
+road:
+  lane_markings: NONE
+  reference:      [[-20.0, 0.0], [120.0, 0.0]]
+  left_boundary:  [[-20.0, 3.5], [120.0, 3.5]]
+  right_boundary: [[-20.0, -3.5], [120.0, -3.5]]
+
+ego:
+  x: 0.0
+  y: 1.75                     # keep-left on an unmarked road
+  yaw_deg: 0.0
+  speed_mps: 4.0
+  desired_speed_mps: 4.0
+  desired_lateral_offset_m: 1.75
+
+goal:
+  s_m: 100.0
+
+agents:
+  # The gate. Parked hard against the right kerb, so it occupies y in [-3.5, -1.7] and the ego cannot
+  # pre-emptively drift right before reaching the cart. This is what makes the sensors-mode run need
+  # the reverse that it previously avoided.
+  - id: parked_1
+    type: CAR
+    x: 18.0
+    y: -2.6
+    heading_deg: 0.0
+    speed_mps: 0.0
+    behavior: STATIC
+
+  - id: cart_1
+    type: PUSHCART
+    x: 36.0
+    y: 3.2
+    heading_deg: -90.0        # wheeled out toward -y, across the ego's half
+    speed_mps: 0.0
+    behavior: CROSSING
+    params:
+      trigger_distance_m: 12.0
+      crossing_speed_mps: 1.2
+      acceleration_mps2: 1.8
+      crossing_distance_m: 1.4
+      stop_after: true

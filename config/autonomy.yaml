@@ -75,6 +75,8 @@ planning:
   crossing_lateral_speed_mps: 0.3 # objects moving across the corridor faster than this count as crossing
   reverse_speed_mps: 1.5          # boxed-in recovery: reverse straight back at most this fast ...
   reverse_distances_m: [3.0, 6.0]        # ... by one of these leg lengths (longest clear one), then re-plan forward
+  reverse_lateral_offsets_m: [0.0, -1.0, 1.0]   # curved reverse: end offsets relative to the current one,
+                                                # clamped into the corridor; 0.0 keeps the straight leg
   reverse_acceleration_mps2: 1.0
   exposure_sigma_cap_m: 1.5       # beyond-horizon (blocked / standoff) checks inflate objects by their measured
                                   # position std-dev (capped): a poorly localised far object slows us down instead of
@@ -149,6 +151,8 @@ control:
     lookahead_time_s: 0.4         # heading / curvature taken this far ahead along the path
     min_lookahead_m: 1.5
     max_lateral_acceleration_mps2: 4.0   # steering command capped so v^2 * kappa stays below this
+    reverse_k_gain: 0.5                  # cross-track gain while reversing (non-minimum-phase: kept small)
+    reverse_crosstrack_limit_rad: 0.15   # hard clamp on the reverse cross-track contribution
   pid:
     kp: 1.5
     ki: 0.15

@@ -54,8 +54,14 @@ class Planner:
 
     @staticmethod
     def _leg_distance(c: CandidateTrajectory) -> float:
-        """Requested length of a reversing leg (encoded in the id: reverse_<D>m)."""
-        return float(c.id[len("reverse_"):-1])
+        """Requested length of a reversing leg, encoded in the id.
+
+        The id is `reverse_<D>m` for a straight leg and `reverse_<D>m_d<offset>` for a curved one, so
+        the distance is the field between the first and second underscore. Slicing to the last
+        character worked only while every reverse id ended in the `m`, which stopped being true when
+        Phase 5 added the lateral end offset.
+        """
+        return float(c.id.split("_")[1].rstrip("m"))
 
     def _boxed_in(self, progressing: list[CandidateTrajectory], predictions: list[ObjectPrediction],
                   check, s0: float) -> bool:

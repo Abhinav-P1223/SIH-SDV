@@ -154,12 +154,32 @@ class CandidateGenerator:
         return CandidateTrajectory(id=label, label=label, trajectory=traj,
                                    lateral_offset_end=d_end, target_speed=v_end)
 
-    def build_reverse(self, ego: VehicleState, fr: FrameOrigin, distance: float, now: float) -> CandidateTrajectory:
-        """Straight reversing recovery along the corridor at the current offset. Speed magnitude follows a
-        trapezoid that starts at the current reverse speed |v0|, accelerates to reverse_speed_mps, holds and
-        decelerates to rest after `distance` metres. A leg longer than the horizon can cover simply holds
-        reverse speed to the end of the horizon (the planner commits to the leg and re-plans the remaining
-        distance every cycle). Velocity is negative; the body keeps facing forward."""
+    def build_reverse(self, ego: VehicleState, fr: FrameOrigin, distance: float, now: float,
+                      d_end: float | None = None) -> CandidateTrajectory:
+        """Reversing recovery along the corridor, optionally curving to a different lateral offset.
+
+        Speed magnitude follows a trapezoid that starts at the current reverse speed |v0|, accelerates to
+        reverse_speed_mps, holds and decelerates to rest after `distance` metres. A leg longer than the
+        horizon can cover simply holds reverse speed to the end of the horizon (the planner commits to the
+        leg and re-plans the remaining distance every cycle). Velocity is negative; the body keeps facing
+        forward.
+
+        THE LATERAL PROFILE, AND WHY THE SIGNS DIFFER FROM `build`
+            Let u = |s_rel| be the distance TRAVELLED backwards, so the station is s0 - u while u grows.
+            The lateral offset follows the same quintic used forwards, evaluated against u.
+
+            The body does not turn around to reverse, so its yaw is the travel heading plus pi:
+                yaw = h_ref - arctan(d'(u))
+            which reduces to the old constant `h_ref` when d' is zero, so a straight reverse is unchanged.
+
+            Differentiating that against time with du/dt = -v gives yaw_rate = v * d''/(1 + d'^2), and the
+            bicycle model gives yaw_rate = v * tan(delta) / L. The v cancels: tan(delta) = L * d''/(1+d'^2),
+            exactly as forwards. So the curvature stored here means the same thing as a forward candidate's,
+            the same steering limit bounds it, and the existing transition-length rule that keeps peak
+            curvature under `max_curvature` carries over untouched.
+
+            Only the initial lateral slope flips: d'(0) = -tan(heading_rel), from the yaw relation above.
+        """
         t = self.rel_times
         a = self.cfg.reverse_acceleration_mps2
         v_max = self.cfg.reverse_speed_mps
@@ -191,20 +211,77 @@ class CandidateGenerator:
         v = -mag
         s_rel = np.concatenate([[0.0], np.cumsum(0.5 * (v[1:] + v[:-1]) * np.diff(t))])
         acc = np.concatenate([np.diff(v) / np.diff(t), [0.0]])
-        x, y, h_ref = self.road.to_cartesian(fr.s0 + s_rel, np.full_like(t, fr.d0))
-        yaw = np.full_like(t, fr.h_ref)
-        traj = Trajectory(t=now + t, x=x, y=y, yaw=yaw, velocity=v, curvature=np.zeros_like(t),
-                          acceleration=acc, id=f"reverse_{requested:.1f}m",
-                          s=fr.s0 + s_rel, d=np.full_like(t, fr.d0), heading_rel=np.zeros_like(t))
-        return CandidateTrajectory(id=traj.id, label=traj.id, trajectory=traj,
-                                   lateral_offset_end=fr.d0, target_speed=0.0)
 
-    def lateral_offsets(self, fr: FrameOrigin, desired_offset: float) -> list[float]:
-        """End offsets desired + k*step for every k whose footprint fits inside the corridor at s0."""
+        target = fr.d0 if d_end is None else float(d_end)
+        shift = abs(target - fr.d0)
+        if shift <= 1e-6:
+            d = np.full_like(t, fr.d0)
+            dd = ddd = np.zeros_like(t)
+            label = f"reverse_{requested:.1f}m"
+        else:
+            u = np.abs(s_rel)                                   # distance travelled backwards
+            # Same transition-length rule as forwards: long enough that the quintic's peak curvature
+            # (5.77 * shift / S^2) stays inside the steering limit, and inside the lateral-acceleration
+            # comfort limit at the reversing speed. At <= 1.5 m/s the second term is negligible, but it
+            # is kept so the two builders cannot drift apart.
+            s_kappa = math.sqrt(5.77 * shift / (0.8 * self.params.max_curvature))
+            s_alat = abs(v_max) * math.sqrt(5.77 * shift / (0.9 * self.cfg.max_lateral_acceleration_mps2))
+            S = max(abs(v_max) * self.cfg.lateral_transition_time_s,
+                    self.cfg.min_lateral_transition_length_m, s_kappa, s_alat)
+            kappa0 = math.tan(ego.steering_angle) / self.params.wheelbase
+            c = quintic_coefficients(fr.d0, -math.tan(fr.heading_rel), kappa0, target, 0.0, 0.0, S)
+            sigma = np.minimum(u, S)
+            d, dd, ddd = eval_quintic(c, sigma)
+            held = u > S
+            d[held], dd[held], ddd[held] = target, 0.0, 0.0
+            label = f"reverse_{requested:.1f}m_d{target:+.2f}"
+
+        x, y, h_ref = self.road.to_cartesian(fr.s0 + s_rel, d)
+        # the body keeps facing forward while travelling backwards, hence the minus
+        yaw = wrap_angle(h_ref - np.arctan(dd))
+        kappa = ddd / np.power(1.0 + dd ** 2, 1.5)
+        traj = Trajectory(t=now + t, x=x, y=y, yaw=np.asarray(yaw), velocity=v, curvature=kappa,
+                          acceleration=acc, id=label,
+                          s=fr.s0 + s_rel, d=d, heading_rel=-np.arctan(dd))
+        return CandidateTrajectory(id=traj.id, label=traj.id, trajectory=traj,
+                                   lateral_offset_end=target, target_speed=0.0)
+
+    def corridor_offset_bounds(self, fr: FrameOrigin) -> tuple[float, float]:
+        """Lowest and highest lateral offset whose footprint still fits the corridor at s0.
+
+        Extracted verbatim from `lateral_offsets` so the reverse candidates are bounded by exactly the
+        same corridor rule as the forward ones rather than by a second, drifting copy of it.
+        """
         d_right, d_left = self.road.lateral_bounds_at(fr.s0) if hasattr(self.road, "lateral_bounds_at") \
             else (-math.inf, math.inf)
         half = 0.5 * self.params.width + self.cfg.boundary_margin_m
-        lo, hi = d_right + half, d_left - half
+        return d_right + half, d_left - half
+
+    def reverse_offsets(self, fr: FrameOrigin) -> list[float]:
+        """A SMALL bounded set of reverse end offsets: the current one plus the configured sidesteps.
+
+        Deliberately not `lateral_offsets`, which returns the whole quantised grid across the corridor.
+        Reversing is a recovery manoeuvre at 1.5 m/s, and a wide fan of backwards candidates would cost
+        collision-checking time to explore places the vehicle has no reason to reverse into. Each offset
+        is clamped into the corridor, so an offset that does not fit simply collapses onto the edge and is
+        de-duplicated away.
+        """
+        lo, hi = self.corridor_offset_bounds(fr)
+        out: list[float] = []
+        for rel in self.cfg.reverse_lateral_offsets_m:
+            o = fr.d0 + rel
+            if math.isfinite(lo) and math.isfinite(hi):
+                if lo > hi:                      # corridor narrower than the vehicle: nothing fits
+                    o = fr.d0
+                else:
+                    o = min(max(o, lo), hi)
+            if all(abs(o - e) > 1e-3 for e in out):
+                out.append(o)
+        return out or [fr.d0]
+
+    def lateral_offsets(self, fr: FrameOrigin, desired_offset: float) -> list[float]:
+        """End offsets desired + k*step for every k whose footprint fits inside the corridor at s0."""
+        lo, hi = self.corridor_offset_bounds(fr)
         step = self.cfg.lateral_step_m
         if step <= 0 or not (math.isfinite(lo) and math.isfinite(hi)):
             offs = [desired_offset + o for o in self.cfg.lateral_offsets_m]
@@ -235,8 +312,10 @@ class CandidateGenerator:
             return cands, fr
         rolling_back = v0 < -0.3
         if policy.allow_reverse and v0 <= 0.3:
+            offs = self.reverse_offsets(fr)
             for D in (reverse_distances if reverse_distances is not None else self.cfg.reverse_distances_m):
-                cands.append(self.build_reverse(ego, fr, D, now))
+                for d_end in offs:
+                    cands.append(self.build_reverse(ego, fr, D, now, d_end))
         if rolling_back:
             # no forward candidates while rolling backwards: finish (or stop) the manoeuvre first
             cands.append(self.build(ego, fr, fr.d0, 0.0, hard, now, f"stop_hard_d{fr.d0:+.2f}"))

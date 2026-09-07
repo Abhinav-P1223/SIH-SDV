@@ -142,6 +142,10 @@ class PlanningConfig:
     crossing_lateral_speed_mps: float = 0.3   # an object moving across the corridor faster than this is 'crossing'
     reverse_speed_mps: float = 1.5            # reversing recovery manoeuvre speed
     reverse_distances_m: list[float] = field(default_factory=lambda: [3.0, 6.0])
+    # Lateral end offsets for reverse candidates, RELATIVE to the current offset, clamped into the
+    # corridor. Deliberately a small fixed set: reversing is a 1.5 m/s recovery, and a wide fan of
+    # backwards candidates would spend collision-checking time on places there is no reason to go.
+    reverse_lateral_offsets_m: list[float] = field(default_factory=lambda: [0.0, -1.0, 1.0])
     reverse_acceleration_mps2: float = 1.0
     exposure_sigma_cap_m: float = 1.5         # beyond-horizon checks inflate objects by min(meas sigma, cap)
     speed_fractions: list[float] = field(default_factory=lambda: [1.0, 0.8, 0.6, 0.4, 0.2, 0.0])
@@ -200,6 +204,11 @@ class StanleyConfig:
     lookahead_time_s: float = 0.4
     min_lookahead_m: float = 1.5
     max_lateral_acceleration_mps2: float = 4.0   # |delta| <= atan(L * a_max / v^2): the tracker cannot exceed comfort
+    # Reversing is non-minimum-phase: steering moves the REAR toward the path but swings the nose the
+    # other way, so a cross-track gain that is fine forwards will fishtail backwards. The reverse gain
+    # is separate and small, and its contribution is clamped outright by the limit below.
+    reverse_k_gain: float = 0.5
+    reverse_crosstrack_limit_rad: float = 0.15
 
 
 @dataclass

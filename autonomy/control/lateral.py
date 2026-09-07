@@ -62,11 +62,31 @@ class StanleyController(LateralController):
         e = -math.sin(ego.yaw) * dx + math.cos(ego.yaw) * dy        # +ve: path is to the left
         v = abs(ego.longitudinal_velocity)
         if ego.longitudinal_velocity < -0.05 or float(traj.velocity[min(1, len(traj) - 1)]) < -1e-6:
-            # reversing: hold the path heading; steering acts with inverted sign on the travel direction
+            # Reversing. The heading term is unchanged from before: hold the path heading, with the sign
+            # inverted because steering acts on the travel direction, which is backwards.
             theta_e = float(wrap_angle(float(traj.yaw[i]) - ego.yaw))
             delta = -self.cfg.heading_gain * theta_e
+
+            # Cross-track, added so a CURVED reverse path can actually be followed. Without it the wheel
+            # only ever nulls heading error, which on a straight reverse path is already zero, so the
+            # vehicle reverses in a straight line no matter what the planner asked for.
+            #
+            # Two things differ from the forward term. The error is measured at the REAR axle, because
+            # that is the end that leads while reversing and the front axle's offset has the wrong sign
+            # for it. And the whole contribution is clamped: reversing is non-minimum-phase, so an
+            # unbounded cross-track command that is correct instantaneously will still fishtail.
+            lr = self.params.cg_to_rear_axle
+            rx, ry = ego.x - lr * math.cos(ego.yaw), ego.y - lr * math.sin(ego.yaw)
+            d2r = (traj.x - rx) ** 2 + (traj.y - ry) ** 2
+            ir = int(np.argmin(d2r))
+            e_rear = (-math.sin(ego.yaw) * (float(traj.x[ir]) - rx)
+                      + math.cos(ego.yaw) * (float(traj.y[ir]) - ry))
+            lim = self.cfg.reverse_crosstrack_limit_rad
+            delta_ct = math.atan2(self.cfg.reverse_k_gain * e_rear, self.cfg.k_soft + v)
+            delta -= max(-lim, min(lim, delta_ct))
+
             delta = max(-self.params.max_steering_angle, min(self.params.max_steering_angle, delta))
-            return delta, LateralDebug(i, px, py, e, theta_e, delta)
+            return delta, LateralDebug(i, px, py, e_rear, theta_e, delta)
 
         # look-ahead point for heading and curvature
         la = max(self.cfg.lookahead_time_s * v, self.cfg.min_lookahead_m)

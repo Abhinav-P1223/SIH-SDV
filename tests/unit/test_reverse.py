@@ -48,14 +48,21 @@ def test_reverse_candidates_only_when_allowed_and_stationary(cfg, params):
     ego = VehicleState(0.0, 40.0, 1.75, 0.0, 0.0)
     cands, _ = gen.generate(ego, SpeedPolicy(4.0, True, False, allow_reverse=True), 1.75, 0.0)
     rev = [c for c in cands if c.id.startswith("reverse_")]
-    assert len(rev) == len(cfg.planning.reverse_distances_m)
+    # Phase 5: one candidate per (leg length, lateral end offset). Before Phase 5 reverse was
+    # straight-only, so this was one per leg length; the offsets are what curved reverse adds.
+    offs = gen.reverse_offsets(gen.frame(ego))
+    assert len(rev) == len(cfg.planning.reverse_distances_m) * len(offs)
+    straight = [c for c in rev if abs(c.lateral_offset_end - 1.75) < 1e-6]
+    assert straight, "the straight-back leg must still be offered"
     for c in rev:
         tr = c.trajectory
         assert tr.velocity.min() < 0 and tr.velocity[0] == 0.0
         # a short leg comes to rest inside the horizon; a long leg holds reverse speed to the end (planner re-plans)
         assert tr.velocity[-1] == 0.0 or abs(tr.velocity[-1]) == pytest.approx(cfg.planning.reverse_speed_mps)
-        assert tr.x[-1] < tr.x[0] and abs(tr.y[-1] - 1.75) < 1e-6      # straight back along the corridor
+        assert tr.x[-1] < tr.x[0]                                      # travels backwards along the corridor
         assert abs(tr.velocity.min()) <= cfg.planning.reverse_speed_mps + 1e-9
+    for c in straight:
+        assert abs(c.trajectory.y[-1] - 1.75) < 1e-6                   # straight back along the corridor
     # not allowed by policy -> none; allowed but moving -> none
     assert not [c for c in gen.generate(ego, SpeedPolicy(4.0, True, False), 1.75, 0.0)[0] if c.id.startswith("reverse_")]
     moving = VehicleState(0.0, 40.0, 1.75, 0.0, 3.0)
