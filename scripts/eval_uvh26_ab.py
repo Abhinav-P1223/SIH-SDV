@@ -112,6 +112,10 @@ def main() -> int:
     ap.add_argument("--iou", type=float, default=0.5)
     ap.add_argument("--score", type=float, default=0.35)
     ap.add_argument("--checkpoint", type=Path, default=CKPT)
+    ap.add_argument("--checkpoint-c", type=Path,
+                    default=ROOT / "perception_detector" / "checkpoints"
+                            / "fasterrcnn_uvh26_oversampled.pt",
+                    help="Phase 7E class-aware run; skipped if absent")
     a = ap.parse_args()
 
     test = UVH26Subset("test", load_manifest(), augment=False)
@@ -132,10 +136,44 @@ def main() -> int:
     rb = evaluate(pb, test, CLASS_NAMES, a.iou, a.score)
     show("B  UVH-26 fine-tuned", rb)
 
+    rc = None
+    if a.checkpoint_c.exists():
+        pc, _, state_c = finetuned_predictor(a.checkpoint_c)
+        print(f"\nevaluating C: UVH-26 class-aware oversampling "
+              f"(epoch {state_c.get('epoch')}) ...", flush=True)
+        rc = evaluate(pc, test, CLASS_NAMES, a.iou, a.score)
+        show("C  UVH-26 fine-tuned, class-aware oversampling", rc)
+
     print("\n" + "=" * 78)
     print("STEP 8 comparison")
     print("=" * 78)
     print(format_table("COCO", ra, "UVH-26 FT", rb, CLASSES))
+
+    if rc is not None:
+        print("\n" + "-" * 63)
+        print("three-way: COCO / uniform sampling / class-aware oversampling")
+        print("-" * 63)
+        hdr = f"{'':<26}{'COCO':>10}{'FT-Uniform':>13}{'FT-Oversamp':>14}"
+        print(hdr)
+        print("-" * len(hdr))
+
+        def tri(label, key, cls=None, decimals=3):
+            def get(r):
+                if cls is None:
+                    return r[key]
+                v = r["per_class"].get(cls)
+                x = v[key] if v else float("nan")
+                return 0.0 if x != x else x
+            f = f"{{:>{{w}}.{decimals}f}}"
+            print(f"{label:<26}"
+                  + f.format(get(ra), w=10) + f.format(get(rb), w=13) + f.format(get(rc), w=14))
+
+        tri("precision", "precision")
+        tri("recall", "recall")
+        tri("mAP", "mAP")
+        for c in CLASSES:
+            tri(f"{c.lower()} recall", "recall", c)
+        tri("latency ms", "latency_ms_mean", None, 1)
 
     print("\nimprovements / regressions / unchanged (recall, threshold 0.01):")
     for c in CLASSES:
@@ -152,6 +190,7 @@ def main() -> int:
         "test_images": len(test), "iou": a.iou, "score_threshold": a.score,
         "checkpoint_epoch": state.get("epoch"), "git_commit": state.get("git_commit"),
         "A_coco_baseline": ra, "B_uvh26_finetuned": rb,
+        "C_uvh26_oversampled": rc,
         "caveats": [
             "UVH-26 is elevated fixed-camera CCTV imagery, not vehicle-mounted dashcam imagery.",
             "The held-out test split is also CCTV, so CCTV-to-dashcam transfer is unvalidated.",

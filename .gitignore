@@ -16,3 +16,7 @@ logs/*
 # Datasets live inside the repo folder but must never enter git (nuScenes mini alone is 5.1 GB)
 Datasets/
 step3prompt
+
+# Detector checkpoints are large binaries. The Phase 7C one is already tracked and stays;
+# every later checkpoint stays local and ships via a GitHub Release instead of git history.
+perception_detector/checkpoints/*.pt

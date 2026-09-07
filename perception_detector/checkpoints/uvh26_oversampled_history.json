@@ -1,0 +1,108 @@
+{
+  "config": {
+    "epochs": 3,
+    "batch_size": 4,
+    "lr": 0.002,
+    "momentum": 0.9,
+    "weight_decay": 0.0005,
+    "trainable_backbone_layers": 0,
+    "seed": 20260907,
+    "score_threshold": 0.35,
+    "iou_threshold": 0.5,
+    "augment_hflip": true,
+    "model_name": "fasterrcnn_mobilenet_v3_large_320_fpn",
+    "sampler": "class_aware",
+    "weight_cap": 16.0,
+    "run_name": "uvh26_oversampled"
+  },
+  "git_commit": "7b2fffc5e0415976e027ff62e1d571ce9f113ef1",
+  "class_names": [
+    "__background__",
+    "MOTORCYCLE",
+    "AUTO_RICKSHAW",
+    "CAR",
+    "BUS",
+    "TRUCK",
+    "BICYCLE"
+  ],
+  "history": [
+    {
+      "epoch": 1,
+      "train_loss": 1.0579821586608886,
+      "train_seconds": 424.9474872999708,
+      "val_mAP": 0.18660393233157116,
+      "val_precision": 0.6719817767653758,
+      "val_recall": 0.272140221402214,
+      "val_per_class_recall": {
+        "MOTORCYCLE": 0.2809917355371901,
+        "AUTO_RICKSHAW": 0.16363636363636364,
+        "CAR": 0.4580152671755725,
+        "BUS": 0.09090909090909091,
+        "TRUCK": 0.07526881720430108,
+        "BICYCLE": 0.0
+      }
+    },
+    {
+      "epoch": 2,
+      "train_loss": 0.8728653545379639,
+      "train_seconds": 394.2386812000186,
+      "val_mAP": 0.2672707006733312,
+      "val_precision": 0.6147260273972602,
+      "val_recall": 0.3311808118081181,
+      "val_per_class_recall": {
+        "MOTORCYCLE": 0.32231404958677684,
+        "AUTO_RICKSHAW": 0.26666666666666666,
+        "CAR": 0.4541984732824427,
+        "BUS": 0.23636363636363636,
+        "TRUCK": 0.2903225806451613,
+        "BICYCLE": 0.0
+      }
+    },
+    {
+      "epoch": 3,
+      "train_loss": 0.8322915945053101,
+      "train_seconds": 480.31634319998557,
+      "val_mAP": 0.25728580012385766,
+      "val_precision": 0.6408450704225352,
+      "val_recall": 0.33579335793357934,
+      "val_per_class_recall": {
+        "MOTORCYCLE": 0.3140495867768595,
+        "AUTO_RICKSHAW": 0.2606060606060606,
+        "CAR": 0.46564885496183206,
+        "BUS": 0.21818181818181817,
+        "TRUCK": 0.34408602150537637,
+        "BICYCLE": 0.12
+      }
+    }
+  ],
+  "sampling": {
+    "class_weight": {
+      "MOTORCYCLE": 1.0,
+      "TRUCK": 4.7524557956777995,
+      "CAR": 2.213174748398902,
+      "BICYCLE": 16.0,
+      "BUS": 9.793522267206479,
+      "AUTO_RICKSHAW": 2.72103487064117
+    },
+    "expected_boxes_per_epoch": {
+      "MOTORCYCLE": 2485.747920857198,
+      "TRUCK": 470.6259195993693,
+      "CAR": 1117.2444206374353,
+      "BICYCLE": 207.00735654326735,
+      "BUS": 308.8897130651818,
+      "AUTO_RICKSHAW": 991.7598775772884
+    },
+    "uniform_boxes_per_epoch": {
+      "MOTORCYCLE": 2419,
+      "TRUCK": 509,
+      "CAR": 1093,
+      "BICYCLE": 106,
+      "BUS": 247,
+      "AUTO_RICKSHAW": 889
+    },
+    "bicycle_image_share": 0.39448571718622527
+  },
+  "total_minutes": 22.996025636667035,
+  "selected_epoch": 3,
+  "selection_rule": "max bicycle recall among epochs within 0.02 mAP of best"
+}

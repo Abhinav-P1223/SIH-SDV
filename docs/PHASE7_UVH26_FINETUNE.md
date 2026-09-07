@@ -130,3 +130,128 @@ when it stopped.
 
 **Latency is unchanged and still far outside the planning budget**, at 250 ms against a 100 ms
 planning period. Fine-tuning changed what the detector sees, not how fast it sees it.
+
+
+---
+
+# Phase 7D/7E — diagnosing the regression, and testing class-aware oversampling
+
+## 9. Why bicycle, bus and truck got worse (7D)
+
+**Bicycle was never absent, it was never confident.** The uniform model emits 73 bicycle boxes
+above 0.01, but its **maximum bicycle score across the whole test set is 0.181** against a 0.35
+cut. Every other class reaches 0.90 or more: car 0.997, motorcycle 0.990, bus 0.982,
+auto-rickshaw 0.943, truck 0.902. Lowering the threshold to 0.10 still only reaches 0.12 recall on
+validation, so it is genuinely under-learned rather than merely mis-calibrated.
+
+**Where the missed objects went**, for the uniform model:
+
+| | Missed | Largest cause | Confused with |
+|---|---|---|---|
+| Bicycle | 32 | overlaps something else 41% | motorcycle, all 9 wrong-class cases |
+| Bus | 49 | wrong class 39% | car 8, auto-rickshaw 7, truck 4 |
+| Truck | 120 | low confidence 30% | auto-rickshaw 14, car 10 |
+
+Missed objects are overwhelmingly **large** (bicycle 19 of 32, bus 39 of 49, truck 99 of 120), so
+this is not a small-object failure.
+
+**This is not catastrophic forgetting**, and the evidence is specific. The backbone was frozen, so
+the shared representation could not drift, and the box predictor was replaced with a randomly
+initialised seven-class head, so there was nothing in it to forget. The mechanism is under-training
+of rare classes in a fresh head under a 23-to-1 imbalance.
+
+## 10. The oversampling experiment (7E)
+
+One change from Phase 7C: a deterministic weighted image sampler. Same 750 images, same splits,
+same manifest, same architecture, same frozen backbone, same optimiser, learning rate, epochs,
+augmentation and seed.
+
+**Formula.** Class weight is inverse box frequency normalised to the most common class, capped.
+An image takes the **maximum** weight over the classes it contains, because the rare class is what
+makes the image worth drawing. The sampling unit is the image, never the box.
+
+**The cap exposed a ceiling that bounds the whole experiment.** Measured before training:
+
+| Cap | Bicycle box exposure | Bicycle-image share of an epoch |
+|---|---|---|
+| 8 | 1.33x | 26.9% |
+| **16 (used)** | **1.95x** | **39.4%** |
+| 25 (uncapped) | 2.38x | 48.2% |
+
+**Even uncapped, bicycle boxes only become 2.4x more frequent.** The 101 bicycle images hold 106
+bicycles between them, about one each, alongside crowds of motorcycles. Image-level oversampling
+can raise how often a bicycle is seen but cannot change what arrives with it. That is a property of
+the data, not of the sampler.
+
+Realised exposure at cap 16: motorcycle 1.03x, car 1.02x, auto-rickshaw 1.12x, bus 1.25x,
+bicycle 1.95x, and truck **0.92x**, which dips because bicycle and bus frames crowd it out.
+
+### Checkpoint selection was changed, and it mattered
+
+Ranking epochs on mAP alone selected epoch 2, where **bicycle validation recall is still exactly
+0.000**. That optimises the metric this phase cares least about. The rule is now: keep every epoch
+within 0.02 mAP of the best, then take the highest bicycle recall, breaking ties on mAP. It selects
+epoch 3, trading 0.010 mAP for bicycle recall 0.000 to 0.120. Both arms are epoch 3, so the
+comparison below differs only in the sampler.
+
+| Epoch | mAP | Bicycle val recall | |
+|---|---|---|---|
+| 1 | 0.187 | 0.000 | |
+| 2 | 0.267 | 0.000 | best mAP |
+| 3 | 0.257 | **0.120** | **selected** |
+
+## 11. Three-way result on the locked 150-image test set
+
+| | COCO | FT-Uniform | FT-Oversampled |
+|---|---|---|---|
+| Precision | 0.536 | 0.621 | **0.630** |
+| Recall | 0.226 | **0.379** | 0.371 |
+| mAP | 0.238 | **0.325** | 0.282 |
+| Motorcycle recall | 0.151 | **0.379** | 0.359 |
+| Auto-rickshaw recall | 0.000 | **0.347** | 0.320 |
+| Car recall | 0.480 | **0.523** | 0.498 |
+| Bus recall | **0.447** | 0.355 | 0.368 |
+| Truck recall | **0.305** | 0.205 | 0.291 |
+| Bicycle recall | **0.094** | 0.000 | 0.062 |
+| Latency | 255 ms | 287 ms | 270 ms |
+
+True positives, which is what the small classes actually turn on:
+
+| Class | GT | COCO TP | Uniform TP | Oversampled TP |
+|---|---|---|---|---|
+| Motorcycle | 754 | 114 | 286 | 271 |
+| Auto-rickshaw | 222 | 0 | 77 | 71 |
+| Car | 325 | 156 | 170 | 162 |
+| Truck | 151 | 46 | 31 | **44** |
+| Bus | 76 | 34 | 27 | 28 |
+| Bicycle | 32 | 3 | 0 | **2** |
+
+## 12. What the evidence actually supports
+
+**Strong evidence.** Motorcycle and auto-rickshaw gains over COCO are real and large, on 754 and
+222 ground-truth boxes. Both survive oversampling with a small cost.
+
+**Directional evidence.** Truck genuinely recovers under oversampling, 31 to 44 true positives on
+151 boxes, back to roughly the COCO level. That is the clearest win of this experiment.
+
+**Inconclusive.** Bicycle moves from 0 to 2 true positives out of 32. Two detections cannot support
+a claim either way, and the oversampled model is **still below the COCO baseline's 3**. Bus moves
+27 to 28 on 76 boxes, which is noise.
+
+**The honest verdict: oversampling did not solve bicycle.** It recovered truck, improved precision
+slightly, and cost 0.043 mAP along with small amounts of motorcycle, auto-rickshaw and car. The
+ceiling analysis explains why: 106 training boxes cannot be repaired by drawing the same 101 images
+more often.
+
+## 13. Recommendation
+
+**Keep the Phase 7C uniform-sampling model as the deliverable.** It has the better mAP (0.325
+against 0.282) and the better motorcycle and auto-rickshaw recall, which are the classes this
+project actually needs.
+
+Prefer the oversampled model only if truck recall matters more than mAP, where it is clearly
+better, 0.291 against 0.205.
+
+**Bicycle is data-limited, not method-limited.** No sampling scheme fixes 106 boxes. Fixing it
+needs more bicycle images, which means more data, which is outside this phase's scope and was
+explicitly ruled out.

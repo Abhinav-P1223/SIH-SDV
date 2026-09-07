@@ -74,8 +74,8 @@
         "ap": 0.033003300330033
       }
     },
-    "latency_ms_mean": 238.25881200066456,
-    "latency_ms_p95": 264.5107200049097,
+    "latency_ms_mean": 255.40008800065456,
+    "latency_ms_p95": 288.1016099912813,
     "iou_threshold": 0.5,
     "score_threshold": 0.35
   },
@@ -149,8 +149,83 @@
         "ap": NaN
       }
     },
-    "latency_ms_mean": 250.41381266744187,
-    "latency_ms_p95": 299.3676099955335,
+    "latency_ms_mean": 286.6808506671805,
+    "latency_ms_p95": 384.6076899906615,
+    "iou_threshold": 0.5,
+    "score_threshold": 0.35
+  },
+  "C_uvh26_oversampled": {
+    "images": 150,
+    "tp": 578,
+    "fp": 340,
+    "fn": 982,
+    "precision": 0.6296296296296297,
+    "recall": 0.37051282051282053,
+    "mAP": 0.2819486494645239,
+    "per_class": {
+      "MOTORCYCLE": {
+        "gt": 754,
+        "predictions": 401,
+        "tp": 271,
+        "fp": 130,
+        "fn": 483,
+        "precision": 0.6758104738154613,
+        "recall": 0.3594164456233422,
+        "ap": 0.3215918203483359
+      },
+      "AUTO_RICKSHAW": {
+        "gt": 222,
+        "predictions": 135,
+        "tp": 71,
+        "fp": 64,
+        "fn": 151,
+        "precision": 0.5259259259259259,
+        "recall": 0.31981981981981983,
+        "ap": 0.27121254681272494
+      },
+      "CAR": {
+        "gt": 325,
+        "predictions": 234,
+        "tp": 162,
+        "fp": 72,
+        "fn": 163,
+        "precision": 0.6923076923076923,
+        "recall": 0.49846153846153846,
+        "ap": 0.46856637037901444
+      },
+      "BUS": {
+        "gt": 76,
+        "predictions": 50,
+        "tp": 28,
+        "fp": 22,
+        "fn": 48,
+        "precision": 0.56,
+        "recall": 0.3684210526315789,
+        "ap": 0.3389552613703744
+      },
+      "TRUCK": {
+        "gt": 151,
+        "predictions": 91,
+        "tp": 44,
+        "fp": 47,
+        "fn": 107,
+        "precision": 0.4835164835164835,
+        "recall": 0.2913907284768212,
+        "ap": 0.2220589671836247
+      },
+      "BICYCLE": {
+        "gt": 32,
+        "predictions": 7,
+        "tp": 2,
+        "fp": 5,
+        "fn": 30,
+        "precision": 0.2857142857142857,
+        "recall": 0.0625,
+        "ap": 0.06930693069306931
+      }
+    },
+    "latency_ms_mean": 269.69734933421324,
+    "latency_ms_p95": 331.0531650291522,
     "iou_threshold": 0.5,
     "score_threshold": 0.35
   },

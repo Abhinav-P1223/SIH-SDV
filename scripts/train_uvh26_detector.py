@@ -22,7 +22,9 @@ from __future__ import annotations
 import argparse
 import json
 import random
+import shutil
 import subprocess
+from collections import Counter
 import sys
 import time
 from dataclasses import asdict, dataclass
@@ -58,6 +60,85 @@ class TrainConfig:
     iou_threshold: float = 0.5
     augment_hflip: bool = True
     model_name: str = "fasterrcnn_mobilenet_v3_large_320_fpn"
+    sampler: str = "uniform"        # "uniform" reproduces Phase 7C exactly; "class_aware" is 7E
+    weight_cap: float = 16.0        # see class_weights() for why, and for its ceiling
+    run_name: str = "uvh26"
+
+
+def class_weights(train, cap: float) -> tuple[dict, dict]:
+    """Inverse box frequency per class, capped, then one weight per IMAGE.
+
+    THE SAMPLING UNIT IS THE IMAGE, not the box. Oversampling boxes independently is impossible
+    here anyway (a box cannot be drawn without its image) and would be wrong in principle: drawing
+    an image drags all of its other objects along, so the honest unit is the image.
+
+    An image takes the MAXIMUM weight over the classes it contains, so a frame holding both a
+    bicycle and six motorcycles is drawn for the bicycle. That is the intent: the rare class is
+    what makes the image valuable.
+
+    THE CAP, AND THE CEILING IT REVEALS. Raw inverse frequency gives bicycle 22.8x motorcycle.
+    Measured before training, the resulting box-level exposure is far smaller than that ratio
+    suggests:
+
+        cap      bicycle exposure     bicycle-image share of an epoch
+          8              1.33x                    26.9%
+         16              1.95x                    39.4%
+         25 (uncapped)   2.38x                    48.2%
+
+    Even UNCAPPED, bicycle boxes only become 2.4x more frequent. The reason is structural: the 101
+    bicycle images hold 106 bicycles between them, about one each, alongside many motorcycles. So
+    image-level oversampling can raise how often a bicycle is SEEN but cannot change the fact that
+    each sighting brings a crowd of common classes with it. That is a property of the data, not of
+    the sampler, and it bounds what this experiment can achieve.
+
+    16 is the operating point: bicycle exposure nearly doubles and bicycle frames become 39% of an
+    epoch, without letting 101 images become half of it. The cost is that truck exposure dips
+    slightly (0.92x) because bicycle and bus frames crowd it out.
+    """
+    boxes = Counter()
+    for _, labels in train.boxes.values():
+        for i in labels:
+            boxes[CLASS_NAMES[i]] += 1
+    most = max(boxes.values())
+    cw = {c: min(most / n, cap) for c, n in boxes.items()}
+    iw = []
+    for e in train.entries:
+        present = train.boxes[e["image_id"]][1]
+        names = {CLASS_NAMES[i] for i in present}
+        iw.append(max(cw[n] for n in names) if names else 1.0)
+    return cw, {"boxes": dict(boxes), "image_weights": iw}
+
+
+def report_sampling(train, cw: dict, info: dict) -> dict:
+    """What the sampler will ACTUALLY do, printed before a single step is taken."""
+    w = np.asarray(info["image_weights"], dtype=float)
+    p = w / w.sum()
+    n = len(train)
+    exp_boxes = Counter()
+    for k, e in enumerate(train.entries):
+        for i in train.boxes[e["image_id"]][1]:
+            exp_boxes[CLASS_NAMES[i]] += p[k] * n
+    out = {"class_weight": cw, "expected_boxes_per_epoch": dict(exp_boxes),
+           "uniform_boxes_per_epoch": info["boxes"]}
+    print()
+    print(f"{'class':<16}{'boxes':>8}{'weight':>9}{'imgs w/ cls':>13}"
+          f"{'uniform/ep':>12}{'sampled/ep':>12}{'ratio':>8}")
+    for c in ["MOTORCYCLE", "AUTO_RICKSHAW", "CAR", "BUS", "TRUCK", "BICYCLE"]:
+        nb = info["boxes"].get(c, 0)
+        imgs = sum(1 for e in train.entries
+                   if c in {CLASS_NAMES[i] for i in train.boxes[e["image_id"]][1]})
+        ex = exp_boxes.get(c, 0.0)
+        print(f"{c:<16}{nb:>8}{cw.get(c,0):>9.2f}{imgs:>13}{nb:>12}{ex:>12.0f}"
+              f"{ex/max(nb,1):>8.2f}x")
+    share = sum(p[k] for k, e in enumerate(train.entries)
+                if "BICYCLE" in {CLASS_NAMES[i] for i in train.boxes[e["image_id"]][1]})
+    uni = 100 * sum(1 for e in train.entries
+                    if 6 in train.boxes[e["image_id"]][1]) / len(train)
+    print()
+    print(f"bicycle-containing images are {100*share:.1f}% of each sampled epoch "
+          f"(uniform would be {uni:.1f}%)")
+    out["bicycle_image_share"] = float(share)
+    return out
 
 
 def set_seed(s: int) -> None:
@@ -101,8 +182,14 @@ def main() -> int:
     ap.add_argument("--epochs", type=int, default=3)
     ap.add_argument("--batch-size", type=int, default=4)
     ap.add_argument("--lr", type=float, default=0.002)
+    ap.add_argument("--sampler", choices=["uniform", "class_aware"], default="uniform")
+    ap.add_argument("--weight-cap", type=float, default=16.0)
+    ap.add_argument("--run-name", default=None)
     a = ap.parse_args()
-    cfg = TrainConfig(epochs=a.epochs, batch_size=a.batch_size, lr=a.lr)
+    cfg = TrainConfig(epochs=a.epochs, batch_size=a.batch_size, lr=a.lr, sampler=a.sampler,
+                      weight_cap=a.weight_cap,
+                      run_name=a.run_name or ("uvh26_oversampled" if a.sampler == "class_aware"
+                                              else "uvh26"))
     set_seed(cfg.seed)
     CKPT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -122,11 +209,25 @@ def main() -> int:
 
     opt = torch.optim.SGD(trainable, lr=cfg.lr, momentum=cfg.momentum,
                           weight_decay=cfg.weight_decay)
-    loader = DataLoader(train, batch_size=cfg.batch_size, shuffle=True, collate_fn=collate,
-                        generator=torch.Generator().manual_seed(cfg.seed))
+
+    sampling = None
+    gen = torch.Generator().manual_seed(cfg.seed)
+    if cfg.sampler == "class_aware":
+        cw, info = class_weights(train, cfg.weight_cap)
+        sampling = report_sampling(train, cw, info)
+        sampler = torch.utils.data.WeightedRandomSampler(
+            torch.as_tensor(info["image_weights"], dtype=torch.double),
+            num_samples=len(train), replacement=True, generator=gen)
+        loader = DataLoader(train, batch_size=cfg.batch_size, sampler=sampler,
+                            collate_fn=collate)
+    else:
+        loader = DataLoader(train, batch_size=cfg.batch_size, shuffle=True, collate_fn=collate,
+                            generator=gen)
+    print()
+    print(f"sampler: {cfg.sampler}", flush=True)
 
     history, best = [], -1.0
-    ckpt_path = CKPT_DIR / "fasterrcnn_uvh26.pt"
+    ckpt_path = CKPT_DIR / f"fasterrcnn_{cfg.run_name}.pt"
     t_start = time.perf_counter()
     for epoch in range(1, cfg.epochs + 1):
         model.train()
@@ -148,24 +249,53 @@ def main() -> int:
                         "val_mAP": v["mAP"], "val_precision": v["precision"],
                         "val_recall": v["recall"],
                         "val_per_class_recall": {k: x["recall"] for k, x in v["per_class"].items()}})
+        # EVERY epoch is kept. Selecting on mAP alone chose an epoch where bicycle recall was
+        # still exactly zero, which is the wrong answer for a phase whose whole purpose is
+        # rare-class recovery, and the losing epoch's weights had already been discarded.
+        torch.save({"model": model.state_dict(), "config": asdict(cfg),
+                    "class_names": CLASS_NAMES, "epoch": epoch, "val": v,
+                    "manifest": str(ROOT / "docs" / "uvh26_manifest.json"),
+                    "sampling": sampling, "git_commit": git_hash()},
+                   CKPT_DIR / f"fasterrcnn_{cfg.run_name}_ep{epoch}.pt")
         flag = ""
         if v["mAP"] == v["mAP"] and v["mAP"] > best:
             best = v["mAP"]
-            torch.save({"model": model.state_dict(), "config": asdict(cfg),
-                        "class_names": CLASS_NAMES, "epoch": epoch, "val": v,
-                        "manifest": str(ROOT / "docs" / "uvh26_manifest.json"),
-                        "git_commit": git_hash()}, ckpt_path)
-            flag = "  <- best, saved"
+            flag = "  <- best mAP"
         print(f"epoch {epoch}/{cfg.epochs}  train loss {train_loss:.4f}  "
               f"val mAP {v['mAP']:.4f}  P {v['precision']:.3f}  R {v['recall']:.3f}  "
               f"[{train_s:.0f}s train]{flag}", flush=True)
 
     mins = (time.perf_counter() - t_start) / 60.0
-    print(f"\ntrained in {mins:.1f} min; best validation mAP {best:.4f}")
-    (CKPT_DIR / "uvh26_history.json").write_text(
+
+    # ---- checkpoint selection: VALIDATION ONLY, rule fixed before the test split is touched --- #
+    #   1. keep every epoch whose mAP is within MAP_SLACK of the best     (overall performance)
+    #   2. among those, take the highest bicycle recall                   (rare-class recovery)
+    #   3. break ties on mAP
+    # Ranking on mAP alone is what selected an epoch with zero bicycle recall, which optimises the
+    # metric this phase is least interested in.
+    MAP_SLACK = 0.02
+    best_map = max(h["val_mAP"] for h in history)
+    eligible = [h for h in history if h["val_mAP"] >= best_map - MAP_SLACK]
+    chosen = max(eligible, key=lambda h: ((h["val_per_class_recall"].get("BICYCLE") or 0.0),
+                                          h["val_mAP"]))
+    print()
+    print(f"selection: best mAP {best_map:.4f}; within {MAP_SLACK} of it: "
+          f"{[h['epoch'] for h in eligible]}")
+    for h in history:
+        b = h["val_per_class_recall"].get("BICYCLE") or 0.0
+        mark = "  <- SELECTED" if h["epoch"] == chosen["epoch"] else ""
+        print(f"   epoch {h['epoch']}  mAP {h['val_mAP']:.4f}  bicycle recall {b:.3f}{mark}")
+    shutil.copyfile(CKPT_DIR / f"fasterrcnn_{cfg.run_name}_ep{chosen['epoch']}.pt", ckpt_path)
+    print()
+    print(f"trained in {mins:.1f} min; selected epoch {chosen['epoch']}, "
+          f"val mAP {chosen['val_mAP']:.4f}")
+    (CKPT_DIR / f"{cfg.run_name}_history.json").write_text(
         json.dumps({"config": asdict(cfg), "git_commit": git_hash(),
                     "class_names": CLASS_NAMES, "history": history,
-                    "total_minutes": mins}, indent=2), encoding="utf-8")
+                    "sampling": sampling, "total_minutes": mins,
+                    "selected_epoch": chosen["epoch"],
+                    "selection_rule": "max bicycle recall among epochs within 0.02 mAP of best"},
+                   indent=2), encoding="utf-8")
     print(f"checkpoint: {ckpt_path}")
     return 0
 
