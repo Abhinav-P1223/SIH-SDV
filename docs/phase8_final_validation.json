@@ -1,0 +1,1659 @@
+{
+  "scenarios": [
+    {
+      "scenario": "UNMARKED_VILLAGE_ROAD",
+      "mode": "ground_truth",
+      "completed": true,
+      "termination": "GOAL_REACHED",
+      "collisions": 0,
+      "min_clearance_m": 1.05,
+      "min_ttc_route_s": 1.8,
+      "min_ttc_physical_s": null,
+      "emergency_brakes": 0,
+      "replans": 351,
+      "plan_changes": 41,
+      "replan_latency_ms": {
+        "mean": 17.76,
+        "p50": 17.0,
+        "p95": 26.3,
+        "max": 50.63
+      },
+      "path_length_m": 143.17,
+      "path_smoothness": 0.0,
+      "mean_abs_curvature": 0.00438,
+      "max_curvature": 0.0988,
+      "max_steering_rad": 0.2538,
+      "max_steering_rate_rad_s": 0.7854,
+      "observed_steering_rate_max": 0.7854,
+      "speed_mps": {
+        "mean": 4.09,
+        "max": 7.0,
+        "min": 3.31
+      },
+      "max_acceleration": 1.57,
+      "max_deceleration": 2.51,
+      "max_cross_track_m": 0.07,
+      "reverse_manoeuvres": 0,
+      "reverse_distance_m": 0.0,
+      "behavior_transitions": 6,
+      "behavior_states": {
+        "FOLLOW": 29.42,
+        "CRUISE": 4.4,
+        "AVOID": 0.4,
+        "CAUTION": 0.8
+      },
+      "duration_s": 35.02,
+      "wall_seconds": 10.5,
+      "realtime_factor": 3.34,
+      "perception": {
+        "recall": null,
+        "precision": null,
+        "missed_objects": 0,
+        "false_tracks": 0,
+        "track_position_error_m": null,
+        "track_velocity_error_mps": null,
+        "track_count_mean": null,
+        "prediction_error_m": 0.043,
+        "detections_total": 0,
+        "fusion_latency_ms": null
+      },
+      "wiring": {
+        "mode": "ground_truth",
+        "object_provider_is_world_truth": true,
+        "planner_road_is_scenario_road": true
+      }
+    },
+    {
+      "scenario": "UNSIGNALIZED_INTERSECTION",
+      "mode": "ground_truth",
+      "completed": true,
+      "termination": "GOAL_REACHED",
+      "collisions": 0,
+      "min_clearance_m": 1.6,
+      "min_ttc_route_s": 0.9,
+      "min_ttc_physical_s": 2.3,
+      "emergency_brakes": 0,
+      "replans": 180,
+      "plan_changes": 58,
+      "replan_latency_ms": {
+        "mean": 28.87,
+        "p50": 28.11,
+        "p95": 35.33,
+        "max": 44.45
+      },
+      "path_length_m": 128.09,
+      "path_smoothness": 1e-05,
+      "mean_abs_curvature": 0.00802,
+      "max_curvature": 0.0785,
+      "max_steering_rad": 0.2026,
+      "max_steering_rate_rad_s": 0.7854,
+      "observed_steering_rate_max": 0.7854,
+      "speed_mps": {
+        "mean": 7.14,
+        "max": 8.0,
+        "min": 2.38
+      },
+      "max_acceleration": 3.0,
+      "max_deceleration": 3.02,
+      "max_cross_track_m": 0.055,
+      "reverse_manoeuvres": 0,
+      "reverse_distance_m": 0.0,
+      "behavior_transitions": 3,
+      "behavior_states": {
+        "CRUISE": 14.86,
+        "AVOID": 2.7,
+        "CAUTION": 0.4
+      },
+      "duration_s": 17.96,
+      "wall_seconds": 7.4,
+      "realtime_factor": 2.42,
+      "perception": {
+        "recall": null,
+        "precision": null,
+        "missed_objects": 0,
+        "false_tracks": 0,
+        "track_position_error_m": null,
+        "track_velocity_error_mps": null,
+        "track_count_mean": null,
+        "prediction_error_m": 0.102,
+        "detections_total": 0,
+        "fusion_latency_ms": null
+      },
+      "wiring": {
+        "mode": "ground_truth",
+        "object_provider_is_world_truth": true,
+        "planner_road_is_scenario_road": true
+      }
+    },
+    {
+      "scenario": "HIGHWAY_MERGE_SLOW_VEHICLES",
+      "mode": "ground_truth",
+      "completed": true,
+      "termination": "GOAL_REACHED",
+      "collisions": 0,
+      "min_clearance_m": 1.747,
+      "min_ttc_route_s": 3.3,
+      "min_ttc_physical_s": null,
+      "emergency_brakes": 0,
+      "replans": 268,
+      "plan_changes": 43,
+      "replan_latency_ms": {
+        "mean": 40.7,
+        "p50": 39.87,
+        "p95": 54.0,
+        "max": 90.89
+      },
+      "path_length_m": 327.82,
+      "path_smoothness": 0.0,
+      "mean_abs_curvature": 0.00101,
+      "max_curvature": 0.0232,
+      "max_steering_rad": 0.0604,
+      "max_steering_rate_rad_s": 0.7854,
+      "observed_steering_rate_max": 0.7854,
+      "speed_mps": {
+        "mean": 12.26,
+        "max": 20.0,
+        "min": 8.0
+      },
+      "max_acceleration": 3.0,
+      "max_deceleration": 3.02,
+      "max_cross_track_m": 0.028,
+      "reverse_manoeuvres": 0,
+      "reverse_distance_m": 0.0,
+      "behavior_transitions": 0,
+      "behavior_states": {
+        "CRUISE": 26.76
+      },
+      "duration_s": 26.76,
+      "wall_seconds": 14.8,
+      "realtime_factor": 1.8,
+      "perception": {
+        "recall": null,
+        "precision": null,
+        "missed_objects": 0,
+        "false_tracks": 0,
+        "track_position_error_m": null,
+        "track_velocity_error_mps": null,
+        "track_count_mean": null,
+        "prediction_error_m": 1.811,
+        "detections_total": 0,
+        "fusion_latency_ms": null
+      },
+      "wiring": {
+        "mode": "ground_truth",
+        "object_provider_is_world_truth": true,
+        "planner_road_is_scenario_road": true
+      }
+    },
+    {
+      "scenario": "DENSE_MARKET_MIXED_TRAFFIC",
+      "mode": "ground_truth",
+      "completed": true,
+      "termination": "GOAL_REACHED",
+      "collisions": 0,
+      "min_clearance_m": 0.886,
+      "min_ttc_route_s": 0.5,
+      "min_ttc_physical_s": 2.6,
+      "emergency_brakes": 0,
+      "replans": 338,
+      "plan_changes": 77,
+      "replan_latency_ms": {
+        "mean": 36.45,
+        "p50": 35.41,
+        "p95": 48.39,
+        "max": 79.72
+      },
+      "path_length_m": 118.35,
+      "path_smoothness": 1e-05,
+      "mean_abs_curvature": 0.01527,
+      "max_curvature": 0.1104,
+      "max_steering_rad": 0.2828,
+      "max_steering_rate_rad_s": 0.7854,
+      "observed_steering_rate_max": 0.7854,
+      "speed_mps": {
+        "mean": 3.51,
+        "max": 5.0,
+        "min": 1.12
+      },
+      "max_acceleration": 3.0,
+      "max_deceleration": 3.02,
+      "max_cross_track_m": 0.087,
+      "reverse_manoeuvres": 0,
+      "reverse_distance_m": 0.0,
+      "behavior_transitions": 14,
+      "behavior_states": {
+        "FOLLOW": 13.0,
+        "CAUTION": 4.0,
+        "AVOID": 12.46,
+        "CRUISE": 4.3
+      },
+      "duration_s": 33.76,
+      "wall_seconds": 20.0,
+      "realtime_factor": 1.69,
+      "perception": {
+        "recall": null,
+        "precision": null,
+        "missed_objects": 0,
+        "false_tracks": 0,
+        "track_position_error_m": null,
+        "track_velocity_error_mps": null,
+        "track_count_mean": null,
+        "prediction_error_m": 1.262,
+        "detections_total": 0,
+        "fusion_latency_ms": null
+      },
+      "wiring": {
+        "mode": "ground_truth",
+        "object_provider_is_world_truth": true,
+        "planner_road_is_scenario_road": true
+      }
+    },
+    {
+      "scenario": "SUDDEN_CATTLE_CROSSING",
+      "mode": "ground_truth",
+      "completed": true,
+      "termination": "GOAL_REACHED",
+      "collisions": 0,
+      "min_clearance_m": 0.963,
+      "min_ttc_route_s": 0.4,
+      "min_ttc_physical_s": 2.3,
+      "emergency_brakes": 0,
+      "replans": 152,
+      "plan_changes": 27,
+      "replan_latency_ms": {
+        "mean": 24.82,
+        "p50": 24.23,
+        "p95": 30.47,
+        "max": 34.02
+      },
+      "path_length_m": 118.24,
+      "path_smoothness": 0.0,
+      "mean_abs_curvature": 0.00614,
+      "max_curvature": 0.0445,
+      "max_steering_rad": 0.1154,
+      "max_steering_rate_rad_s": 0.7854,
+      "observed_steering_rate_max": 0.7854,
+      "speed_mps": {
+        "mean": 7.83,
+        "max": 10.0,
+        "min": 1.4
+      },
+      "max_acceleration": 3.0,
+      "max_deceleration": 3.02,
+      "max_cross_track_m": 0.036,
+      "reverse_manoeuvres": 0,
+      "reverse_distance_m": 0.0,
+      "behavior_transitions": 3,
+      "behavior_states": {
+        "CRUISE": 9.62,
+        "AVOID": 5.1,
+        "CAUTION": 0.4
+      },
+      "duration_s": 15.12,
+      "wall_seconds": 4.8,
+      "realtime_factor": 3.13,
+      "perception": {
+        "recall": null,
+        "precision": null,
+        "missed_objects": 0,
+        "false_tracks": 0,
+        "track_position_error_m": null,
+        "track_velocity_error_mps": null,
+        "track_count_mean": null,
+        "prediction_error_m": 0.104,
+        "detections_total": 0,
+        "fusion_latency_ms": null
+      },
+      "wiring": {
+        "mode": "ground_truth",
+        "object_provider_is_world_truth": true,
+        "planner_road_is_scenario_road": true
+      }
+    },
+    {
+      "scenario": "NARROW_LANE_REVERSE_RECOVERY",
+      "mode": "ground_truth",
+      "completed": true,
+      "termination": "GOAL_REACHED",
+      "collisions": 0,
+      "min_clearance_m": 0.514,
+      "min_ttc_route_s": 1.0,
+      "min_ttc_physical_s": 1.9,
+      "emergency_brakes": 0,
+      "replans": 340,
+      "plan_changes": 87,
+      "replan_latency_ms": {
+        "mean": 24.38,
+        "p50": 24.33,
+        "p95": 38.91,
+        "max": 50.2
+      },
+      "path_length_m": 91.55,
+      "path_smoothness": 1e-05,
+      "mean_abs_curvature": 0.0243,
+      "max_curvature": 0.1893,
+      "max_steering_rad": 0.4718,
+      "max_steering_rate_rad_s": 0.7854,
+      "observed_steering_rate_max": 0.7854,
+      "speed_mps": {
+        "mean": 2.32,
+        "max": 4.0,
+        "min": -1.5
+      },
+      "max_acceleration": 6.01,
+      "max_deceleration": 8.0,
+      "max_cross_track_m": 0.226,
+      "reverse_manoeuvres": 1,
+      "reverse_distance_m": 6.47,
+      "behavior_transitions": 13,
+      "behavior_states": {
+        "CRUISE": 20.08,
+        "CAUTION": 2.0,
+        "AVOID": 3.8,
+        "STOPPED": 2.4,
+        "REVERSING": 5.7
+      },
+      "duration_s": 33.98,
+      "wall_seconds": 11.2,
+      "realtime_factor": 3.02,
+      "perception": {
+        "recall": null,
+        "precision": null,
+        "missed_objects": 0,
+        "false_tracks": 0,
+        "track_position_error_m": null,
+        "track_velocity_error_mps": null,
+        "track_count_mean": null,
+        "prediction_error_m": 0.029,
+        "detections_total": 0,
+        "fusion_latency_ms": null
+      },
+      "wiring": {
+        "mode": "ground_truth",
+        "object_provider_is_world_truth": true,
+        "planner_road_is_scenario_road": true
+      }
+    },
+    {
+      "scenario": "NARROW_LANE_BOXED_IN",
+      "mode": "ground_truth",
+      "completed": true,
+      "termination": "GOAL_REACHED",
+      "collisions": 0,
+      "min_clearance_m": 0.798,
+      "min_ttc_route_s": 0.9,
+      "min_ttc_physical_s": 2.0,
+      "emergency_brakes": 0,
+      "replans": 318,
+      "plan_changes": 70,
+      "replan_latency_ms": {
+        "mean": 21.58,
+        "p50": 23.03,
+        "p95": 33.28,
+        "max": 49.13
+      },
+      "path_length_m": 90.7,
+      "path_smoothness": 1e-05,
+      "mean_abs_curvature": 0.02307,
+      "max_curvature": 0.2142,
+      "max_steering_rad": 0.5285,
+      "max_steering_rate_rad_s": 0.7854,
+      "observed_steering_rate_max": 0.7854,
+      "speed_mps": {
+        "mean": 2.48,
+        "max": 4.0,
+        "min": -1.5
+      },
+      "max_acceleration": 3.0,
+      "max_deceleration": 8.0,
+      "max_cross_track_m": 0.303,
+      "reverse_manoeuvres": 1,
+      "reverse_distance_m": 6.1,
+      "behavior_transitions": 9,
+      "behavior_states": {
+        "CRUISE": 20.14,
+        "AVOID": 2.8,
+        "STOPPED": 2.4,
+        "REVERSING": 5.4,
+        "CAUTION": 1.0
+      },
+      "duration_s": 31.74,
+      "wall_seconds": 9.0,
+      "realtime_factor": 3.52,
+      "perception": {
+        "recall": null,
+        "precision": null,
+        "missed_objects": 0,
+        "false_tracks": 0,
+        "track_position_error_m": null,
+        "track_velocity_error_mps": null,
+        "track_count_mean": null,
+        "prediction_error_m": 0.053,
+        "detections_total": 0,
+        "fusion_latency_ms": null
+      },
+      "wiring": {
+        "mode": "ground_truth",
+        "object_provider_is_world_truth": true,
+        "planner_road_is_scenario_road": true
+      }
+    },
+    {
+      "scenario": "UNPROTECTED_TURN",
+      "mode": "ground_truth",
+      "completed": true,
+      "termination": "GOAL_REACHED",
+      "collisions": 0,
+      "min_clearance_m": 0.57,
+      "min_ttc_route_s": 0.4,
+      "min_ttc_physical_s": 3.6,
+      "emergency_brakes": 0,
+      "replans": 258,
+      "plan_changes": 39,
+      "replan_latency_ms": {
+        "mean": 29.84,
+        "p50": 28.65,
+        "p95": 40.3,
+        "max": 55.43
+      },
+      "path_length_m": 128.56,
+      "path_smoothness": 1e-05,
+      "mean_abs_curvature": 0.01632,
+      "max_curvature": 0.2335,
+      "max_steering_rad": 0.5711,
+      "max_steering_rate_rad_s": 0.7854,
+      "observed_steering_rate_max": 0.7854,
+      "speed_mps": {
+        "mean": 4.99,
+        "max": 8.0,
+        "min": 0.0
+      },
+      "max_acceleration": 3.0,
+      "max_deceleration": 3.02,
+      "max_cross_track_m": 0.168,
+      "reverse_manoeuvres": 0,
+      "reverse_distance_m": 0.0,
+      "behavior_transitions": 8,
+      "behavior_states": {
+        "CRUISE": 12.68,
+        "CAUTION": 1.6,
+        "AVOID": 11.1,
+        "STOPPED": 0.4
+      },
+      "duration_s": 25.78,
+      "wall_seconds": 9.7,
+      "realtime_factor": 2.66,
+      "perception": {
+        "recall": null,
+        "precision": null,
+        "missed_objects": 0,
+        "false_tracks": 0,
+        "track_position_error_m": null,
+        "track_velocity_error_mps": null,
+        "track_count_mean": null,
+        "prediction_error_m": 0.097,
+        "detections_total": 0,
+        "fusion_latency_ms": null
+      },
+      "wiring": {
+        "mode": "ground_truth",
+        "object_provider_is_world_truth": true,
+        "planner_road_is_scenario_road": true
+      }
+    },
+    {
+      "scenario": "NARROW_LANE_MUTUAL_YIELD",
+      "mode": "ground_truth",
+      "completed": true,
+      "termination": "GOAL_REACHED",
+      "collisions": 0,
+      "min_clearance_m": 0.953,
+      "min_ttc_route_s": 2.9,
+      "min_ttc_physical_s": null,
+      "emergency_brakes": 0,
+      "replans": 189,
+      "plan_changes": 16,
+      "replan_latency_ms": {
+        "mean": 19.12,
+        "p50": 18.5,
+        "p95": 24.59,
+        "max": 31.53
+      },
+      "path_length_m": 87.92,
+      "path_smoothness": 0.0,
+      "mean_abs_curvature": 0.00545,
+      "max_curvature": 0.086,
+      "max_steering_rad": 0.2215,
+      "max_steering_rate_rad_s": 0.7854,
+      "observed_steering_rate_max": 0.7854,
+      "speed_mps": {
+        "mean": 4.67,
+        "max": 6.0,
+        "min": 0.21
+      },
+      "max_acceleration": 3.0,
+      "max_deceleration": 3.02,
+      "max_cross_track_m": 0.046,
+      "reverse_manoeuvres": 0,
+      "reverse_distance_m": 0.0,
+      "behavior_transitions": 4,
+      "behavior_states": {
+        "CRUISE": 17.54,
+        "CAUTION": 0.9,
+        "AVOID": 0.4
+      },
+      "duration_s": 18.84,
+      "wall_seconds": 5.1,
+      "realtime_factor": 3.7,
+      "perception": {
+        "recall": null,
+        "precision": null,
+        "missed_objects": 0,
+        "false_tracks": 0,
+        "track_position_error_m": null,
+        "track_velocity_error_mps": null,
+        "track_count_mean": null,
+        "prediction_error_m": 1.389,
+        "detections_total": 0,
+        "fusion_latency_ms": null
+      },
+      "wiring": {
+        "mode": "ground_truth",
+        "object_provider_is_world_truth": true,
+        "planner_road_is_scenario_road": true
+      }
+    },
+    {
+      "scenario": "SUDDEN_PEDESTRIAN_DART",
+      "mode": "ground_truth",
+      "completed": true,
+      "termination": "GOAL_REACHED",
+      "collisions": 0,
+      "min_clearance_m": 1.258,
+      "min_ttc_route_s": 0.3,
+      "min_ttc_physical_s": 1.4,
+      "emergency_brakes": 0,
+      "replans": 119,
+      "plan_changes": 11,
+      "replan_latency_ms": {
+        "mean": 24.88,
+        "p50": 24.48,
+        "p95": 32.68,
+        "max": 41.36
+      },
+      "path_length_m": 97.85,
+      "path_smoothness": 0.0,
+      "mean_abs_curvature": 0.0029,
+      "max_curvature": 0.0607,
+      "max_steering_rad": 0.1571,
+      "max_steering_rate_rad_s": 0.7854,
+      "observed_steering_rate_max": 0.7854,
+      "speed_mps": {
+        "mean": 8.27,
+        "max": 10.0,
+        "min": 2.54
+      },
+      "max_acceleration": 3.0,
+      "max_deceleration": 8.0,
+      "max_cross_track_m": 0.086,
+      "reverse_manoeuvres": 0,
+      "reverse_distance_m": 0.0,
+      "behavior_transitions": 4,
+      "behavior_states": {
+        "CRUISE": 8.96,
+        "CAUTION": 0.5,
+        "AVOID": 2.4
+      },
+      "duration_s": 11.86,
+      "wall_seconds": 3.8,
+      "realtime_factor": 3.16,
+      "perception": {
+        "recall": null,
+        "precision": null,
+        "missed_objects": 0,
+        "false_tracks": 0,
+        "track_position_error_m": null,
+        "track_velocity_error_mps": null,
+        "track_count_mean": null,
+        "prediction_error_m": 0.403,
+        "detections_total": 0,
+        "fusion_latency_ms": null
+      },
+      "wiring": {
+        "mode": "ground_truth",
+        "object_provider_is_world_truth": true,
+        "planner_road_is_scenario_road": true
+      }
+    },
+    {
+      "scenario": "MIXED_TRAFFIC_CURVE",
+      "mode": "ground_truth",
+      "completed": true,
+      "termination": "GOAL_REACHED",
+      "collisions": 0,
+      "min_clearance_m": 2.88,
+      "min_ttc_route_s": 1.9,
+      "min_ttc_physical_s": null,
+      "emergency_brakes": 0,
+      "replans": 267,
+      "plan_changes": 38,
+      "replan_latency_ms": {
+        "mean": 29.77,
+        "p50": 26.72,
+        "p95": 51.23,
+        "max": 62.14
+      },
+      "path_length_m": 141.52,
+      "path_smoothness": 0.0,
+      "mean_abs_curvature": 0.00534,
+      "max_curvature": 0.0411,
+      "max_steering_rad": 0.1066,
+      "max_steering_rate_rad_s": 0.7854,
+      "observed_steering_rate_max": 0.7854,
+      "speed_mps": {
+        "mean": 5.3,
+        "max": 8.0,
+        "min": 3.2
+      },
+      "max_acceleration": 3.0,
+      "max_deceleration": 3.02,
+      "max_cross_track_m": 0.039,
+      "reverse_manoeuvres": 0,
+      "reverse_distance_m": 0.0,
+      "behavior_transitions": 3,
+      "behavior_states": {
+        "CRUISE": 3.5,
+        "FOLLOW": 21.3,
+        "CAUTION": 1.9
+      },
+      "duration_s": 26.7,
+      "wall_seconds": 11.0,
+      "realtime_factor": 2.44,
+      "perception": {
+        "recall": null,
+        "precision": null,
+        "missed_objects": 0,
+        "false_tracks": 0,
+        "track_position_error_m": null,
+        "track_velocity_error_mps": null,
+        "track_count_mean": null,
+        "prediction_error_m": 0.206,
+        "detections_total": 0,
+        "fusion_latency_ms": null
+      },
+      "wiring": {
+        "mode": "ground_truth",
+        "object_provider_is_world_truth": true,
+        "planner_road_is_scenario_road": true
+      }
+    },
+    {
+      "scenario": "UNMARKED_VILLAGE_ROAD",
+      "mode": "sensors",
+      "completed": true,
+      "termination": "GOAL_REACHED",
+      "collisions": 0,
+      "min_clearance_m": 0.907,
+      "min_ttc_route_s": 1.8,
+      "min_ttc_physical_s": 1.2,
+      "emergency_brakes": 0,
+      "replans": 357,
+      "plan_changes": 94,
+      "replan_latency_ms": {
+        "mean": 20.57,
+        "p50": 20.21,
+        "p95": 28.65,
+        "max": 40.11
+      },
+      "path_length_m": 143.17,
+      "path_smoothness": 1e-05,
+      "mean_abs_curvature": 0.0102,
+      "max_curvature": 0.1139,
+      "max_steering_rad": 0.2916,
+      "max_steering_rate_rad_s": 0.7854,
+      "observed_steering_rate_max": 0.7854,
+      "speed_mps": {
+        "mean": 4.01,
+        "max": 7.0,
+        "min": 3.23
+      },
+      "max_acceleration": 2.51,
+      "max_deceleration": 3.02,
+      "max_cross_track_m": 0.101,
+      "reverse_manoeuvres": 0,
+      "reverse_distance_m": 0.0,
+      "behavior_transitions": 25,
+      "behavior_states": {
+        "CRUISE": 0.3,
+        "FOLLOW": 29.5,
+        "CAUTION": 3.6,
+        "AVOID": 2.3
+      },
+      "duration_s": 35.7,
+      "wall_seconds": 13.5,
+      "realtime_factor": 2.65,
+      "perception": {
+        "recall": 0.948,
+        "precision": 0.985,
+        "missed_objects": 73,
+        "false_tracks": 21,
+        "track_position_error_m": 0.198,
+        "track_velocity_error_mps": 0.204,
+        "track_count_mean": 3.8,
+        "prediction_error_m": 0.39,
+        "detections_total": 3884,
+        "fusion_latency_ms": 57.2
+      },
+      "wiring": {
+        "mode": "sensors",
+        "object_provider_is_fusion": true,
+        "fusion_present": true,
+        "sensors_present": true,
+        "planner_road_is_scenario_road": true
+      }
+    },
+    {
+      "scenario": "UNSIGNALIZED_INTERSECTION",
+      "mode": "sensors",
+      "completed": true,
+      "termination": "GOAL_REACHED",
+      "collisions": 0,
+      "min_clearance_m": 1.805,
+      "min_ttc_route_s": 1.1,
+      "min_ttc_physical_s": 2.6,
+      "emergency_brakes": 0,
+      "replans": 183,
+      "plan_changes": 43,
+      "replan_latency_ms": {
+        "mean": 29.7,
+        "p50": 28.79,
+        "p95": 37.7,
+        "max": 49.27
+      },
+      "path_length_m": 128.13,
+      "path_smoothness": 1e-05,
+      "mean_abs_curvature": 0.01,
+      "max_curvature": 0.0903,
+      "max_steering_rad": 0.2323,
+      "max_steering_rate_rad_s": 0.7854,
+      "observed_steering_rate_max": 0.7854,
+      "speed_mps": {
+        "mean": 7.03,
+        "max": 8.0,
+        "min": 2.55
+      },
+      "max_acceleration": 3.0,
+      "max_deceleration": 8.0,
+      "max_cross_track_m": 0.064,
+      "reverse_manoeuvres": 0,
+      "reverse_distance_m": 0.0,
+      "behavior_transitions": 5,
+      "behavior_states": {
+        "CRUISE": 15.14,
+        "CAUTION": 0.8,
+        "AVOID": 2.3
+      },
+      "duration_s": 18.24,
+      "wall_seconds": 8.5,
+      "realtime_factor": 2.14,
+      "perception": {
+        "recall": 0.955,
+        "precision": 0.964,
+        "missed_objects": 33,
+        "false_tracks": 26,
+        "track_position_error_m": 0.277,
+        "track_velocity_error_mps": 0.276,
+        "track_count_mean": 3.96,
+        "prediction_error_m": 0.398,
+        "detections_total": 1848,
+        "fusion_latency_ms": 56.1
+      },
+      "wiring": {
+        "mode": "sensors",
+        "object_provider_is_fusion": true,
+        "fusion_present": true,
+        "sensors_present": true,
+        "planner_road_is_scenario_road": true
+      }
+    },
+    {
+      "scenario": "HIGHWAY_MERGE_SLOW_VEHICLES",
+      "mode": "sensors",
+      "completed": true,
+      "termination": "GOAL_REACHED",
+      "collisions": 0,
+      "min_clearance_m": 1.401,
+      "min_ttc_route_s": 1.1,
+      "min_ttc_physical_s": 3.1,
+      "emergency_brakes": 0,
+      "replans": 366,
+      "plan_changes": 112,
+      "replan_latency_ms": {
+        "mean": 38.18,
+        "p50": 37.8,
+        "p95": 50.52,
+        "max": 57.48
+      },
+      "path_length_m": 327.85,
+      "path_smoothness": 0.0,
+      "mean_abs_curvature": 0.00233,
+      "max_curvature": 0.0444,
+      "max_steering_rad": 0.1151,
+      "max_steering_rate_rad_s": 0.7854,
+      "observed_steering_rate_max": 0.7854,
+      "speed_mps": {
+        "mean": 8.97,
+        "max": 20.0,
+        "min": 5.28
+      },
+      "max_acceleration": 3.0,
+      "max_deceleration": 8.0,
+      "max_cross_track_m": 0.034,
+      "reverse_manoeuvres": 0,
+      "reverse_distance_m": 0.0,
+      "behavior_transitions": 59,
+      "behavior_states": {
+        "CRUISE": 10.7,
+        "CAUTION": 7.8,
+        "AVOID": 18.1
+      },
+      "duration_s": 36.6,
+      "wall_seconds": 19.8,
+      "realtime_factor": 1.85,
+      "perception": {
+        "recall": 0.977,
+        "precision": 0.745,
+        "missed_objects": 19,
+        "false_tracks": 278,
+        "track_position_error_m": 0.635,
+        "track_velocity_error_mps": 0.396,
+        "track_count_mean": 2.98,
+        "prediction_error_m": 0.939,
+        "detections_total": 2826,
+        "fusion_latency_ms": 54.3
+      },
+      "wiring": {
+        "mode": "sensors",
+        "object_provider_is_fusion": true,
+        "fusion_present": true,
+        "sensors_present": true,
+        "planner_road_is_scenario_road": true
+      }
+    },
+    {
+      "scenario": "DENSE_MARKET_MIXED_TRAFFIC",
+      "mode": "sensors",
+      "completed": true,
+      "termination": "GOAL_REACHED",
+      "collisions": 0,
+      "min_clearance_m": 0.836,
+      "min_ttc_route_s": 0.3,
+      "min_ttc_physical_s": 1.1,
+      "emergency_brakes": 3,
+      "replans": 433,
+      "plan_changes": 224,
+      "replan_latency_ms": {
+        "mean": 33.92,
+        "p50": 34.38,
+        "p95": 45.63,
+        "max": 54.48
+      },
+      "path_length_m": 118.5,
+      "path_smoothness": 3e-05,
+      "mean_abs_curvature": 0.028,
+      "max_curvature": 0.1907,
+      "max_steering_rad": 0.4751,
+      "max_steering_rate_rad_s": 0.7854,
+      "observed_steering_rate_max": 0.7854,
+      "speed_mps": {
+        "mean": 2.74,
+        "max": 5.0,
+        "min": 0.0
+      },
+      "max_acceleration": 3.0,
+      "max_deceleration": 8.0,
+      "max_cross_track_m": 0.158,
+      "reverse_manoeuvres": 0,
+      "reverse_distance_m": 0.0,
+      "behavior_transitions": 67,
+      "behavior_states": {
+        "CRUISE": 12.84,
+        "FOLLOW": 4.6,
+        "CAUTION": 8.7,
+        "AVOID": 14.2,
+        "STOPPED": 1.7,
+        "EMERGENCY_BRAKE": 1.2
+      },
+      "duration_s": 43.24,
+      "wall_seconds": 31.5,
+      "realtime_factor": 1.37,
+      "perception": {
+        "recall": 0.983,
+        "precision": 0.918,
+        "missed_objects": 63,
+        "false_tracks": 330,
+        "track_position_error_m": 0.296,
+        "track_velocity_error_mps": 0.277,
+        "track_count_mean": 9.27,
+        "prediction_error_m": 0.581,
+        "detections_total": 10686,
+        "fusion_latency_ms": 53.7
+      },
+      "wiring": {
+        "mode": "sensors",
+        "object_provider_is_fusion": true,
+        "fusion_present": true,
+        "sensors_present": true,
+        "planner_road_is_scenario_road": true
+      }
+    },
+    {
+      "scenario": "SUDDEN_CATTLE_CROSSING",
+      "mode": "sensors",
+      "completed": true,
+      "termination": "GOAL_REACHED",
+      "collisions": 0,
+      "min_clearance_m": 1.288,
+      "min_ttc_route_s": 0.6,
+      "min_ttc_physical_s": 2.1,
+      "emergency_brakes": 0,
+      "replans": 155,
+      "plan_changes": 44,
+      "replan_latency_ms": {
+        "mean": 24.47,
+        "p50": 24.12,
+        "p95": 30.86,
+        "max": 35.55
+      },
+      "path_length_m": 118.13,
+      "path_smoothness": 1e-05,
+      "mean_abs_curvature": 0.01274,
+      "max_curvature": 0.0951,
+      "max_steering_rad": 0.2446,
+      "max_steering_rate_rad_s": 0.7854,
+      "observed_steering_rate_max": 0.7854,
+      "speed_mps": {
+        "mean": 7.64,
+        "max": 10.0,
+        "min": 0.8
+      },
+      "max_acceleration": 3.0,
+      "max_deceleration": 8.0,
+      "max_cross_track_m": 0.065,
+      "reverse_manoeuvres": 0,
+      "reverse_distance_m": 0.0,
+      "behavior_transitions": 6,
+      "behavior_states": {
+        "CRUISE": 9.88,
+        "CAUTION": 0.9,
+        "AVOID": 4.7
+      },
+      "duration_s": 15.48,
+      "wall_seconds": 5.0,
+      "realtime_factor": 3.08,
+      "perception": {
+        "recall": 0.994,
+        "precision": 1.0,
+        "missed_objects": 1,
+        "false_tracks": 0,
+        "track_position_error_m": 0.081,
+        "track_velocity_error_mps": 0.192,
+        "track_count_mean": 0.99,
+        "prediction_error_m": 0.349,
+        "detections_total": 483,
+        "fusion_latency_ms": 59.7
+      },
+      "wiring": {
+        "mode": "sensors",
+        "object_provider_is_fusion": true,
+        "fusion_present": true,
+        "sensors_present": true,
+        "planner_road_is_scenario_road": true
+      }
+    },
+    {
+      "scenario": "NARROW_LANE_REVERSE_RECOVERY",
+      "mode": "sensors",
+      "completed": true,
+      "termination": "GOAL_REACHED",
+      "collisions": 0,
+      "min_clearance_m": 0.66,
+      "min_ttc_route_s": 0.3,
+      "min_ttc_physical_s": 0.3,
+      "emergency_brakes": 3,
+      "replans": 334,
+      "plan_changes": 121,
+      "replan_latency_ms": {
+        "mean": 27.56,
+        "p50": 28.18,
+        "p95": 43.63,
+        "max": 64.18
+      },
+      "path_length_m": 84.87,
+      "path_smoothness": 3e-05,
+      "mean_abs_curvature": 0.03276,
+      "max_curvature": 0.233,
+      "max_steering_rad": 0.5698,
+      "max_steering_rate_rad_s": 0.7854,
+      "observed_steering_rate_max": 0.7854,
+      "speed_mps": {
+        "mean": 2.36,
+        "max": 4.0,
+        "min": -1.5
+      },
+      "max_acceleration": 3.0,
+      "max_deceleration": 8.0,
+      "max_cross_track_m": 0.299,
+      "reverse_manoeuvres": 1,
+      "reverse_distance_m": 3.09,
+      "behavior_transitions": 23,
+      "behavior_states": {
+        "CRUISE": 17.24,
+        "CAUTION": 3.5,
+        "AVOID": 5.6,
+        "STOPPED": 3.1,
+        "REVERSING": 3.4,
+        "EMERGENCY_BRAKE": 0.5
+      },
+      "duration_s": 33.34,
+      "wall_seconds": 13.2,
+      "realtime_factor": 2.53,
+      "perception": {
+        "recall": 0.997,
+        "precision": 1.0,
+        "missed_objects": 2,
+        "false_tracks": 0,
+        "track_position_error_m": 0.07,
+        "track_velocity_error_mps": 0.158,
+        "track_count_mean": 1.99,
+        "prediction_error_m": 0.288,
+        "detections_total": 1425,
+        "fusion_latency_ms": 61.1
+      },
+      "wiring": {
+        "mode": "sensors",
+        "object_provider_is_fusion": true,
+        "fusion_present": true,
+        "sensors_present": true,
+        "planner_road_is_scenario_road": true
+      }
+    },
+    {
+      "scenario": "NARROW_LANE_BOXED_IN",
+      "mode": "sensors",
+      "completed": true,
+      "termination": "GOAL_REACHED",
+      "collisions": 0,
+      "min_clearance_m": 0.69,
+      "min_ttc_route_s": 0.0,
+      "min_ttc_physical_s": 1.6,
+      "emergency_brakes": 0,
+      "replans": 245,
+      "plan_changes": 64,
+      "replan_latency_ms": {
+        "mean": 31.05,
+        "p50": 27.24,
+        "p95": 54.97,
+        "max": 189.16
+      },
+      "path_length_m": 78.69,
+      "path_smoothness": 7e-05,
+      "mean_abs_curvature": 0.02512,
+      "max_curvature": 0.2486,
+      "max_steering_rad": 0.6109,
+      "max_steering_rate_rad_s": 0.7854,
+      "observed_steering_rate_max": 0.7854,
+      "speed_mps": {
+        "mean": 3.22,
+        "max": 4.0,
+        "min": 0.0
+      },
+      "max_acceleration": 3.0,
+      "max_deceleration": 8.0,
+      "max_cross_track_m": 0.176,
+      "reverse_manoeuvres": 0,
+      "reverse_distance_m": 0.0,
+      "behavior_transitions": 16,
+      "behavior_states": {
+        "CRUISE": 17.34,
+        "CAUTION": 2.6,
+        "AVOID": 4.5
+      },
+      "duration_s": 24.44,
+      "wall_seconds": 9.9,
+      "realtime_factor": 2.46,
+      "perception": {
+        "recall": 0.996,
+        "precision": 1.0,
+        "missed_objects": 1,
+        "false_tracks": 0,
+        "track_position_error_m": 0.066,
+        "track_velocity_error_mps": 0.158,
+        "track_count_mean": 1.0,
+        "prediction_error_m": 0.291,
+        "detections_total": 550,
+        "fusion_latency_ms": 62.3
+      },
+      "wiring": {
+        "mode": "sensors",
+        "object_provider_is_fusion": true,
+        "fusion_present": true,
+        "sensors_present": true,
+        "planner_road_is_scenario_road": true
+      }
+    },
+    {
+      "scenario": "UNPROTECTED_TURN",
+      "mode": "sensors",
+      "completed": true,
+      "termination": "GOAL_REACHED",
+      "collisions": 0,
+      "min_clearance_m": 0.873,
+      "min_ttc_route_s": 1.1,
+      "min_ttc_physical_s": 3.3,
+      "emergency_brakes": 0,
+      "replans": 178,
+      "plan_changes": 46,
+      "replan_latency_ms": {
+        "mean": 32.52,
+        "p50": 30.12,
+        "p95": 52.53,
+        "max": 73.07
+      },
+      "path_length_m": 128.47,
+      "path_smoothness": 1e-05,
+      "mean_abs_curvature": 0.01368,
+      "max_curvature": 0.105,
+      "max_steering_rad": 0.2693,
+      "max_steering_rate_rad_s": 0.7854,
+      "observed_steering_rate_max": 0.7854,
+      "speed_mps": {
+        "mean": 7.23,
+        "max": 8.0,
+        "min": 4.41
+      },
+      "max_acceleration": 3.0,
+      "max_deceleration": 3.02,
+      "max_cross_track_m": 0.098,
+      "reverse_manoeuvres": 0,
+      "reverse_distance_m": 0.0,
+      "behavior_transitions": 10,
+      "behavior_states": {
+        "CRUISE": 13.1,
+        "CAUTION": 2.0,
+        "AVOID": 2.7
+      },
+      "duration_s": 17.8,
+      "wall_seconds": 7.5,
+      "realtime_factor": 2.36,
+      "perception": {
+        "recall": 0.994,
+        "precision": 0.894,
+        "missed_objects": 1,
+        "false_tracks": 21,
+        "track_position_error_m": 0.101,
+        "track_velocity_error_mps": 0.282,
+        "track_count_mean": 1.11,
+        "prediction_error_m": 0.371,
+        "detections_total": 479,
+        "fusion_latency_ms": 60.2
+      },
+      "wiring": {
+        "mode": "sensors",
+        "object_provider_is_fusion": true,
+        "fusion_present": true,
+        "sensors_present": true,
+        "planner_road_is_scenario_road": true
+      }
+    },
+    {
+      "scenario": "NARROW_LANE_MUTUAL_YIELD",
+      "mode": "sensors",
+      "completed": true,
+      "termination": "GOAL_REACHED",
+      "collisions": 0,
+      "min_clearance_m": 1.005,
+      "min_ttc_route_s": 1.8,
+      "min_ttc_physical_s": null,
+      "emergency_brakes": 0,
+      "replans": 186,
+      "plan_changes": 33,
+      "replan_latency_ms": {
+        "mean": 18.6,
+        "p50": 19.1,
+        "p95": 25.36,
+        "max": 30.44
+      },
+      "path_length_m": 88.0,
+      "path_smoothness": 0.0,
+      "mean_abs_curvature": 0.00373,
+      "max_curvature": 0.0579,
+      "max_steering_rad": 0.15,
+      "max_steering_rate_rad_s": 0.7854,
+      "observed_steering_rate_max": 0.7854,
+      "speed_mps": {
+        "mean": 4.74,
+        "max": 6.0,
+        "min": 0.0
+      },
+      "max_acceleration": 3.0,
+      "max_deceleration": 8.0,
+      "max_cross_track_m": 0.062,
+      "reverse_manoeuvres": 0,
+      "reverse_distance_m": 0.0,
+      "behavior_transitions": 11,
+      "behavior_states": {
+        "CRUISE": 15.58,
+        "EMERGENCY_BRAKE": 0.3,
+        "STOPPED": 0.3,
+        "CAUTION": 1.1,
+        "AVOID": 1.3
+      },
+      "duration_s": 18.58,
+      "wall_seconds": 5.1,
+      "realtime_factor": 3.66,
+      "perception": {
+        "recall": 0.865,
+        "precision": 1.0,
+        "missed_objects": 24,
+        "false_tracks": 0,
+        "track_position_error_m": 0.361,
+        "track_velocity_error_mps": 0.19,
+        "track_count_mean": 0.83,
+        "prediction_error_m": 0.277,
+        "detections_total": 401,
+        "fusion_latency_ms": 57.9
+      },
+      "wiring": {
+        "mode": "sensors",
+        "object_provider_is_fusion": true,
+        "fusion_present": true,
+        "sensors_present": true,
+        "planner_road_is_scenario_road": true
+      }
+    },
+    {
+      "scenario": "SUDDEN_PEDESTRIAN_DART",
+      "mode": "sensors",
+      "completed": true,
+      "termination": "GOAL_REACHED",
+      "collisions": 0,
+      "min_clearance_m": 1.594,
+      "min_ttc_route_s": 0.3,
+      "min_ttc_physical_s": 0.7,
+      "emergency_brakes": 1,
+      "replans": 126,
+      "plan_changes": 7,
+      "replan_latency_ms": {
+        "mean": 24.34,
+        "p50": 25.66,
+        "p95": 33.13,
+        "max": 38.58
+      },
+      "path_length_m": 97.82,
+      "path_smoothness": 0.0,
+      "mean_abs_curvature": 2e-05,
+      "max_curvature": 0.0005,
+      "max_steering_rad": 0.1571,
+      "max_steering_rate_rad_s": 0.7854,
+      "observed_steering_rate_max": 0.7854,
+      "speed_mps": {
+        "mean": 7.82,
+        "max": 10.0,
+        "min": 0.0
+      },
+      "max_acceleration": 3.0,
+      "max_deceleration": 8.0,
+      "max_cross_track_m": 0.041,
+      "reverse_manoeuvres": 0,
+      "reverse_distance_m": 0.0,
+      "behavior_transitions": 6,
+      "behavior_states": {
+        "CRUISE": 9.94,
+        "AVOID": 1.1,
+        "EMERGENCY_BRAKE": 1.0,
+        "CAUTION": 0.5
+      },
+      "duration_s": 12.54,
+      "wall_seconds": 4.1,
+      "realtime_factor": 3.06,
+      "perception": {
+        "recall": 0.992,
+        "precision": 0.984,
+        "missed_objects": 1,
+        "false_tracks": 2,
+        "track_position_error_m": 0.168,
+        "track_velocity_error_mps": 0.393,
+        "track_count_mean": 1.01,
+        "prediction_error_m": 0.494,
+        "detections_total": 353,
+        "fusion_latency_ms": 59.5
+      },
+      "wiring": {
+        "mode": "sensors",
+        "object_provider_is_fusion": true,
+        "fusion_present": true,
+        "sensors_present": true,
+        "planner_road_is_scenario_road": true
+      }
+    },
+    {
+      "scenario": "MIXED_TRAFFIC_CURVE",
+      "mode": "sensors",
+      "completed": true,
+      "termination": "GOAL_REACHED",
+      "collisions": 0,
+      "min_clearance_m": 2.071,
+      "min_ttc_route_s": 1.7,
+      "min_ttc_physical_s": null,
+      "emergency_brakes": 0,
+      "replans": 258,
+      "plan_changes": 75,
+      "replan_latency_ms": {
+        "mean": 29.12,
+        "p50": 27.37,
+        "p95": 42.32,
+        "max": 79.06
+      },
+      "path_length_m": 141.84,
+      "path_smoothness": 1e-05,
+      "mean_abs_curvature": 0.00991,
+      "max_curvature": 0.0985,
+      "max_steering_rad": 0.2531,
+      "max_steering_rate_rad_s": 0.7854,
+      "observed_steering_rate_max": 0.7854,
+      "speed_mps": {
+        "mean": 5.51,
+        "max": 8.0,
+        "min": 2.27
+      },
+      "max_acceleration": 3.0,
+      "max_deceleration": 3.03,
+      "max_cross_track_m": 0.072,
+      "reverse_manoeuvres": 0,
+      "reverse_distance_m": 0.0,
+      "behavior_transitions": 8,
+      "behavior_states": {
+        "CRUISE": 2.6,
+        "FOLLOW": 19.18,
+        "CAUTION": 1.0,
+        "AVOID": 3.0
+      },
+      "duration_s": 25.78,
+      "wall_seconds": 11.2,
+      "realtime_factor": 2.31,
+      "perception": {
+        "recall": 0.969,
+        "precision": 0.868,
+        "missed_objects": 16,
+        "false_tracks": 76,
+        "track_position_error_m": 0.292,
+        "track_velocity_error_mps": 0.354,
+        "track_count_mean": 2.23,
+        "prediction_error_m": 0.856,
+        "detections_total": 2064,
+        "fusion_latency_ms": 56.3
+      },
+      "wiring": {
+        "mode": "sensors",
+        "object_provider_is_fusion": true,
+        "fusion_present": true,
+        "sensors_present": true,
+        "planner_road_is_scenario_road": true
+      }
+    }
+  ],
+  "replanning_evidence": [
+    {
+      "scenario": "SUDDEN_CATTLE_CROSSING",
+      "mode": "sensors",
+      "t": 4.0,
+      "before": {
+        "ego": {
+          "x": 38.5,
+          "y": -0.45,
+          "speed": 8.96,
+          "yaw": -0.101
+        },
+        "nearest_object": {
+          "id": "trk_1",
+          "type": "CATTLE",
+          "x": 60.0,
+          "y": 2.73,
+          "vx": -0.1,
+          "vy": -0.71,
+          "distance_m": 21.74
+        },
+        "predicted_position_2s": {
+          "x": 59.58,
+          "y": -0.14
+        },
+        "min_ttc_physical_s": 2.1,
+        "risk_level": "HIGH",
+        "risk_score": 0.541,
+        "candidates_total": 73,
+        "candidates_feasible": 46,
+        "candidates_rejected": 27
+      },
+      "decision": {
+        "fsm_state": "AVOID",
+        "reason": "Predicted trajectory of trk_1 (CATTLE) intersects ego trajectory within 2.1 s (risk 0.49).",
+        "selected_trajectory": "d+1.75_v4.2",
+        "target_speed": 4.2,
+        "lateral_offset_end": 1.75,
+        "safety_override": false,
+        "safety_reason": ""
+      },
+      "after": {
+        "t": 4.7,
+        "fsm_state": "AVOID",
+        "selected_trajectory": "d+1.75_v2.8",
+        "trajectory_changed": true,
+        "trajectory_changed_after_s": 0.7,
+        "ego": {
+          "x": 43.28,
+          "y": -0.01,
+          "speed": 5.3
+        },
+        "lateral_shift_m": 0.43,
+        "speed_change_mps": -3.66
+      },
+      "outcome": {
+        "collisions": 0,
+        "min_clearance_m": 1.288,
+        "termination": "GOAL_REACHED"
+      }
+    },
+    {
+      "scenario": "SUDDEN_PEDESTRIAN_DART",
+      "mode": "sensors",
+      "t": 4.2,
+      "before": {
+        "ego": {
+          "x": 41.82,
+          "y": 1.75,
+          "speed": 7.44,
+          "yaw": 0.0
+        },
+        "nearest_object": {
+          "id": "trk_1",
+          "type": "PEDESTRIAN",
+          "x": 49.85,
+          "y": -1.57,
+          "vx": -0.56,
+          "vy": 2.17,
+          "distance_m": 8.69
+        },
+        "predicted_position_2s": {
+          "x": 47.7,
+          "y": 6.73
+        },
+        "min_ttc_physical_s": 0.7,
+        "risk_level": "CRITICAL",
+        "risk_score": 1.185,
+        "candidates_total": 2,
+        "candidates_feasible": 1,
+        "candidates_rejected": 1
+      },
+      "decision": {
+        "fsm_state": "EMERGENCY_BRAKE",
+        "reason": "Physical TTC 1.00 s at current speed 9.2 m/s with trk_1; emergency braking.",
+        "selected_trajectory": "stop_hard_d+1.8",
+        "target_speed": 0.0,
+        "lateral_offset_end": 1.75,
+        "safety_override": true,
+        "safety_reason": "physical TTC 0.70 s < 1.00 s to trk_1"
+      },
+      "after": {
+        "t": 4.9,
+        "fsm_state": "EMERGENCY_BRAKE",
+        "selected_trajectory": "stop_soft_d+1.8",
+        "trajectory_changed": true,
+        "trajectory_changed_after_s": 0.7,
+        "ego": {
+          "x": 45.12,
+          "y": 1.75,
+          "speed": 1.84
+        },
+        "lateral_shift_m": 0.0,
+        "speed_change_mps": -5.6
+      },
+      "outcome": {
+        "collisions": 0,
+        "min_clearance_m": 1.594,
+        "termination": "GOAL_REACHED"
+      }
+    },
+    {
+      "scenario": "DENSE_MARKET_MIXED_TRAFFIC",
+      "mode": "sensors",
+      "t": 13.2,
+      "before": {
+        "ego": {
+          "x": 23.9,
+          "y": 0.77,
+          "speed": 2.58,
+          "yaw": 0.019
+        },
+        "nearest_object": {
+          "id": "trk_1",
+          "type": "PUSHCART",
+          "x": 30.04,
+          "y": 2.67,
+          "vx": 0.07,
+          "vy": -0.18,
+          "distance_m": 6.44
+        },
+        "predicted_position_2s": {
+          "x": 30.09,
+          "y": 2.54
+        },
+        "min_ttc_physical_s": 1.1,
+        "risk_level": "CRITICAL",
+        "risk_score": 0.889,
+        "candidates_total": 2,
+        "candidates_feasible": 1,
+        "candidates_rejected": 1
+      },
+      "decision": {
+        "fsm_state": "EMERGENCY_BRAKE",
+        "reason": "Physical TTC 1.10 s at current speed 2.7 m/s with trk_1; emergency braking.",
+        "selected_trajectory": "stop_hard_d+0.8",
+        "target_speed": 0.0,
+        "lateral_offset_end": 0.77,
+        "safety_override": true,
+        "safety_reason": "critical risk level from trk_1"
+      },
+      "after": {
+        "t": 13.3,
+        "fsm_state": "EMERGENCY_BRAKE",
+        "selected_trajectory": "stop_soft_d+0.8",
+        "trajectory_changed": true,
+        "trajectory_changed_after_s": 0.1,
+        "ego": {
+          "x": 24.12,
+          "y": 0.77,
+          "speed": 1.78
+        },
+        "lateral_shift_m": 0.0,
+        "speed_change_mps": -0.8
+      },
+      "outcome": {
+        "collisions": 0,
+        "min_clearance_m": 0.836,
+        "termination": "GOAL_REACHED"
+      }
+    },
+    {
+      "scenario": "NARROW_LANE_REVERSE_RECOVERY",
+      "mode": "sensors",
+      "t": 21.2,
+      "before": {
+        "ego": {
+          "x": 37.07,
+          "y": -0.74,
+          "speed": 2.24,
+          "yaw": 0.202
+        },
+        "nearest_object": {
+          "id": "trk_2",
+          "type": "PUSHCART",
+          "x": 35.99,
+          "y": 1.67,
+          "vx": -0.03,
+          "vy": -0.25,
+          "distance_m": 2.64
+        },
+        "predicted_position_2s": {
+          "x": 35.86,
+          "y": 0.73
+        },
+        "min_ttc_physical_s": 0.3,
+        "risk_level": "CRITICAL",
+        "risk_score": 1.2,
+        "candidates_total": 2,
+        "candidates_feasible": 0,
+        "candidates_rejected": 2
+      },
+      "decision": {
+        "fsm_state": "EMERGENCY_BRAKE",
+        "reason": "Physical TTC 0.60 s at current speed 4.0 m/s with trk_2; emergency braking.",
+        "selected_trajectory": "stop_hard_d-0.8",
+        "target_speed": 0.0,
+        "lateral_offset_end": -0.76,
+        "safety_override": true,
+        "safety_reason": "planner returned fallback stop (no feasible trajectory)"
+      },
+      "after": {
+        "t": 21.3,
+        "fsm_state": "EMERGENCY_BRAKE",
+        "selected_trajectory": "stop_hard_d-0.7",
+        "trajectory_changed": true,
+        "trajectory_changed_after_s": 0.1,
+        "ego": {
+          "x": 37.25,
+          "y": -0.69,
+          "speed": 1.44
+        },
+        "lateral_shift_m": 0.05,
+        "speed_change_mps": -0.8
+      },
+      "outcome": {
+        "collisions": 0,
+        "min_clearance_m": 0.66,
+        "termination": "GOAL_REACHED"
+      }
+    }
+  ],
+  "safety_checks": {
+    "no collisions in any scenario or mode": true,
+    "every scenario reached its goal": true,
+    "sensors mode uses fusion as the object provider": true,
+    "ground-truth mode uses the world provider": true,
+    "planner consumes the scenario road": true,
+    "replanning actually changes the trajectory somewhere": true,
+    "emergency braking fires where required": true,
+    "reverse recovery fires where required": true
+  },
+  "note": "The learned camera detector from Phases 6 and 7 is NOT in this closed loop: the simulator renders no images. 'sensors' mode is the simulated camera, LiDAR and radar models feeding the same Detection contract into the same tracker."
+}
