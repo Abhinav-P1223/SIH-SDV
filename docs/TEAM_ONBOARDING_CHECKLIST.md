@@ -34,8 +34,9 @@ worked. Full detail in [TEAM_HANDOFF.md](TEAM_HANDOFF.md), quick version in
   ```
 - [ ] **You understand that no dataset is required** to run the simulator, the scenarios or the
   final validation
-- [ ] **Datasets obtained only if your task needs them** — see handoff section 6. `Datasets/` is
-  gitignored and must never be committed
+- [ ] **Datasets obtained only if your task needs them** — download links in
+  [SETUP_GUIDE.md](SETUP_GUIDE.md), licences in handoff section 6. `Datasets/` is gitignored and
+  must never be committed
 
 ## It runs
 

@@ -149,9 +149,9 @@ Everything below is **gitignored on purpose**. Nothing here may ever be committe
 
 | Path | Contents | Required? | Size | Source | Redistributable |
 |---|---|---|---|---|---|
-| `Datasets/v1.0-mini/` | nuScenes v1.0-mini | Only for fusion and detector evaluation | 5.1 GB | Register at nuscenes.org | No |
-| `Datasets/idd-lite/` | IDD-Lite segmentation | Only for segmentation work | 42 MB | Register at idd.insaan.iiit.ac.in | No |
-| `Datasets/uvh26_subset/` | 750-image UVH-26 subset | Only for detector fine-tuning | 2.5 GB | `python scripts/select_uvh26_subset.py --download` | CC BY 4.0, but keep it out of git |
+| `Datasets/v1.0-mini/` | nuScenes v1.0-mini | Only for fusion and detector evaluation | 5.1 GB | [v1.0-mini.tgz](https://www.nuscenes.org/data/v1.0-mini.tgz), no account needed for the mini split | No, non-commercial research licence |
+| `Datasets/idd-lite/` | IDD-Lite segmentation | Only for segmentation work | 42 MB | [idd.insaan.iiit.ac.in/dataset/download](https://idd.insaan.iiit.ac.in/dataset/download/), free account required | No |
+| `Datasets/uvh26_subset/` | 750-image UVH-26 subset | Only for detector fine-tuning | 2.5 GB | `python scripts/select_uvh26_subset.py --download`, from [iisc-aim/UVH-26](https://huggingface.co/datasets/iisc-aim/UVH-26) | CC BY 4.0, but keep it out of git |
 | `perception_detector/checkpoints/*oversampled*.pt` | Phase 7E experiment | No | 4 x 76 MB | Regenerate, or ask the lead | Yes, as a release artefact |
 | `~/.cache/torch/hub/checkpoints/` | COCO pretrained weights | Auto-downloaded on first use | 88 MB | torchvision downloads it | Yes |
 

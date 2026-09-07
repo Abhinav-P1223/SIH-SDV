@@ -94,18 +94,23 @@ python scripts/final_validation.py
 **Demo:** follow [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md), a timed five-minute flow with a
 "do not say" list so nothing unsupported is claimed on stage.
 
-## Prerequisites you may or may not need
+## Datasets, and where to download them
 
 Both model checkpoints ship **inside the repository**, so a plain clone is enough for everything
-above. Datasets are only needed for perception work and are gitignored:
+above. **No dataset is required** to run the simulator, the scenarios or the final validation.
+Datasets are only needed if you want to re-train or re-evaluate the perception models, and all
+three are gitignored.
 
-| Dataset | Size | Needed for |
-|---|---|---|
-| nuScenes v1.0-mini | 5.1 GB | Fusion validation, detector evaluation |
-| IDD-Lite | 42 MB | Segmentation training and evaluation |
-| UVH-26 subset | 2.5 GB | Detector fine-tuning, reproducible from the tracked manifest |
+| Dataset | Size | Needed for | Download |
+|---|---|---|---|
+| **nuScenes v1.0-mini** | 5.1 GB | Fusion validation, detector evaluation | [direct tarball](https://www.nuscenes.org/data/v1.0-mini.tgz) &middot; [dataset page](https://www.nuscenes.org/nuscenes#download) |
+| **IDD-Lite** (`idd20k_lite`) | 42 MB | Segmentation training and evaluation | [idd.insaan.iiit.ac.in/dataset/download](https://idd.insaan.iiit.ac.in/dataset/download/) — free account required |
+| **UVH-26** (750-image subset) | 2.5 GB | Detector fine-tuning, reproducible from the tracked manifest | `python scripts/select_uvh26_subset.py --download` &middot; [source on Hugging Face](https://huggingface.co/datasets/iisc-aim/UVH-26) |
 
-Never commit dataset files. See [docs/SETUP_GUIDE.md](docs/SETUP_GUIDE.md).
+Extract into `Datasets/v1.0-mini/`, `Datasets/idd-lite/` and `Datasets/uvh26_subset/` respectively.
+`Datasets/` is gitignored and must stay that way — **never commit dataset files**. Licences:
+nuScenes is non-commercial research use, IDD requires accepting its terms at registration, UVH-26
+is CC BY 4.0. Step-by-step instructions in [docs/SETUP_GUIDE.md](docs/SETUP_GUIDE.md).
 
 ## Documentation
 

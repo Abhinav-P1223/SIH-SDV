@@ -97,11 +97,49 @@ and zero collisions.
 The closed-loop simulator, every scenario and the final validation need **no datasets at all**. The
 two model checkpoints you need are **already in the repository**.
 
-| Dataset | Size | Needed for | How to get it |
+| Dataset | Size | Needed for | Extract to |
 |---|---|---|---|
-| nuScenes v1.0-mini | 5.1 GB | Fusion validation, detector evaluation | Register at nuscenes.org, extract to `Datasets/v1.0-mini/` |
-| IDD-Lite | 42 MB | Segmentation training and evaluation | Register at idd.insaan.iiit.ac.in, extract to `Datasets/idd-lite/` |
-| UVH-26 subset | 2.5 GB | Detector fine-tuning and its A/B | `python scripts/select_uvh26_subset.py --download`, reproducible from the tracked manifest |
+| nuScenes v1.0-mini | 5.1 GB | Fusion validation, detector evaluation | `Datasets/v1.0-mini/` |
+| IDD-Lite (`idd20k_lite`) | 42 MB | Segmentation training and evaluation | `Datasets/idd-lite/` |
+| UVH-26 subset | 2.5 GB | Detector fine-tuning and its A/B | `Datasets/uvh26_subset/` |
+
+### nuScenes v1.0-mini
+
+Direct download, no account needed for the mini split:
+
+```bash
+curl -L -o v1.0-mini.tgz https://www.nuscenes.org/data/v1.0-mini.tgz
+mkdir -p Datasets/v1.0-mini && tar -xzf v1.0-mini.tgz -C Datasets/v1.0-mini
+```
+
+Dataset page: <https://www.nuscenes.org/nuscenes#download>. Licence: non-commercial research use.
+Verify with `python scripts/audit_datasets.py --nuscenes Datasets/v1.0-mini`.
+
+### IDD-Lite
+
+Needs a **free account**, so it cannot be scripted. Register and accept the terms at
+<https://idd.insaan.iiit.ac.in/dataset/download/>, download **IDD-Lite (idd20k_lite)**, then:
+
+```bash
+mkdir -p Datasets/idd-lite
+tar -xzf idd-lite.tar.gz -C Datasets/idd-lite      # or: unzip idd20k_lite.zip -d Datasets/idd-lite
+```
+
+You must end up with `Datasets/idd-lite/idd20k_lite/{leftImg8bit,gtFine}/`, which is the path the
+scripts expect. If the archive unpacks one level deeper or shallower, move it so it matches. Verify with
+`python scripts/audit_datasets.py --idd-lite Datasets/idd-lite/idd20k_lite`.
+
+### UVH-26 subset
+
+Scripted, and reproducible from the manifest tracked in git. Takes 20 to 40 minutes:
+
+```bash
+python scripts/select_uvh26_subset.py --download
+```
+
+It pulls exactly the 750 images named in `docs/uvh26_manifest.json` (seed 20260907) from
+<https://huggingface.co/datasets/iisc-aim/UVH-26>, so everyone gets the identical split. Licence:
+CC BY 4.0 (AIM @ IISc). Verify with `python scripts/audit_uvh26_subset.py`.
 
 `Datasets/` is gitignored and **must stay that way**. Never commit dataset files.
 
