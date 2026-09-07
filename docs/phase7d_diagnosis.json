@@ -1,0 +1,880 @@
+{
+  "checkpoint_epoch": 3,
+  "score_threshold": 0.35,
+  "iou": 0.5,
+  "step1_test": {
+    "A_coco": {
+      "threshold": 0.35,
+      "tp": 353,
+      "fp": 305,
+      "fn": 1207,
+      "precision": 0.5364741641337386,
+      "recall": 0.22628205128205128,
+      "per_class": {
+        "MOTORCYCLE": {
+          "gt": 754,
+          "pred": 164,
+          "tp": 114,
+          "fp": 50,
+          "fn": 640,
+          "precision": 0.6951219512195121,
+          "recall": 0.15119363395225463
+        },
+        "AUTO_RICKSHAW": {
+          "gt": 222,
+          "pred": 0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 222,
+          "precision": NaN,
+          "recall": 0.0
+        },
+        "CAR": {
+          "gt": 325,
+          "pred": 284,
+          "tp": 156,
+          "fp": 128,
+          "fn": 169,
+          "precision": 0.5492957746478874,
+          "recall": 0.48
+        },
+        "BUS": {
+          "gt": 76,
+          "pred": 74,
+          "tp": 34,
+          "fp": 40,
+          "fn": 42,
+          "precision": 0.4594594594594595,
+          "recall": 0.4473684210526316
+        },
+        "TRUCK": {
+          "gt": 151,
+          "pred": 126,
+          "tp": 46,
+          "fp": 80,
+          "fn": 105,
+          "precision": 0.36507936507936506,
+          "recall": 0.304635761589404
+        },
+        "BICYCLE": {
+          "gt": 32,
+          "pred": 10,
+          "tp": 3,
+          "fp": 7,
+          "fn": 29,
+          "precision": 0.3,
+          "recall": 0.09375
+        }
+      }
+    },
+    "B_finetuned": {
+      "threshold": 0.35,
+      "tp": 591,
+      "fp": 361,
+      "fn": 969,
+      "precision": 0.6207983193277311,
+      "recall": 0.37884615384615383,
+      "per_class": {
+        "MOTORCYCLE": {
+          "gt": 754,
+          "pred": 454,
+          "tp": 286,
+          "fp": 168,
+          "fn": 468,
+          "precision": 0.6299559471365639,
+          "recall": 0.3793103448275862
+        },
+        "AUTO_RICKSHAW": {
+          "gt": 222,
+          "pred": 136,
+          "tp": 77,
+          "fp": 59,
+          "fn": 145,
+          "precision": 0.5661764705882353,
+          "recall": 0.34684684684684686
+        },
+        "CAR": {
+          "gt": 325,
+          "pred": 253,
+          "tp": 170,
+          "fp": 83,
+          "fn": 155,
+          "precision": 0.6719367588932806,
+          "recall": 0.5230769230769231
+        },
+        "BUS": {
+          "gt": 76,
+          "pred": 45,
+          "tp": 27,
+          "fp": 18,
+          "fn": 49,
+          "precision": 0.6,
+          "recall": 0.35526315789473684
+        },
+        "TRUCK": {
+          "gt": 151,
+          "pred": 64,
+          "tp": 31,
+          "fp": 33,
+          "fn": 120,
+          "precision": 0.484375,
+          "recall": 0.2052980132450331
+        },
+        "BICYCLE": {
+          "gt": 32,
+          "pred": 0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 32,
+          "precision": NaN,
+          "recall": 0.0
+        }
+      }
+    }
+  },
+  "step2_miss_analysis": {
+    "reasons": {
+      "BICYCLE": {
+        "WRONG_CLASS": 9,
+        "LOW_CONFIDENCE": 3,
+        "ABSENT": 6,
+        "OVERLAPS_SOMETHING_ELSE": 13,
+        "POOR_LOCALISATION": 1
+      },
+      "TRUCK": {
+        "ABSENT": 22,
+        "WRONG_CLASS": 28,
+        "POOR_LOCALISATION": 20,
+        "LOW_CONFIDENCE": 36,
+        "OVERLAPS_SOMETHING_ELSE": 14
+      },
+      "BUS": {
+        "WRONG_CLASS": 19,
+        "OVERLAPS_SOMETHING_ELSE": 10,
+        "LOW_CONFIDENCE": 9,
+        "ABSENT": 7,
+        "POOR_LOCALISATION": 4
+      }
+    },
+    "sizes": {
+      "BICYCLE": {
+        "large": 19,
+        "small": 2,
+        "medium": 11
+      },
+      "TRUCK": {
+        "large": 99,
+        "medium": 20,
+        "small": 1
+      },
+      "BUS": {
+        "large": 39,
+        "medium": 10
+      }
+    },
+    "wrong_class_as": {
+      "BICYCLE": {
+        "MOTORCYCLE": 9
+      },
+      "BUS": {
+        "TRUCK": 4,
+        "CAR": 8,
+        "AUTO_RICKSHAW": 7
+      },
+      "TRUCK": {
+        "BUS": 3,
+        "CAR": 10,
+        "AUTO_RICKSHAW": 14,
+        "MOTORCYCLE": 1
+      }
+    }
+  },
+  "step3_confidence_profile": {
+    "MOTORCYCLE": {
+      "predictions_above_0.01": 1816,
+      "above_0.35": 454,
+      "max": 0.9904704093933105,
+      "p90": 0.7377291917800903,
+      "median": 0.14786887168884277
+    },
+    "AUTO_RICKSHAW": {
+      "predictions_above_0.01": 708,
+      "above_0.35": 136,
+      "max": 0.9433550238609314,
+      "p90": 0.5276399254798889,
+      "median": 0.11085407435894012
+    },
+    "CAR": {
+      "predictions_above_0.01": 828,
+      "above_0.35": 253,
+      "max": 0.99741131067276,
+      "p90": 0.9044168591499329,
+      "median": 0.1604817807674408
+    },
+    "BUS": {
+      "predictions_above_0.01": 281,
+      "above_0.35": 45,
+      "max": 0.98219233751297,
+      "p90": 0.4815458059310913,
+      "median": 0.10887379199266434
+    },
+    "TRUCK": {
+      "predictions_above_0.01": 480,
+      "above_0.35": 64,
+      "max": 0.9018847942352295,
+      "p90": 0.39788734912872314,
+      "median": 0.12467138469219208
+    },
+    "BICYCLE": {
+      "predictions_above_0.01": 73,
+      "above_0.35": 0,
+      "max": 0.1808331161737442,
+      "p90": 0.10033262521028519,
+      "median": 0.06354229152202606
+    }
+  },
+  "step4_sweep_val": [
+    {
+      "threshold": 0.1,
+      "tp": 521,
+      "fp": 1211,
+      "fn": 563,
+      "precision": 0.3008083140877598,
+      "recall": 0.4806273062730627,
+      "per_class": {
+        "MOTORCYCLE": {
+          "gt": 484,
+          "pred": 704,
+          "tp": 221,
+          "fp": 483,
+          "fn": 263,
+          "precision": 0.31392045454545453,
+          "recall": 0.45661157024793386
+        },
+        "AUTO_RICKSHAW": {
+          "gt": 165,
+          "pred": 287,
+          "tp": 62,
+          "fp": 225,
+          "fn": 103,
+          "precision": 0.21602787456445993,
+          "recall": 0.37575757575757573
+        },
+        "CAR": {
+          "gt": 262,
+          "pred": 423,
+          "tp": 160,
+          "fp": 263,
+          "fn": 102,
+          "precision": 0.37825059101654845,
+          "recall": 0.6106870229007634
+        },
+        "BUS": {
+          "gt": 55,
+          "pred": 105,
+          "tp": 19,
+          "fp": 86,
+          "fn": 36,
+          "precision": 0.18095238095238095,
+          "recall": 0.34545454545454546
+        },
+        "TRUCK": {
+          "gt": 93,
+          "pred": 207,
+          "tp": 56,
+          "fp": 151,
+          "fn": 37,
+          "precision": 0.27053140096618356,
+          "recall": 0.6021505376344086
+        },
+        "BICYCLE": {
+          "gt": 25,
+          "pred": 6,
+          "tp": 3,
+          "fp": 3,
+          "fn": 22,
+          "precision": 0.5,
+          "recall": 0.12
+        }
+      }
+    },
+    {
+      "threshold": 0.2,
+      "tp": 454,
+      "fp": 541,
+      "fn": 630,
+      "precision": 0.4562814070351759,
+      "recall": 0.4188191881918819,
+      "per_class": {
+        "MOTORCYCLE": {
+          "gt": 484,
+          "pred": 423,
+          "tp": 193,
+          "fp": 230,
+          "fn": 291,
+          "precision": 0.4562647754137116,
+          "recall": 0.3987603305785124
+        },
+        "AUTO_RICKSHAW": {
+          "gt": 165,
+          "pred": 154,
+          "tp": 54,
+          "fp": 100,
+          "fn": 111,
+          "precision": 0.35064935064935066,
+          "recall": 0.32727272727272727
+        },
+        "CAR": {
+          "gt": 262,
+          "pred": 269,
+          "tp": 149,
+          "fp": 120,
+          "fn": 113,
+          "precision": 0.5539033457249071,
+          "recall": 0.5687022900763359
+        },
+        "BUS": {
+          "gt": 55,
+          "pred": 47,
+          "tp": 14,
+          "fp": 33,
+          "fn": 41,
+          "precision": 0.2978723404255319,
+          "recall": 0.2545454545454545
+        },
+        "TRUCK": {
+          "gt": 93,
+          "pred": 102,
+          "tp": 44,
+          "fp": 58,
+          "fn": 49,
+          "precision": 0.43137254901960786,
+          "recall": 0.4731182795698925
+        },
+        "BICYCLE": {
+          "gt": 25,
+          "pred": 0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 25,
+          "precision": NaN,
+          "recall": 0.0
+        }
+      }
+    },
+    {
+      "threshold": 0.3,
+      "tp": 393,
+      "fp": 297,
+      "fn": 691,
+      "precision": 0.5695652173913044,
+      "recall": 0.3625461254612546,
+      "per_class": {
+        "MOTORCYCLE": {
+          "gt": 484,
+          "pred": 296,
+          "tp": 167,
+          "fp": 129,
+          "fn": 317,
+          "precision": 0.5641891891891891,
+          "recall": 0.3450413223140496
+        },
+        "AUTO_RICKSHAW": {
+          "gt": 165,
+          "pred": 106,
+          "tp": 48,
+          "fp": 58,
+          "fn": 117,
+          "precision": 0.4528301886792453,
+          "recall": 0.2909090909090909
+        },
+        "CAR": {
+          "gt": 262,
+          "pred": 204,
+          "tp": 133,
+          "fp": 71,
+          "fn": 129,
+          "precision": 0.6519607843137255,
+          "recall": 0.5076335877862596
+        },
+        "BUS": {
+          "gt": 55,
+          "pred": 25,
+          "tp": 12,
+          "fp": 13,
+          "fn": 43,
+          "precision": 0.48,
+          "recall": 0.21818181818181817
+        },
+        "TRUCK": {
+          "gt": 93,
+          "pred": 59,
+          "tp": 33,
+          "fp": 26,
+          "fn": 60,
+          "precision": 0.559322033898305,
+          "recall": 0.3548387096774194
+        },
+        "BICYCLE": {
+          "gt": 25,
+          "pred": 0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 25,
+          "precision": NaN,
+          "recall": 0.0
+        }
+      }
+    },
+    {
+      "threshold": 0.4,
+      "tp": 348,
+      "fp": 180,
+      "fn": 736,
+      "precision": 0.6590909090909091,
+      "recall": 0.3210332103321033,
+      "per_class": {
+        "MOTORCYCLE": {
+          "gt": 484,
+          "pred": 236,
+          "tp": 151,
+          "fp": 85,
+          "fn": 333,
+          "precision": 0.6398305084745762,
+          "recall": 0.3119834710743802
+        },
+        "AUTO_RICKSHAW": {
+          "gt": 165,
+          "pred": 72,
+          "tp": 42,
+          "fp": 30,
+          "fn": 123,
+          "precision": 0.5833333333333334,
+          "recall": 0.2545454545454545
+        },
+        "CAR": {
+          "gt": 262,
+          "pred": 167,
+          "tp": 122,
+          "fp": 45,
+          "fn": 140,
+          "precision": 0.7305389221556886,
+          "recall": 0.46564885496183206
+        },
+        "BUS": {
+          "gt": 55,
+          "pred": 17,
+          "tp": 11,
+          "fp": 6,
+          "fn": 44,
+          "precision": 0.6470588235294118,
+          "recall": 0.2
+        },
+        "TRUCK": {
+          "gt": 93,
+          "pred": 36,
+          "tp": 22,
+          "fp": 14,
+          "fn": 71,
+          "precision": 0.6111111111111112,
+          "recall": 0.23655913978494625
+        },
+        "BICYCLE": {
+          "gt": 25,
+          "pred": 0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 25,
+          "precision": NaN,
+          "recall": 0.0
+        }
+      }
+    },
+    {
+      "threshold": 0.5,
+      "tp": 315,
+      "fp": 117,
+      "fn": 769,
+      "precision": 0.7291666666666666,
+      "recall": 0.29059040590405905,
+      "per_class": {
+        "MOTORCYCLE": {
+          "gt": 484,
+          "pred": 193,
+          "tp": 138,
+          "fp": 55,
+          "fn": 346,
+          "precision": 0.7150259067357513,
+          "recall": 0.28512396694214875
+        },
+        "AUTO_RICKSHAW": {
+          "gt": 165,
+          "pred": 59,
+          "tp": 37,
+          "fp": 22,
+          "fn": 128,
+          "precision": 0.6271186440677966,
+          "recall": 0.22424242424242424
+        },
+        "CAR": {
+          "gt": 262,
+          "pred": 145,
+          "tp": 116,
+          "fp": 29,
+          "fn": 146,
+          "precision": 0.8,
+          "recall": 0.44274809160305345
+        },
+        "BUS": {
+          "gt": 55,
+          "pred": 14,
+          "tp": 10,
+          "fp": 4,
+          "fn": 45,
+          "precision": 0.7142857142857143,
+          "recall": 0.18181818181818182
+        },
+        "TRUCK": {
+          "gt": 93,
+          "pred": 21,
+          "tp": 14,
+          "fp": 7,
+          "fn": 79,
+          "precision": 0.6666666666666666,
+          "recall": 0.15053763440860216
+        },
+        "BICYCLE": {
+          "gt": 25,
+          "pred": 0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 25,
+          "precision": NaN,
+          "recall": 0.0
+        }
+      }
+    }
+  ],
+  "step4_sweep_test_diagnostic": [
+    {
+      "threshold": 0.1,
+      "tp": 814,
+      "fp": 1762,
+      "fn": 746,
+      "precision": 0.3159937888198758,
+      "recall": 0.5217948717948718,
+      "per_class": {
+        "MOTORCYCLE": {
+          "gt": 754,
+          "pred": 1184,
+          "tp": 381,
+          "fp": 803,
+          "fn": 373,
+          "precision": 0.3217905405405405,
+          "recall": 0.5053050397877984
+        },
+        "AUTO_RICKSHAW": {
+          "gt": 222,
+          "pred": 386,
+          "tp": 101,
+          "fp": 285,
+          "fn": 121,
+          "precision": 0.2616580310880829,
+          "recall": 0.45495495495495497
+        },
+        "CAR": {
+          "gt": 325,
+          "pred": 547,
+          "tp": 204,
+          "fp": 343,
+          "fn": 121,
+          "precision": 0.37294332723948814,
+          "recall": 0.6276923076923077
+        },
+        "BUS": {
+          "gt": 76,
+          "pred": 157,
+          "tp": 45,
+          "fp": 112,
+          "fn": 31,
+          "precision": 0.28662420382165604,
+          "recall": 0.5921052631578947
+        },
+        "TRUCK": {
+          "gt": 151,
+          "pred": 293,
+          "tp": 81,
+          "fp": 212,
+          "fn": 70,
+          "precision": 0.2764505119453925,
+          "recall": 0.5364238410596026
+        },
+        "BICYCLE": {
+          "gt": 32,
+          "pred": 9,
+          "tp": 2,
+          "fp": 7,
+          "fn": 30,
+          "precision": 0.2222222222222222,
+          "recall": 0.0625
+        }
+      }
+    },
+    {
+      "threshold": 0.2,
+      "tp": 710,
+      "fp": 828,
+      "fn": 850,
+      "precision": 0.4616384915474642,
+      "recall": 0.4551282051282051,
+      "per_class": {
+        "MOTORCYCLE": {
+          "gt": 754,
+          "pred": 707,
+          "tp": 333,
+          "fp": 374,
+          "fn": 421,
+          "precision": 0.471004243281471,
+          "recall": 0.4416445623342175
+        },
+        "AUTO_RICKSHAW": {
+          "gt": 222,
+          "pred": 226,
+          "tp": 88,
+          "fp": 138,
+          "fn": 134,
+          "precision": 0.3893805309734513,
+          "recall": 0.3963963963963964
+        },
+        "CAR": {
+          "gt": 325,
+          "pred": 365,
+          "tp": 190,
+          "fp": 175,
+          "fn": 135,
+          "precision": 0.5205479452054794,
+          "recall": 0.5846153846153846
+        },
+        "BUS": {
+          "gt": 76,
+          "pred": 86,
+          "tp": 38,
+          "fp": 48,
+          "fn": 38,
+          "precision": 0.4418604651162791,
+          "recall": 0.5
+        },
+        "TRUCK": {
+          "gt": 151,
+          "pred": 154,
+          "tp": 61,
+          "fp": 93,
+          "fn": 90,
+          "precision": 0.3961038961038961,
+          "recall": 0.40397350993377484
+        },
+        "BICYCLE": {
+          "gt": 32,
+          "pred": 0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 32,
+          "precision": NaN,
+          "recall": 0.0
+        }
+      }
+    },
+    {
+      "threshold": 0.3,
+      "tp": 630,
+      "fp": 471,
+      "fn": 930,
+      "precision": 0.5722070844686649,
+      "recall": 0.40384615384615385,
+      "per_class": {
+        "MOTORCYCLE": {
+          "gt": 754,
+          "pred": 518,
+          "tp": 302,
+          "fp": 216,
+          "fn": 452,
+          "precision": 0.583011583011583,
+          "recall": 0.4005305039787798
+        },
+        "AUTO_RICKSHAW": {
+          "gt": 222,
+          "pred": 163,
+          "tp": 81,
+          "fp": 82,
+          "fn": 141,
+          "precision": 0.49693251533742333,
+          "recall": 0.36486486486486486
+        },
+        "CAR": {
+          "gt": 325,
+          "pred": 279,
+          "tp": 174,
+          "fp": 105,
+          "fn": 151,
+          "precision": 0.6236559139784946,
+          "recall": 0.5353846153846153
+        },
+        "BUS": {
+          "gt": 76,
+          "pred": 59,
+          "tp": 34,
+          "fp": 25,
+          "fn": 42,
+          "precision": 0.576271186440678,
+          "recall": 0.4473684210526316
+        },
+        "TRUCK": {
+          "gt": 151,
+          "pred": 82,
+          "tp": 39,
+          "fp": 43,
+          "fn": 112,
+          "precision": 0.47560975609756095,
+          "recall": 0.2582781456953642
+        },
+        "BICYCLE": {
+          "gt": 32,
+          "pred": 0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 32,
+          "precision": NaN,
+          "recall": 0.0
+        }
+      }
+    },
+    {
+      "threshold": 0.4,
+      "tp": 556,
+      "fp": 272,
+      "fn": 1004,
+      "precision": 0.6714975845410628,
+      "recall": 0.3564102564102564,
+      "per_class": {
+        "MOTORCYCLE": {
+          "gt": 754,
+          "pred": 402,
+          "tp": 273,
+          "fp": 129,
+          "fn": 481,
+          "precision": 0.6791044776119403,
+          "recall": 0.3620689655172414
+        },
+        "AUTO_RICKSHAW": {
+          "gt": 222,
+          "pred": 113,
+          "tp": 67,
+          "fp": 46,
+          "fn": 155,
+          "precision": 0.5929203539823009,
+          "recall": 0.30180180180180183
+        },
+        "CAR": {
+          "gt": 325,
+          "pred": 228,
+          "tp": 162,
+          "fp": 66,
+          "fn": 163,
+          "precision": 0.7105263157894737,
+          "recall": 0.49846153846153846
+        },
+        "BUS": {
+          "gt": 76,
+          "pred": 39,
+          "tp": 27,
+          "fp": 12,
+          "fn": 49,
+          "precision": 0.6923076923076923,
+          "recall": 0.35526315789473684
+        },
+        "TRUCK": {
+          "gt": 151,
+          "pred": 46,
+          "tp": 27,
+          "fp": 19,
+          "fn": 124,
+          "precision": 0.5869565217391305,
+          "recall": 0.17880794701986755
+        },
+        "BICYCLE": {
+          "gt": 32,
+          "pred": 0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 32,
+          "precision": NaN,
+          "recall": 0.0
+        }
+      }
+    },
+    {
+      "threshold": 0.5,
+      "tp": 494,
+      "fp": 145,
+      "fn": 1066,
+      "precision": 0.7730829420970265,
+      "recall": 0.31666666666666665,
+      "per_class": {
+        "MOTORCYCLE": {
+          "gt": 754,
+          "pred": 320,
+          "tp": 248,
+          "fp": 72,
+          "fn": 506,
+          "precision": 0.775,
+          "recall": 0.32891246684350134
+        },
+        "AUTO_RICKSHAW": {
+          "gt": 222,
+          "pred": 79,
+          "tp": 52,
+          "fp": 27,
+          "fn": 170,
+          "precision": 0.6582278481012658,
+          "recall": 0.23423423423423423
+        },
+        "CAR": {
+          "gt": 325,
+          "pred": 191,
+          "tp": 151,
+          "fp": 40,
+          "fn": 174,
+          "precision": 0.7905759162303665,
+          "recall": 0.4646153846153846
+        },
+        "BUS": {
+          "gt": 76,
+          "pred": 26,
+          "tp": 22,
+          "fp": 4,
+          "fn": 54,
+          "precision": 0.8461538461538461,
+          "recall": 0.2894736842105263
+        },
+        "TRUCK": {
+          "gt": 151,
+          "pred": 23,
+          "tp": 21,
+          "fp": 2,
+          "fn": 130,
+          "precision": 0.9130434782608695,
+          "recall": 0.1390728476821192
+        },
+        "BICYCLE": {
+          "gt": 32,
+          "pred": 0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 32,
+          "precision": NaN,
+          "recall": 0.0
+        }
+      }
+    }
+  ]
+}
