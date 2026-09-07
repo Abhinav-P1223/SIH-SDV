@@ -24,6 +24,9 @@ ENDPOINTS
     /api/reset (POST)     stop and clear
     /api/stream           text/event-stream of compact frames
     /api/results          docs/FINAL_SYSTEM_RESULTS.json, served verbatim
+    /api/replays          recorded runs
+    /api/replay/<file>    one recorded run (gzip)
+    /api/tests            per-scenario test outcomes (ui/collect_tests.py)
 
 Frames are produced by `autonomy.telemetry.dashboard.compact_frame`, imported unchanged, so the UI
 sees exactly the contract the existing dashboard already publishes.
@@ -317,6 +320,11 @@ class Handler(BaseHTTPRequestHandler):
             # evidence file is frozen, so the fix belongs here: re-serialise NaN as null and let
             # the UI render it as NOT AVAILABLE. No value changes.
             self._json(_json_safe(json.loads(RESULTS.read_text(encoding="utf-8"))))
+        elif path == "/api/tests":
+            f = REPLAY / "tests.json"
+            if not f.exists():
+                self._json({"by_scenario": {}, "hint": "run:  python -m ui.collect_tests"}); return
+            self._file(f, "application/json; charset=utf-8")
         elif path == "/api/replays":
             idx = REPLAY / "index.json"
             if not idx.exists():

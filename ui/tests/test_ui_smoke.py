@@ -6,6 +6,7 @@ Run with:  python -m pytest ui/tests -q
 from __future__ import annotations
 
 import json
+import re
 import sys
 import time
 import urllib.error
@@ -290,3 +291,49 @@ def test_no_external_assets_are_required(app):
         text = f.read_text(encoding="utf-8")
         for bad in ("http://", "https://", "cdn.", "unpkg", "jsdelivr"):
             assert bad not in text, f"{f.name} references {bad}"
+
+
+# --------------------------------------------------------------------------- story & tests
+def test_tests_endpoint_reports_real_pytest_outcomes(app):
+    code, body = get("/api/tests")
+    d = json.loads(body)
+    assert code == 200
+    assert d.get("by_scenario"), "no test results; run  python -m ui.collect_tests"
+    assert d["exit_code"] == 0, "the recorded scenario-test run did not pass"
+
+    total = sum(len(v) for v in d["by_scenario"].values()) + len(d.get("ungrouped", []))
+    assert total == d["total"]
+    for scenario, rows in d["by_scenario"].items():
+        assert scenario in scenario_names(), f"{scenario} is not a real scenario"
+        for r in rows:
+            assert r["outcome"] in ("PASSED", "FAILED", "SKIPPED")
+            assert (ROOT / r["file"]).exists(), r["file"]
+            assert r["title"] and not r["title"].startswith("test_")
+
+
+def test_every_recorded_replay_has_mapped_tests(app):
+    """A judge opening a scenario should see the tests that cover it."""
+    replays = json.loads(get("/api/replays")[1])["replays"]
+    tests = json.loads(get("/api/tests")[1])["by_scenario"]
+    missing = [r["scenario"] for r in replays if r["scenario"] not in tests]
+    assert not missing, f"no tests mapped to: {missing}"
+
+
+def test_story_module_is_served_and_self_contained(app):
+    code, body = get("/static/src/story.js")
+    assert code == 200
+    assert b"buildStory" in body and b"showCaption" in body
+    text = body.decode("utf-8")
+    for bad in ("http://", "https://"):
+        assert bad not in text
+
+
+def test_story_beats_cover_the_events_the_replays_contain(app):
+    """Every event kind a replay can produce must have a caption template."""
+    story = (ROOT / "ui" / "static" / "src" / "story.js").read_text(encoding="utf-8")
+    replay = (ROOT / "ui" / "static" / "src" / "replay.js").read_text(encoding="utf-8")
+    kinds = set(re.findall(r'push\(t,\s*"(\w+)"', replay))
+    kinds |= {"start"}                      # synthesised opening chapter
+    kinds -= {"track"} - kinds              # no-op, keeps the set explicit
+    for k in kinds:
+        assert f"  {k}: {{" in story, f"story.js has no beat for event kind {k!r}"

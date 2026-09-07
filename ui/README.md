@@ -23,6 +23,39 @@ python -m ui.server --port 9000 --no-browser
 only. Three.js r160 and OrbitControls are **vendored into `ui/static/vendor/`**, so the console
 works with no network and no build step. Nothing is fetched from a CDN.
 
+### Story mode
+
+Every replay is broken into **narrated chapters** derived from its own recorded events — normal
+driving, object detected, risk rising, decision, emergency brake, reverse recovery, safe passage.
+Each chapter caption is written from the telemetry at that instant, so selecting *Sudden cattle
+crossing* gives you, in order:
+
+> **OBJECT DETECTED** — COW confirmed as track trk_1, moving at 0.3 m/s.
+> **DECISION** — Route at desired speed intersects a predicted object in 3.7 s; reducing speed.
+> 38 of 73 candidate paths are feasible; it chose d-1.75_v6.0.
+> **DECISION** — Predicted trajectory of trk_1 (CATTLE) intersects ego trajectory within 2.1 s.
+> 2 of 73 candidate paths are feasible; it chose d-2.25_v7.0.
+> **SAFE PASSAGE** — Goal reached with 0 collisions. Closest approach 1.29 m.
+
+Nothing is scripted per scenario: chapters are selected by importance from the recorded event
+stream, so a re-record produces a new story automatically. Click a chapter to jump to it. The
+**Story** button toggles the on-scene caption.
+
+### Per-scenario tests
+
+The **Tests** tab in the bottom strip shows the real pytest cases that cover the scenario you are
+watching, with the outcome pytest actually reported:
+
+```bash
+python -m ui.collect_tests          # scenario suites, ~11 min
+python -m ui.collect_tests --all    # the whole tests/ tree
+```
+
+Outcomes are read from JUnit XML (the project sets `addopts = "-q"`, so `-v` produces no per-test
+lines). Each row's description is the test function's own docstring, so the label and the result
+cannot drift apart. A scenario is matched by the `[PARAM]` in the node id, else by the scenario
+named in the function body, else by the file.
+
 ### Demo mode
 
 Press **Start demo**, or the **Demo** button in the transport panel. It plays the five demo
@@ -70,7 +103,7 @@ frames over SSE. Replay is preferred for judging because it is scrubbable and de
 | TTC physical, risk score, worst object | `frame.risk` |
 | Min clearance, collisions | `frame.metrics` |
 | Tracks, class, velocity, heading | `frame.objects` |
-| Truth agents | `frame.agents` |
+| Tracks / truth agents | `frame.objects` and `frame.agents` |
 | Candidates, feasible, latency, rejections | `frame.plan` |
 | Emergency brake | `frame.safety.override_active` |
 | Replans | count of recorded `planning_cycle` frames up to now |
@@ -82,7 +115,8 @@ Anything genuinely absent renders as **NOT AVAILABLE**. Nothing is filled in.
 
 ## Screens
 
-**Drive** — the Three.js scene plus telemetry. Road surface and boundaries, dashed direction
+**Drive** — the Three.js scene, telemetry rail, "why did we replan?", and a bottom strip with
+**Story / Events / Tests**. Road surface and boundaries, dashed direction
 reference (*not* a lane line), ego vehicle built from primitives with working steering and brake
 lights, tracked objects coloured by class with screen-space labels and velocity vectors, amber
 prediction trails, the full candidate fan coloured by feasibility, the selected trajectory as a
@@ -120,6 +154,7 @@ counts, the state transition, commanded acceleration, and the selected candidate
 | `GET /api/replays` | Recorded runs with summaries |
 | `GET /api/replay/<file>` | One recorded run (gzip) |
 | `GET /api/results` | `FINAL_SYSTEM_RESULTS.json` (NaN → null so browsers can parse it) |
+| `GET /api/tests` | per-scenario pytest outcomes from `ui/collect_tests.py` |
 | `GET /api/scenarios` | Scenario list from the YAML files |
 | `GET /api/stream` | SSE live telemetry |
 | `POST /api/run` / `pause` / `reset` | Live run control |
@@ -129,7 +164,7 @@ counts, the state transition, commanded acceleration, and the selected candidate
 ## Tests
 
 ```bash
-python -m pytest ui/tests -q      # 21 tests, about 40 s
+python -m pytest ui/tests -q      # 25 tests, about 60 s
 python -m pytest tests/ -q        # the frozen 348-test suite, unchanged
 ```
 

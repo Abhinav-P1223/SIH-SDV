@@ -66,6 +66,12 @@
     <!-- storytelling beat -->
     <div class="beat" id="beat"><i></i><span></span></div>
 
+    <!-- story caption -->
+    <div class="caption" id="caption">
+      <div class="cap-title"></div>
+      <div class="cap-text"></div>
+    </div>
+
     <!-- emergency banner -->
     <div class="eb" id="eb">EMERGENCY BRAKE · SAFETY OVERRIDE</div>
 
@@ -120,8 +126,7 @@
 
     <section class="card">
       <div class="card-hd"><span>Perception &amp; planning</span></div>
-      <div class="mrow"><label>Tracks</label><b id="m-tracks">—</b><i></i></div>
-      <div class="mrow"><label>Truth agents</label><b id="m-agents">—</b><i></i></div>
+      <div class="mrow"><label>Tracks / truth agents</label><b id="m-tracks">—</b><i></i></div>
       <div class="mrow"><label>Candidates</label><b id="m-cand">—</b><i></i></div>
       <div class="mrow"><label>Feasible</label><b id="m-feas">—</b><i></i></div>
       <div class="mrow"><label>Replans</label><b id="m-replans">—</b><i></i></div>
@@ -160,16 +165,26 @@
     </div>
     <div class="tp-time"><b id="tp-now">0.00</b> / <span id="tp-dur">0.00</span> s</div>
     <div class="tp-demo">
+      <button class="btn sm" id="tp-demo">Demo</button>
       <button class="btn sm" id="tp-prev">Prev</button>
-      <button class="btn sm demo" id="tp-demo">Demo</button>
+      <button class="btn sm demo" id="tp-story">Story</button>
       <button class="btn sm" id="tp-next">Next</button>
     </div>
   </section>
 
-  <!-- timeline -->
+  <!-- bottom strip: story / events / tests -->
   <section class="events card">
-    <div class="card-hd"><span>Event timeline</span><em>click to seek</em></div>
-    <div class="ev-wrap" id="events"></div>
+    <div class="card-hd strip-hd">
+      <div class="subtabs">
+        <button class="sub on" data-sub="story">Story</button>
+        <button class="sub" data-sub="events">Events</button>
+        <button class="sub" data-sub="tests">Tests <b id="test-badge"></b></button>
+      </div>
+      <em id="strip-note">click a chapter to jump there</em>
+    </div>
+    <div class="sub-pane on" id="pane-story"><div class="story-list" id="story-list"></div></div>
+    <div class="sub-pane" id="pane-events"><div class="ev-wrap" id="events"></div></div>
+    <div class="sub-pane" id="pane-tests"><div class="test-list" id="test-list"></div></div>
   </section>
 </main>
 

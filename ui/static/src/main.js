@@ -8,10 +8,12 @@ import {
   renderMarks, updateBeat, showInspector,
 } from "./panels.js";
 import { renderValidation, renderPerception, renderScenarios } from "./reports.js";
+import { buildStory, renderStory, highlightChapter, showCaption } from "./story.js";
 
 const A = {
   scene: null, clock: null, replay: null, index: [], results: null,
   demo: false, demoAt: 0, selected: null, trail: [], lastIdx: -1,
+  story: [], storyMode: true, tests: null, chapterIdx: -1,
 };
 
 /* ── boot ─────────────────────────────────────────────────────────────── */
@@ -26,12 +28,14 @@ async function boot() {
   wireUI();
   loop();
 
-  const [idx, res] = await Promise.all([
+  const [idx, res, tst] = await Promise.all([
     fetch("/api/replays").then((r) => r.json()),
     fetch("/api/results").then((r) => r.json()),
+    fetch("/api/tests").then((r) => r.json()).catch(() => ({ by_scenario: {} })),
   ]);
   A.index = idx.replays || [];
   A.results = res;
+  A.tests = tst;
 
   if (!A.index.length) {
     toast("No replays recorded. Run:  python -m ui.capture", true);
@@ -86,6 +90,11 @@ async function open(meta, autoplay) {
   $("tp-slider").max = "1000";
   renderEvents(r, (t) => seekAbs(t));
   renderMarks(r, (t) => A.clock.seek(t));
+
+  A.story = buildStory(r);
+  A.chapterIdx = -1;
+  renderStory(A.story, (rel) => A.clock.seek(rel));
+  renderTests(r.scenario);
   onTick(0);
 
   $("boot").classList.remove("on");
@@ -120,6 +129,12 @@ function onTick(t) {
     if (live) { A.selected = live; showInspector(live, f); }
   }
 
+  if (A.story.length) {
+    const i = highlightChapter(A.story, t);
+    A.chapterIdx = i;
+    showCaption(A.storyMode && i >= 0 ? A.story[i] : null);
+  }
+
   $("tp-now").textContent = t.toFixed(2);
   const sl = $("tp-slider");
   if (document.activeElement !== sl) sl.value = String((t / r.duration) * 1000);
@@ -147,6 +162,20 @@ function wireUI() {
     if (A.replay) A.clock.seek((+e.target.value / 1000) * A.replay.duration);
   };
   $("tp-demo").onclick = () => startDemo();
+  $("tp-story").onclick = () => {
+    A.storyMode = !A.storyMode;
+    $("tp-story").classList.toggle("demo", A.storyMode);
+    toast(A.storyMode ? "Story captions on" : "Story captions off");
+    if (!A.storyMode) showCaption(null);
+  };
+  document.querySelectorAll(".sub").forEach((b) => (b.onclick = () => {
+    document.querySelectorAll(".sub").forEach((x) => x.classList.toggle("on", x === b));
+    document.querySelectorAll(".sub-pane").forEach((p) =>
+      p.classList.toggle("on", p.id === "pane-" + b.dataset.sub));
+    $("strip-note").textContent = { story: "click a chapter to jump there",
+      events: "click an event to seek", tests: "real pytest outcomes for this scenario"
+    }[b.dataset.sub];
+  }));
   $("tp-next").onclick = () => nextDemo();
   $("tp-prev").onclick = () => { A.demoAt = Math.max(0, A.demoAt - 2); nextDemo(); };
   $("inspect-x").onclick = () => { A.selected = null; showInspector(null); };
@@ -168,6 +197,36 @@ function showTab(name) {
   document.querySelectorAll(".screen").forEach((s) => s.classList.toggle("on", s.id === "s-" + name));
   $("top-ctl").style.visibility = name === "drive" ? "visible" : "hidden";
   if (name === "drive") setTimeout(() => A.scene.resize(), 30);
+}
+
+/* ── per-scenario tests ── */
+function renderTests(scenario) {
+  const box = $("test-list"), badge = $("test-badge");
+  const rows = (A.tests && A.tests.by_scenario && A.tests.by_scenario[scenario]) || [];
+  if (!rows.length) {
+    badge.textContent = "";
+    box.innerHTML = `<div class="test-empty">No tests are mapped to ${scenario.replace(/_/g, " ")}.
+      Run <code>python -m ui.collect_tests</code> to record them.</div>`;
+    return;
+  }
+  const pass = rows.filter((r) => r.outcome === "PASSED").length;
+  badge.textContent = `${pass}/${rows.length}`;
+  const secs = rows.reduce((a, r) => a + (r.seconds || 0), 0);
+  box.innerHTML =
+    `<div class="test-head"><b>${pass} of ${rows.length} passed</b>
+       <span>real pytest run · ${secs.toFixed(0)} s of execution</span></div>` +
+    rows.map((r) => {
+      const cls = r.outcome === "PASSED" ? "pass" : r.outcome === "SKIPPED" ? "skip" : "fail";
+      const mark = r.outcome === "PASSED" ? "✓" : r.outcome === "SKIPPED" ? "–" : "✕";
+      const sub = r.doc || `<code>${r.file.split("/").pop()}</code>`;
+      return `<div class="tst ${cls}"><i>${mark}</i><div class="tst-b">
+        <b>${escapeHtml(r.title)}</b><span>${sub}</span></div></div>`;
+    }).join("");
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"]/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 }
 
 /* ── demo mode ── */

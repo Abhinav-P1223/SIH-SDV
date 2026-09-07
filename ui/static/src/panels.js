@@ -45,8 +45,8 @@ export function updatePanels(f, planFrame, replay) {
   $("m-acc").textContent = fmt(c.acceleration, 2);
   $("m-brake").textContent = fmt(c.brake, 2);
 
-  $("m-tracks").textContent = (f.objects || []).length;
-  $("m-agents").textContent = (f.agents || []).length;
+  // both counts on one row: published tracks vs how many objects the simulator actually holds
+  $("m-tracks").textContent = `${(f.objects || []).length} / ${(f.agents || []).length}`;
   $("m-cand").textContent = plan ? plan.candidate_count : NA;
   $("m-feas").textContent = plan ? plan.feasible_count : NA;
   // compact_frame does not carry replanning_count; count recorded planning cycles instead.
