@@ -1,0 +1,1407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SIH26037 — Project Overview</title>
+<style>
+:root{
+  --bg:#ffffff; --panel:#f6f8fb; --panel2:#eef2f7; --ink:#0d1725; --body:#3a4757; --muted:#7a8798;
+  --rule:#dfe5ed;
+  --brand:#1d4ed8; --brand-soft:#e8efff;
+  --cyan:#0e7490; --amber:#b45309; --amber-soft:#fdf0dc;
+  --violet:#6d28d9; --violet-soft:#f0e9fe;
+  --green:#0f7b47; --green-soft:#e2f6ec;
+  --red:#b42318; --red-soft:#fdeae8;
+  --slate:#475569; --slate-soft:#eceff3;
+  --shadow:0 1px 2px rgba(13,23,37,.05),0 6px 20px -8px rgba(13,23,37,.12);
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){
+:root{
+  --bg:#0d1117; --panel:#151c26; --panel2:#1b2430; --ink:#eaf0f7; --body:#b9c5d3; --muted:#7e8b9c;
+  --rule:#242e3c;
+  --brand:#7aa5ff; --brand-soft:#182541;
+  --cyan:#5ec8de; --amber:#e9a94b; --amber-soft:#31240f;
+  --violet:#b394f7; --violet-soft:#251b3d;
+  --green:#54c78c; --green-soft:#102c1e;
+  --red:#f08a80; --red-soft:#331a18;
+  --slate:#93a1b3; --slate-soft:#1b2430;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -10px rgba(0,0,0,.6);
+}}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth; scroll-padding-top:24px}
+body{margin:0;background:var(--bg);color:var(--body);
+  font:16px/1.68 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%}
+h1,h2,h3,h4{color:var(--ink);line-height:1.22;font-weight:660;letter-spacing:-.012em}
+p{margin:0 0 15px}
+a{color:var(--brand);text-underline-offset:2px}
+code{font-family:var(--mono);font-size:.86em;background:var(--panel2);padding:1.5px 6px;border-radius:4px;color:var(--ink)}
+pre{background:var(--panel);border:1px solid var(--rule);border-radius:10px;padding:16px 18px;
+  overflow-x:auto;font-family:var(--mono);font-size:.83rem;line-height:1.6;color:var(--ink)}
+pre code{background:none;padding:0;font-size:1em}
+
+.hero{background:linear-gradient(160deg,#0d1c33 0%,#13284a 55%,#0f2b45 100%);color:#e8eef8;padding:52px 0 44px;
+  border-bottom:1px solid rgba(255,255,255,.08)}
+.hero .in{max-width:1180px;margin:0 auto;padding:0 28px}
+.eyebrow{font:600 .74rem/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:#7fb0f0;margin-bottom:16px}
+.hero h1{color:#fff;font-size:2.35rem;margin:0 0 14px;max-width:20ch;letter-spacing:-.022em}
+@media(max-width:700px){.hero h1{font-size:1.6rem}}
+.hero .sub{color:#a9bcd6;font-size:1.05rem;max-width:62ch;margin:0 0 26px}
+.hero-tags{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:30px}
+.tag{font:600 .72rem/1 var(--mono);letter-spacing:.06em;padding:6px 11px;border-radius:20px;
+  background:rgba(255,255,255,.09);color:#cfe0f5;border:1px solid rgba(255,255,255,.14)}
+.tag.hot{background:rgba(122,165,255,.16);color:#a8c8ff;border-color:rgba(122,165,255,.35)}
+.hero-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:1px;
+  background:rgba(255,255,255,.11);border:1px solid rgba(255,255,255,.11);border-radius:12px;overflow:hidden}
+.hero-stats div{background:#102138;padding:16px 18px}
+.hero-stats b{display:block;font-size:1.7rem;color:#fff;line-height:1.1;letter-spacing:-.02em}
+.hero-stats span{font:500 .73rem/1.3 var(--mono);color:#8fa6c4;letter-spacing:.03em;display:block;margin-top:5px}
+
+.shell{max-width:1180px;margin:0 auto;padding:0 28px;display:grid;grid-template-columns:236px minmax(0,1fr);gap:52px;align-items:start}
+@media(max-width:980px){.shell{grid-template-columns:1fr;gap:0}}
+nav.side{position:sticky;top:20px;padding:34px 0 40px;font-size:.875rem}
+@media(max-width:980px){nav.side{position:static;padding:26px 0 0}}
+nav.side .lbl{font:700 .68rem/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:12px}
+nav.side ol{list-style:none;margin:0;padding:0;counter-reset:n}
+nav.side li{counter-increment:n}
+nav.side a{display:block;padding:5px 10px 5px 30px;border-radius:6px;color:var(--body);text-decoration:none;position:relative;line-height:1.4}
+nav.side a::before{content:counter(n);position:absolute;left:8px;top:5px;font:600 .7rem/1.5 var(--mono);color:var(--muted)}
+nav.side a:hover{background:var(--panel2);color:var(--ink)}
+@media(max-width:980px){nav.side ol{columns:2;column-gap:24px}}
+@media(max-width:560px){nav.side ol{columns:1}}
+main{padding:34px 0 100px;min-width:0}
+
+section{padding-top:14px;margin-bottom:52px}
+section>h2{display:flex;align-items:baseline;gap:14px;font-size:1.55rem;margin:0 0 6px;padding-bottom:14px;border-bottom:2px solid var(--rule)}
+section>h2 .num{font:700 .8rem/1 var(--mono);color:var(--brand);background:var(--brand-soft);
+  padding:7px 9px;border-radius:7px;letter-spacing:.02em;flex:none}
+.kicker{color:var(--muted);font-size:.95rem;margin:14px 0 20px}
+h3{font-size:1.08rem;margin:30px 0 10px}
+h4{font-size:.95rem;margin:20px 0 8px;color:var(--ink)}
+ul,ol{margin:0 0 15px;padding-left:24px}
+li{margin-bottom:7px}
+
+.tw{overflow-x:auto;margin:20px 0;border:1px solid var(--rule);border-radius:11px;background:var(--bg)}
+table{border-collapse:collapse;width:100%;font-size:.9rem;min-width:440px}
+th,td{padding:11px 15px;text-align:left;vertical-align:top;border-bottom:1px solid var(--rule)}
+thead th{background:var(--panel);color:var(--ink);font-weight:640;font-size:.78rem;letter-spacing:.05em;
+  text-transform:uppercase;white-space:nowrap}
+tbody tr:last-child td{border-bottom:0}
+tbody tr:hover{background:var(--panel)}
+td.num,th.num{font-family:var(--mono);font-size:.85rem;white-space:nowrap}
+.up{color:var(--green);font-weight:700}
+.down{color:var(--red);font-weight:700}
+
+.note{border:1px solid var(--rule);border-left:4px solid var(--brand);background:var(--panel);
+  border-radius:0 11px 11px 0;padding:16px 20px;margin:22px 0}
+.note>*:last-child{margin-bottom:0}
+.note .hd{font:700 .7rem/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;margin-bottom:9px;color:var(--brand)}
+.note.warn{border-left-color:var(--amber);background:var(--amber-soft)} .note.warn .hd{color:var(--amber)}
+.note.bad{border-left-color:var(--red);background:var(--red-soft)} .note.bad .hd{color:var(--red)}
+.note.good{border-left-color:var(--green);background:var(--green-soft)} .note.good .hd{color:var(--green)}
+.note.key{border-left-color:var(--violet);background:var(--violet-soft)} .note.key .hd{color:var(--violet)}
+
+.pill{display:inline-block;font:700 .67rem/1 var(--mono);letter-spacing:.07em;text-transform:uppercase;
+  padding:4px 8px;border-radius:5px;vertical-align:1px}
+.p-ok{background:var(--green-soft);color:var(--green)}
+.p-bad{background:var(--red-soft);color:var(--red)}
+.p-warn{background:var(--amber-soft);color:var(--amber)}
+.p-frozen{background:var(--slate-soft);color:var(--slate)}
+
+.grid{display:grid;gap:14px;margin:22px 0}
+.g2{grid-template-columns:repeat(auto-fit,minmax(250px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(205px,1fr))}
+.card{background:var(--panel);border:1px solid var(--rule);border-radius:12px;padding:17px 19px}
+.card h4{margin:0 0 7px;font-size:.98rem;display:flex;align-items:center;gap:8px}
+.card p{margin:0;font-size:.9rem;color:var(--body)}
+.card p+p{margin-top:9px}
+.card .dot{width:9px;height:9px;border-radius:50%;flex:none}
+
+.vs{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:22px 0}
+@media(max-width:640px){.vs{grid-template-columns:1fr}}
+.vs>div{border-radius:12px;padding:18px 20px;border:1px solid var(--rule)}
+.vs .old{background:var(--red-soft);border-color:color-mix(in srgb,var(--red) 22%,transparent)}
+.vs .new{background:var(--green-soft);border-color:color-mix(in srgb,var(--green) 22%,transparent)}
+.vs .lab{font:700 .68rem/1 var(--mono);letter-spacing:.11em;text-transform:uppercase;margin-bottom:9px}
+.vs .old .lab{color:var(--red)} .vs .new .lab{color:var(--green)}
+.vs p{margin:0;font-size:.93rem}
+.vs q{font-size:1.02rem;color:var(--ink);font-weight:600;display:block;margin-bottom:7px}
+
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:12px;margin:22px 0}
+.stat{background:var(--panel);border:1px solid var(--rule);border-radius:12px;padding:15px 17px;box-shadow:var(--shadow)}
+.stat b{display:block;font-size:1.65rem;color:var(--ink);line-height:1.12;letter-spacing:-.022em}
+.stat span{font:500 .74rem/1.35 var(--mono);color:var(--muted);display:block;margin-top:5px}
+.stat.ok b{color:var(--green)}
+
+figure{margin:24px 0;background:var(--panel);border:1px solid var(--rule);border-radius:13px;padding:22px 18px 14px;text-align:center;overflow-x:auto}
+figure svg{max-width:100%;height:auto;display:block;margin:0 auto}
+figcaption{font-size:.82rem;color:var(--muted);margin-top:14px;text-align:center;font-style:italic}
+
+.bars{margin:22px 0;border:1px solid var(--rule);border-radius:12px;padding:20px;background:var(--panel)}
+.bar-row{margin-bottom:16px}
+.bar-row:last-of-type{margin-bottom:0}
+.bar-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:6px;font-size:.87rem}
+.bar-top b{color:var(--ink);font-weight:620}
+.bar-top em{font-family:var(--mono);font-style:normal;font-size:.78rem;color:var(--muted);text-align:right}
+.track{position:relative;height:9px;background:var(--panel2);border-radius:5px;margin-bottom:4px}
+.fill{position:absolute;left:0;top:0;height:100%;border-radius:5px}
+.f-old{background:var(--slate);opacity:.5}
+.f-new{background:var(--brand)}
+.f-new.neg{background:var(--red)}
+.legend{display:flex;flex-wrap:wrap;gap:18px;font-size:.78rem;color:var(--muted);margin-top:16px;padding-top:13px;border-top:1px solid var(--rule)}
+.legend i{display:inline-block;width:16px;height:8px;border-radius:4px;margin-right:6px}
+
+.scn{display:grid;grid-template-columns:repeat(auto-fit,minmax(268px,1fr));gap:13px;margin:22px 0}
+.scn article{background:var(--panel);border:1px solid var(--rule);border-radius:12px;padding:16px 18px;
+  border-top:3px solid var(--brand)}
+.scn h4{font:700 .78rem/1.3 var(--mono);letter-spacing:.02em;margin:0 0 8px;color:var(--ink)}
+.scn p{font-size:.875rem;margin:0 0 10px}
+.scn .m{display:flex;flex-wrap:wrap;gap:6px}
+.scn .m span{font:600 .69rem/1 var(--mono);background:var(--bg);border:1px solid var(--rule);
+  padding:4px 7px;border-radius:5px;color:var(--muted)}
+.scn .m span.g{color:var(--green);border-color:color-mix(in srgb,var(--green) 30%,transparent)}
+.scn .m span.a{color:var(--amber);border-color:color-mix(in srgb,var(--amber) 30%,transparent)}
+
+.pv{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:22px 0}
+@media(max-width:760px){.pv{grid-template-columns:1fr}}
+.pv .box{border-radius:12px;border:1px solid var(--rule);overflow:hidden}
+.pv .box>h3{margin:0;padding:13px 18px;font:700 .78rem/1 var(--mono);letter-spacing:.1em;text-transform:uppercase}
+.pv .yes>h3{background:var(--green-soft);color:var(--green)}
+.pv .no>h3{background:var(--red-soft);color:var(--red)}
+.pv ul{list-style:none;margin:0;padding:14px 18px 16px}
+.pv li{padding-left:22px;position:relative;font-size:.89rem;margin-bottom:10px}
+.pv .yes li::before{content:"\2713";position:absolute;left:0;color:var(--green);font-weight:700}
+.pv .no li::before{content:"\2715";position:absolute;left:0;color:var(--red);font-weight:700}
+.pv li b{color:var(--ink)}
+
+footer{border-top:1px solid var(--rule);background:var(--panel);margin-top:20px}
+footer .in{max-width:1180px;margin:0 auto;padding:26px 28px 40px;font-size:.85rem;color:var(--muted)}
+
+@media print{
+  nav.side{display:none}
+  .shell{display:block;max-width:none;padding:0 10mm}
+  body{font-size:10pt}
+  section>h2{page-break-after:avoid}
+  .tw,figure,.note,.bars,.card,.stat,.scn article,.pv .box{page-break-inside:avoid}
+  a{color:inherit;text-decoration:none}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+</style>
+</head>
+<body>
+
+<header class="hero">
+<div class="in">
+  <div class="eyebrow">Smart India Hackathon &middot; Problem SIH26037</div>
+  <h1>Adaptive Path Planning &amp; Collision Avoidance for Unstructured Indian Roads</h1>
+  <p class="sub">A closed-loop autonomy stack that plans through drivable space instead of lane
+  markings — with every claim measured, and every limitation stated.</p>
+  <div class="hero-tags">
+    <span class="tag hot">System frozen &middot; 2ccd232</span>
+    <span class="tag">Evidence &middot; f3f8eef</span>
+    <span class="tag">CPU only</span>
+    <span class="tag">10–15 min read</span>
+  </div>
+  <div class="hero-stats">
+    <div><b>22/22</b><span>runs completed</span></div>
+    <div><b>0</b><span>collisions</span></div>
+    <div><b>348</b><span>tests passed</span></div>
+    <div><b>0.51 m</b><span>worst clearance</span></div>
+    <div><b>55 ms</b><span>p95 re-plan</span></div>
+  </div>
+</div>
+</header>
+
+<div class="shell">
+<nav class="side">
+  <div class="lbl">Contents</div>
+  <ol>
+    <li><a href="#s1">The problem</a></li>
+    <li><a href="#s2">Our core idea</a></li>
+    <li><a href="#s3">System flow</a></li>
+    <li><a href="#s4">Why each part exists</a></li>
+    <li><a href="#s5">Perception</a></li>
+    <li><a href="#s6">Sensor fusion</a></li>
+    <li><a href="#s7">Tracking</a></li>
+    <li><a href="#s8">Prediction</a></li>
+    <li><a href="#s9">Risk &amp; TTC</a></li>
+    <li><a href="#s10">Behaviour</a></li>
+    <li><a href="#s11">Path planning</a></li>
+    <li><a href="#s12">Collision checking</a></li>
+    <li><a href="#s13">Control &amp; dynamics</a></li>
+    <li><a href="#s14">Safety supervisor</a></li>
+    <li><a href="#s15">Reverse recovery</a></li>
+    <li><a href="#s16">Learned perception</a></li>
+    <li><a href="#s17">Datasets</a></li>
+    <li><a href="#s18">Final validation</a></li>
+    <li><a href="#s19">Scenarios</a></li>
+    <li><a href="#s20">What's different</a></li>
+    <li><a href="#s21">What is proven</a></li>
+    <li><a href="#s22">One-page summary</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<section id="s1">
+<h2><span class="num">01</span> The problem</h2>
+<p class="kicker">Why an Indian road defeats software that was written for a lane.</p>
+
+<p>SIH26037 asks for adaptive path planning and collision avoidance on <strong>unstructured</strong>
+Indian roads. That one word carries the whole difficulty. Almost all publicly available
+autonomous-driving software assumes a structured road: painted lanes, traffic that stays inside them,
+and road users whose next move follows from a small set of rules. An Indian road frequently offers
+none of that.</p>
+
+<div class="grid g3">
+  <div class="card"><h4><span class="dot" style="background:var(--red)"></span>No lane markings</h4>
+  <p>Village and rural roads have no centreline to detect. The primary input of a lane-follower simply does not exist.</p></div>
+  <div class="card"><h4><span class="dot" style="background:var(--amber)"></span>Mixed traffic</h4>
+  <p>Motorcycles, auto-rickshaws, bicycles, cars, buses and trucks share one carriageway. "One vehicle per lane" is meaningless.</p></div>
+  <div class="card"><h4><span class="dot" style="background:var(--red)"></span>Pedestrians &amp; cattle</h4>
+  <p>They enter the carriageway without warning. The threat is not in a lane and never was.</p></div>
+  <div class="card"><h4><span class="dot" style="background:var(--amber)"></span>Sudden crossings</h4>
+  <p>A cow, a child, a cyclist emerging from between parked vehicles. Demands reacting to a <em>predicted</em> path, not a current position.</p></div>
+  <div class="card"><h4><span class="dot" style="background:var(--violet)"></span>Informal merging</h4>
+  <p>Vehicles join from side roads without yielding or signalling. Right-of-way cannot be inferred from road geometry.</p></div>
+  <div class="card"><h4><span class="dot" style="background:var(--cyan)"></span>Narrow roads</h4>
+  <p>Two vehicles cannot pass. Sometimes the only correct action is to reverse — a manoeuvre most stacks cannot perform.</p></div>
+</div>
+
+<div class="note bad">
+  <div class="hd">The core failure</div>
+  <p>A lane-following stack answers one question: <em>"where is the centre of my lane, and how do I
+  stay on it?"</em> On an unstructured road that question has no answer. Worse, when lane detection
+  fails there is nothing to fall back on, because every downstream module was written in terms of a
+  lane. <strong>The failure is not graceful.</strong></p>
+</div>
+</section>
+
+<section id="s2">
+<h2><span class="num">02</span> Our core idea</h2>
+<p class="kicker">Stop looking for a lane. Look for space.</p>
+
+<div class="vs">
+  <div class="old"><div class="lab">Traditional</div>
+    <q>"Find the lane centreline, then follow it."</q>
+    <p>Requires paint. Degrades to nothing when the paint is absent.</p></div>
+  <div class="new"><div class="lab">Ours</div>
+    <q>"Find the safest useful path through the drivable corridor."</q>
+    <p>Requires only road edges and a direction of travel. Paint is optional metadata nothing reads.</p></div>
+</div>
+
+<p>At every planning cycle the system:</p>
+<ol>
+<li>Understands the available <strong>drivable corridor</strong> — two road edges plus a reference
+direction toward the goal.</li>
+<li><strong>Predicts</strong> where every nearby road user will be over the next few seconds.</li>
+<li>Evaluates <strong>collision risk</strong> against those predictions.</li>
+<li>Generates <strong>many candidate trajectories</strong> inside the corridor.</li>
+<li>Discards the infeasible and the colliding, then <strong>scores</strong> and selects the best.</li>
+<li>Hands the trajectory to a controller that drives a vehicle model.</li>
+</ol>
+
+<div class="note key">
+  <div class="hd">It is a loop, not a pipeline</div>
+  <p>The vehicle's own motion changes what the sensors see next cycle, which changes the tracks, the
+  predictions, the risk, and therefore the plan. The plan is re-derived <strong>from scratch 10 times
+  per second</strong>; the controller and vehicle dynamics run at <strong>50&nbsp;Hz</strong>. Nothing
+  is scripted — no scenario contains a pre-authored ego manoeuvre. Every behaviour you observe emerges
+  from these modules interacting.</p>
+</div>
+</section>
+
+<section id="s3">
+<h2><span class="num">03</span> Complete system flow</h2>
+<p class="kicker">Thirteen stages, one closed loop, fifty times a second.</p>
+
+<figure>
+<svg viewBox="0 0 600 690" width="600" role="img" aria-label="Closed-loop system architecture">
+<defs>
+  <marker id="ah" markerWidth="9" markerHeight="9" refX="7" refY="3.2" orient="auto">
+    <path d="M0,0 L7,3.2 L0,6.4 Z" fill="#94a3b8"/></marker>
+</defs>
+<g stroke="#94a3b8" stroke-width="1.6" fill="none" marker-end="url(#ah)">
+  <line x1="250" y1="52" x2="250" y2="60"/><line x1="250" y1="100" x2="250" y2="108"/>
+  <line x1="250" y1="148" x2="250" y2="156"/><line x1="250" y1="196" x2="250" y2="204"/>
+  <line x1="250" y1="244" x2="250" y2="252"/><line x1="250" y1="292" x2="250" y2="300"/>
+  <line x1="250" y1="340" x2="250" y2="348"/><line x1="250" y1="388" x2="250" y2="396"/>
+  <line x1="250" y1="436" x2="250" y2="444"/><line x1="250" y1="484" x2="250" y2="492"/>
+  <line x1="250" y1="532" x2="250" y2="540"/><line x1="250" y1="580" x2="250" y2="588"/>
+</g>
+<g text-anchor="middle" font-family="-apple-system,Segoe UI,Roboto,sans-serif">
+<rect x="110" y="14" width="280" height="38" rx="9" fill="#eceff3" stroke="#94a3b8" stroke-width="1.5"/>
+<text x="250" y="32" font-size="12.5" font-weight="600" fill="#334155">WORLD / SCENARIO</text>
+<text x="250" y="45" font-size="9.5" fill="#5b6b7d" font-family="ui-monospace,Menlo,monospace">road corridor · agents · goal</text>
+
+<rect x="110" y="62" width="280" height="38" rx="9" fill="#eceff3" stroke="#94a3b8" stroke-width="1.5"/>
+<text x="250" y="80" font-size="12.5" font-weight="600" fill="#334155">CAMERA · LiDAR · RADAR</text>
+<text x="250" y="93" font-size="9.5" fill="#5b6b7d" font-family="ui-monospace,Menlo,monospace">20 Hz · 10 Hz · 20 Hz</text>
+
+<rect x="110" y="110" width="280" height="38" rx="9" fill="#e0f5fa" stroke="#0e7490" stroke-width="1.5"/>
+<text x="250" y="128" font-size="12.5" font-weight="600" fill="#0b5566">PERCEPTION</text>
+<text x="250" y="141" font-size="9.5" fill="#0b5566" font-family="ui-monospace,Menlo,monospace">Detection[] in world frame</text>
+
+<rect x="110" y="158" width="280" height="38" rx="9" fill="#e0f5fa" stroke="#0e7490" stroke-width="1.5"/>
+<text x="250" y="176" font-size="12.5" font-weight="600" fill="#0b5566">SENSOR FUSION</text>
+<text x="250" y="189" font-size="9.5" fill="#0b5566" font-family="ui-monospace,Menlo,monospace">Kalman filter + radar EKF</text>
+
+<rect x="110" y="206" width="280" height="38" rx="9" fill="#e0f5fa" stroke="#0e7490" stroke-width="1.5"/>
+<text x="250" y="224" font-size="12.5" font-weight="600" fill="#0b5566">TRACKING</text>
+<text x="250" y="237" font-size="9.5" fill="#0b5566" font-family="ui-monospace,Menlo,monospace">persistent IDs · covariance</text>
+
+<rect x="110" y="254" width="280" height="38" rx="9" fill="#e0f5fa" stroke="#0e7490" stroke-width="1.5"/>
+<text x="250" y="272" font-size="12.5" font-weight="600" fill="#0b5566">PREDICTION</text>
+<text x="250" y="285" font-size="9.5" fill="#0b5566" font-family="ui-monospace,Menlo,monospace">4 s horizon · uncertainty growth</text>
+
+<rect x="110" y="302" width="280" height="38" rx="9" fill="#fdf0dc" stroke="#b45309" stroke-width="1.5"/>
+<text x="250" y="320" font-size="12.5" font-weight="600" fill="#8a3f07">RISK / TTC</text>
+<text x="250" y="333" font-size="9.5" fill="#8a3f07" font-family="ui-monospace,Menlo,monospace">5 levels · NONE to CRITICAL</text>
+
+<rect x="110" y="350" width="280" height="38" rx="9" fill="#fdf0dc" stroke="#b45309" stroke-width="1.5"/>
+<text x="250" y="368" font-size="12.5" font-weight="600" fill="#8a3f07">BEHAVIOUR FSM</text>
+<text x="250" y="381" font-size="9.5" fill="#8a3f07" font-family="ui-monospace,Menlo,monospace">7 states · 14 transitions</text>
+
+<rect x="110" y="398" width="280" height="38" rx="9" fill="#f0e9fe" stroke="#6d28d9" stroke-width="1.5"/>
+<text x="250" y="416" font-size="12.5" font-weight="600" fill="#54209e">ADAPTIVE PLANNER</text>
+<text x="250" y="429" font-size="9.5" fill="#54209e" font-family="ui-monospace,Menlo,monospace">corridor-frame lattice · quintics</text>
+
+<rect x="110" y="446" width="280" height="38" rx="9" fill="#f0e9fe" stroke="#6d28d9" stroke-width="1.5"/>
+<text x="250" y="464" font-size="12.5" font-weight="600" fill="#54209e">COLLISION CHECKING</text>
+<text x="250" y="477" font-size="9.5" fill="#54209e" font-family="ui-monospace,Menlo,monospace">oriented boxes · separating axis</text>
+
+<rect x="110" y="494" width="280" height="38" rx="9" fill="#e2f6ec" stroke="#0f7b47" stroke-width="1.5"/>
+<text x="250" y="512" font-size="12.5" font-weight="600" fill="#0b5c35">CONTROLLER</text>
+<text x="250" y="525" font-size="9.5" fill="#0b5c35" font-family="ui-monospace,Menlo,monospace">Stanley + PID</text>
+
+<rect x="110" y="542" width="280" height="38" rx="9" fill="#fdeae8" stroke="#b42318" stroke-width="1.8"/>
+<text x="250" y="560" font-size="12.5" font-weight="600" fill="#8c1b12">SAFETY SUPERVISOR</text>
+<text x="250" y="573" font-size="9.5" fill="#8c1b12" font-family="ui-monospace,Menlo,monospace">independent brake override</text>
+
+<rect x="110" y="590" width="280" height="38" rx="9" fill="#e2f6ec" stroke="#0f7b47" stroke-width="1.5"/>
+<text x="250" y="608" font-size="12.5" font-weight="600" fill="#0b5c35">VEHICLE DYNAMICS</text>
+<text x="250" y="621" font-size="9.5" fill="#0b5c35" font-family="ui-monospace,Menlo,monospace">kinematic bicycle · actuator limits</text>
+</g>
+<path d="M390 609 L470 609 L470 33 L394 33" stroke="#94a3b8" stroke-width="1.6" fill="none" marker-end="url(#ah)"/>
+<text x="486" y="321" font-size="10.5" font-weight="600" fill="#8fa0b3" font-family="ui-monospace,Menlo,monospace"
+  transform="rotate(90 486 321)" text-anchor="middle">CLOSED LOOP · 50 Hz</text>
+<path d="M110 321 L60 321 L60 561 L106 561" stroke="#b42318" stroke-width="1.5" fill="none"
+  marker-end="url(#ah)" stroke-dasharray="4 3" opacity=".75"/>
+<text x="46" y="441" font-size="9.5" font-weight="600" fill="#b42318" font-family="ui-monospace,Menlo,monospace"
+  transform="rotate(-90 46 441)" text-anchor="middle" opacity=".8">risk · independent path</text>
+</svg>
+<figcaption>Risk reaches the safety supervisor directly, bypassing the planner — so a planner fault
+cannot disable emergency braking.</figcaption>
+</figure>
+
+<div class="grid g2">
+<div class="card"><h4>World / scenario</h4><p>A YAML file defines the road corridor, the ego's start and goal, and the other road users with their behaviours. Advances every 20 ms; the only source of truth.</p></div>
+<div class="card"><h4>Sensors</h4><p>Sensor <em>models</em>, not renderers. Each converts ground-truth agents into noisy measurements subject to FOV, range, occlusion, dropout, rate and latency.</p></div>
+<div class="card"><h4>Perception</h4><p>Emits <code>Detection</code> records already in the world frame: position, a 2×2 covariance, plus whatever that sensor knows — class, extent, radial speed.</p></div>
+<div class="card"><h4>Sensor fusion</h4><p>Combines all three sensors into one estimate per object. Kalman filter on <code>[x, y, vx, vy]</code>; radar radial speed enters through an EKF update.</p></div>
+<div class="card"><h4>Tracking</h4><p>Persistent identities across frames. Tentative on first sight, confirmed after 3 hits, deleted after 1.0 s without an update.</p></div>
+<div class="card"><h4>Prediction</h4><p>Projects each track 4 s ahead with a constant-acceleration model, growing positional uncertainty with time.</p></div>
+<div class="card"><h4>Risk / TTC</h4><p>Sweeps the ego's predicted footprint against every object's, producing TTC, a collision probability and a level from NONE to CRITICAL.</p></div>
+<div class="card"><h4>Behaviour FSM</h4><p>Converts risk into a <em>policy</em>: target speed, whether lateral avoidance is allowed, whether only stopping is acceptable, whether reversing is permitted.</p></div>
+<div class="card"><h4>Adaptive planner</h4><p>Generates candidates inside the corridor under that policy, and selects one. Never returns nothing.</p></div>
+<div class="card"><h4>Collision checking</h4><p>Rejects candidates that leave the corridor, exceed steering limits, or breach the safety margin against a predicted footprint.</p></div>
+<div class="card"><h4>Controller</h4><p>Stanley for steering, PID for speed. Turns the chosen trajectory into steering angle, acceleration and brake.</p></div>
+<div class="card"><h4>Safety supervisor</h4><p>Ignores the plan's reasoning entirely. Looks only at physical TTC, risk level, and whether the planner failed. Can override with full braking.</p></div>
+<div class="card"><h4>Vehicle dynamics</h4><p>Kinematic bicycle model with actuator saturation. <strong>The only code permitted to change the ego pose.</strong></p></div>
+</div>
+</section>
+
+<section id="s4">
+<h2><span class="num">04</span> Why each component exists</h2>
+<p class="kicker">Every layer earns its place by solving something the layer above cannot.</p>
+<div class="tw"><table>
+<thead><tr><th>Component</th><th>Why we need it</th><th>What we use</th></tr></thead>
+<tbody>
+<tr><td><b>Perception</b></td><td>Raw sensors do not report objects; something must turn signals into measurements</td><td>Camera / LiDAR / radar models emitting <code>Detection</code></td></tr>
+<tr><td><b>Sensor fusion</b></td><td>No single sensor gives position, class and velocity well — each is best at one</td><td>Linear Kalman filter <code>[x,y,vx,vy]</code>; EKF for radar radial speed</td></tr>
+<tr><td><b>Tracking</b></td><td>A detection is one instant with no identity; velocity needs two views of the same object</td><td>Gated greedy nearest-neighbour, Mahalanobis χ²&nbsp;=&nbsp;9.21, confirm at 3 hits</td></tr>
+<tr><td><b>Prediction</b></td><td>Reacting to where an object <em>is</em> is already too late at 10 m/s</td><td>Constant-acceleration, 4 s horizon, per-class uncertainty, intent priors</td></tr>
+<tr><td><b>Risk / TTC</b></td><td>The planner needs a scalar it can act on; the safety layer needs one it can trust</td><td>Footprint distance series, band collision probability, 5 risk levels</td></tr>
+<tr><td><b>Behaviour</b></td><td>Separating <em>what to do</em> from <em>how to do it</em> keeps both auditable</td><td>Declarative FSM, 7 states, 14 transitions in one table, dual hysteresis</td></tr>
+<tr><td><b>Path planning</b></td><td>The corridor admits infinite paths; we need one safe <em>and</em> progressing</td><td>Corridor-frame lattice, quintic lateral, jerk-limited speed profiles</td></tr>
+<tr><td><b>Collision check</b></td><td>A path safe at its centreline still collides — the vehicle has width</td><td>Oriented-box footprints, separating-axis distance, swept over the horizon</td></tr>
+<tr><td><b>Controller</b></td><td>A trajectory is a wish; the vehicle has inertia and steering limits</td><td>Stanley with curvature feed-forward, PID with anti-windup</td></tr>
+<tr><td><b>Vehicle dynamics</b></td><td>Without real dynamics the results are meaningless</td><td>Kinematic bicycle, actuator angle + rate saturation</td></tr>
+<tr><td><b>Safety supervisor</b></td><td>If the planner is wrong, nothing downstream of it would notice</td><td>Independent override: TTC &lt; 1.0 s, CRITICAL risk, or planner fallback → 8.0 m/s²</td></tr>
+</tbody></table></div>
+</section>
+
+<section id="s5">
+<h2><span class="num">05</span> Perception</h2>
+<p class="kicker">Three sensors, because each answers a different question well and the others badly.</p>
+
+<div class="grid g3">
+<div class="card" style="border-top:3px solid var(--cyan)">
+  <h4>Camera — <em>what is it?</em></h4>
+  <p><b>20 Hz &middot; 60 m &middot; 100° FOV</b><br>Position with range-dominated covariance, object class, class confidence.</p>
+  <p style="color:var(--red)"><b>Weak at:</b> range — monocular depth error grows with distance.</p></div>
+<div class="card" style="border-top:3px solid var(--violet)">
+  <h4>LiDAR — <em>where, how big?</em></h4>
+  <p><b>10 Hz &middot; 80 m &middot; 360° FOV</b><br>Position with tight isotropic covariance, plus object length, width and heading.</p>
+  <p style="color:var(--red)"><b>Weak at:</b> no class, no direct velocity.</p></div>
+<div class="card" style="border-top:3px solid var(--amber)">
+  <h4>Radar — <em>how fast closing?</em></h4>
+  <p><b>20 Hz &middot; 120 m &middot; 60° FOV</b><br>Position with bearing-dominated covariance, and a direct <b>radial speed</b> measurement.</p>
+  <p style="color:var(--red)"><b>Weak at:</b> coarse bearing; small objects may be missed.</p></div>
+</div>
+
+<div class="note">
+  <div class="hd">Why three, not one</div>
+  <p>Their errors are <strong>complementary, not merely redundant</strong>. The camera's covariance is
+  long and thin <em>along</em> the viewing ray; the radar's is thin <em>across</em> it. Fusing them
+  gives a position better than either alone. And radar's radial speed is a direct measurement — it
+  converges an object's velocity estimate far faster than differentiating positions ever could.</p>
+</div>
+
+<h3>Two learned camera components</h3>
+<p>Both built and validated <strong>offline</strong> on real Indian-road imagery:</p>
+<div class="grid g2">
+<div class="card"><h4>Drivable-space segmentation</h4><p>Fast-SCNN trained on IDD-Lite turns a road
+photograph into a drivable-area mask, from which a corridor is extracted. That corridor can drive the
+real planner through a safety gate — the planner cannot tell it apart from a corridor loaded from
+YAML. <b>Drivable IoU 0.877.</b></p></div>
+<div class="card"><h4>Object detection</h4><p>Faster R-CNN MobileNetV3-320-FPN fine-tuned on UVH-26,
+detecting Indian traffic participants including auto-rickshaws — a class COCO does not have. Full
+results in <a href="#s16">section 16</a>.</p></div>
+</div>
+</section>
+
+<section id="s6">
+<h2><span class="num">06</span> Sensor fusion</h2>
+<p class="kicker">One estimate per object, with honest uncertainty attached.</p>
+
+<div class="note key">
+  <div class="hd">The idea in three lines</div>
+  <p><strong>Camera</strong> tells us <em>what</em> an object probably is.<br>
+  <strong>LiDAR</strong> tells us <em>where</em> it is and <em>how big</em>.<br>
+  <strong>Radar</strong> tells us <em>how fast</em> it is closing on us.</p>
+</div>
+
+<div class="grid g2">
+<div class="card"><h4>Kalman filter</h4><p>Each track carries state <code>[x, y, vx, vy]</code> and a 4×4
+covariance. Between measurements the state is predicted forward on a constant-velocity model with
+acceleration process noise; on arrival it is corrected, weighted by the relative confidence of
+prediction and measurement.</p></div>
+<div class="card"><h4>Radar EKF</h4><p>Radial speed is <em>not</em> linear in the state — it is the
+object's velocity projected onto the sensor-to-object direction, minus the ego's own. That is
+linearised about the current estimate, making it an <strong>extended</strong> Kalman update. The only
+non-linear update in the filter.</p></div>
+<div class="card"><h4>Covariance</h4><p>Every published track carries a real 2×2 positional covariance,
+not a placeholder. Prediction grows it with time and the planner uses it to prefer routes clear of
+uncertain objects — so an uncertain object is treated as <em>more</em> dangerous, correctly.</p></div>
+<div class="card"><h4>Mahalanobis gating</h4><p>Before associating a detection with a track we ask
+whether it is plausibly <em>this</em> track given its uncertainty — a distance normalised by
+covariance, gated at χ²&nbsp;=&nbsp;9.21 (99%, 2 dof). Anything outside every gate starts a new track
+rather than corrupting an existing one.</p></div>
+</div>
+
+<p><strong>Timestamp-aware measurements.</strong> Camera, LiDAR and radar do not fire simultaneously
+and each has its own latency. Each track therefore carries an explicit <code>state_time</code> — the
+moment its state is valid <em>at</em>, which is not the same as the time of its last measurement.
+Measurements too stale, too far out of order, or stamped in the future are dropped rather than
+silently applied.</p>
+
+<div class="note warn">
+  <div class="hd">Shipped disabled — deliberately</div>
+  <p>Full temporal fusion (predicting each measurement to its own timestamp) is implemented and
+  tested, but <strong>ships off</strong>. Enabling it makes the vehicle measurably more conservative,
+  because it removes an over-confidence the existing collision margins were tuned against. Turning it
+  on is a planner-retuning decision, deliberately out of scope. See
+  <code>docs/PHASE4_TEMPORAL_FUSION.md</code>.</p>
+</div>
+</section>
+
+<section id="s7">
+<h2><span class="num">07</span> Tracking</h2>
+<p class="kicker">A detection is a moment. A track is a story — and prediction needs the story.</p>
+
+<p><strong>Why one detection per frame is not enough.</strong> A detection is a single instant with no
+identity. It cannot tell you velocity — that needs two observations of <em>the same object</em>. It
+cannot survive a moment of occlusion. And a sensor that drops out for one frame would, without
+tracking, look exactly like an object that ceased to exist.</p>
+
+<div class="tw"><table>
+<thead><tr><th>What tracking adds</th><th>Why it matters</th></tr></thead>
+<tbody>
+<tr><td><b>Persistent ID</b></td><td><code>trk_1</code>, <code>trk_2</code>… stable across frames, so history means something</td></tr>
+<tr><td><b>Position</b></td><td>Fused estimate, better than any single sensor</td></tr>
+<tr><td><b>Velocity</b></td><td>Estimated by the filter, converged fast by radar's direct radial measurement</td></tr>
+<tr><td><b>History</b></td><td>The basis for acceleration estimation, and therefore prediction</td></tr>
+<tr><td><b>Covariance</b></td><td>Honest positional uncertainty, consumed by risk and the planner</td></tr>
+<tr><td><b>Class &amp; confidence</b></td><td>Confidence-weighted votes from camera detections; <code>UNKNOWN</code> below a floor</td></tr>
+</tbody></table></div>
+
+<figure>
+<svg viewBox="0 0 700 96" width="700" role="img" aria-label="Track lifecycle">
+<defs><marker id="ah2" markerWidth="9" markerHeight="9" refX="7" refY="3.2" orient="auto">
+<path d="M0,0 L7,3.2 L0,6.4 Z" fill="#94a3b8"/></marker></defs>
+<g text-anchor="middle" font-family="-apple-system,Segoe UI,Roboto,sans-serif">
+<rect x="6" y="30" width="112" height="40" rx="8" fill="#e0f5fa" stroke="#0e7490" stroke-width="1.5"/>
+<text x="62" y="48" font-size="11.5" font-weight="600" fill="#0b5566">DETECTION</text>
+<text x="62" y="62" font-size="9" fill="#0b5566" font-family="ui-monospace,monospace">unmatched</text>
+<rect x="150" y="30" width="112" height="40" rx="8" fill="#fdf0dc" stroke="#b45309" stroke-width="1.5"/>
+<text x="206" y="48" font-size="11.5" font-weight="600" fill="#8a3f07">TENTATIVE</text>
+<text x="206" y="62" font-size="9" fill="#8a3f07" font-family="ui-monospace,monospace">dies at 0.5 s</text>
+<rect x="294" y="30" width="112" height="40" rx="8" fill="#e2f6ec" stroke="#0f7b47" stroke-width="1.5"/>
+<text x="350" y="48" font-size="11.5" font-weight="600" fill="#0b5c35">CONFIRMED</text>
+<text x="350" y="62" font-size="9" fill="#0b5c35" font-family="ui-monospace,monospace">published</text>
+<rect x="438" y="30" width="112" height="40" rx="8" fill="#eef2f7" stroke="#64748b" stroke-width="1.5"/>
+<text x="494" y="48" font-size="11.5" font-weight="600" fill="#334155">COASTING</text>
+<text x="494" y="62" font-size="9" fill="#334155" font-family="ui-monospace,monospace">no update</text>
+<rect x="582" y="30" width="112" height="40" rx="8" fill="#fdeae8" stroke="#b42318" stroke-width="1.5"/>
+<text x="638" y="48" font-size="11.5" font-weight="600" fill="#8c1b12">DELETED</text>
+<text x="638" y="62" font-size="9" fill="#8c1b12" font-family="ui-monospace,monospace">after 1.0 s</text>
+</g>
+<g stroke="#94a3b8" stroke-width="1.6" fill="none" marker-end="url(#ah2)">
+<line x1="120" y1="50" x2="145" y2="50"/><line x1="264" y1="50" x2="289" y2="50"/>
+<line x1="408" y1="50" x2="433" y2="50"/><line x1="552" y1="50" x2="577" y2="50"/></g>
+<text x="206" y="22" font-size="9" font-weight="600" fill="#64748b" text-anchor="middle" font-family="ui-monospace,monospace">3 hits</text>
+<path d="M494 30 C494 8, 350 8, 350 27" stroke="#0f7b47" stroke-width="1.4" fill="none"
+  marker-end="url(#ah2)" stroke-dasharray="3 3"/>
+<text x="424" y="18" font-size="9" font-weight="600" fill="#0f7b47" text-anchor="middle" font-family="ui-monospace,monospace">re-detected</text>
+</svg>
+<figcaption>Deletion is time-based, not frame-based, so a 10 Hz LiDAR-only object survives the empty
+ingests between its frames.</figcaption>
+</figure>
+
+<div class="stats">
+<div class="stat"><b>0.865–0.997</b><span>track recall</span></div>
+<div class="stat"><b>0.745–1.000</b><span>track precision</span></div>
+<div class="stat"><b>0.635 m</b><span>worst position error</span></div>
+<div class="stat"><b>0.396 m/s</b><span>worst velocity error</span></div>
+</div>
+</section>
+
+<section id="s8">
+<h2><span class="num">08</span> Motion prediction</h2>
+<p class="kicker">Four seconds ahead, with an uncertainty envelope that grows honestly.</p>
+
+<div class="grid g2">
+<div class="card"><h4>Constant-acceleration model</h4><p>The predictor is the only module that sees
+successive <code>ObjectState</code>s, so it estimates each object's acceleration itself — least-squares
+slope over recent velocity history, low-pass filtered, clamped per class. With too little history the
+acceleration is zero and it reduces exactly to constant velocity. Beyond a short window the speed is
+held: constant acceleration is not credible for long.</p></div>
+<div class="card"><h4>Intent priors</h4><p>For free movers — a pedestrian, a cow — the <em>sign</em> of
+acceleration is read as intent. Braking hard? Probably about to stop, so grow uncertainty
+<em>less</em>. Speeding up? Committing to the crossing, so grow it <em>more</em>. A small, explicit,
+tunable prior.</p></div>
+<div class="card"><h4>Road-following prior</h4><p>A vehicle whose class follows roads and whose heading
+is within 30° of the corridor is predicted <em>along the corridor</em>, not in a straight line, with
+its small lateral velocity decaying — that component is mostly estimation noise.</p></div>
+<div class="card"><h4>Uncertainty growth</h4><p>Positional uncertainty grows with the square of time,
+seeded by the track's own covariance and scaled per class. A pedestrian's envelope balloons faster
+than a bus's, which is correct.</p></div>
+</div>
+
+<div class="note">
+  <div class="hd">Why this beats reacting to current position</div>
+  <p>At 10 m/s a vehicle covers 10 m in the second it takes to notice, decide and brake. A system that
+  only sees where a cow <em>is</em> commits to a plan that is already wrong. Seeing where the cow
+  <em>will be</em>, with an uncertainty envelope, lets the planner steer around it early and gently
+  rather than braking hard and late.</p>
+</div>
+
+<div class="note warn">
+  <div class="hd">Not a neural predictor</div>
+  <p>This is an explicit kinematic model with hand-set priors. Deliberately so: it is inspectable, it
+  degrades predictably, and every one of its assumptions is written down.</p>
+</div>
+</section>
+
+<section id="s9">
+<h2><span class="num">09</span> Risk and TTC</h2>
+<p class="kicker">Distance ranks threats backwards. Something better is required.</p>
+
+<div class="vs">
+<div class="old"><div class="lab">Naive</div><q>distance ÷ closing speed</q>
+<p>A cow 5 m away at the roadside scores worse than a cow 30 m away walking into your path. It also
+ignores direction entirely.</p></div>
+<div class="new"><div class="lab">Ours</div><q>swept footprint overlap under uncertainty</q>
+<p>The ego's rectangle is swept against each object's <em>predicted</em> rectangle over 4 s, and
+weighted by probability, time and object class.</p></div>
+</div>
+
+<h3>Three views of the ego's own motion</h3>
+<div class="tw"><table>
+<thead><tr><th>View</th><th>Question</th><th>Consumed by</th></tr></thead>
+<tbody>
+<tr><td><b>Route</b></td><td>"If I proceed along my route at desired speed, what happens?"</td><td>Behaviour FSM — so a threat stays visible after the planner has already slowed</td></tr>
+<tr><td><b>Physical</b></td><td>"At my <em>current</em> heading and speed, what happens?"</td><td>Safety supervisor. A stopped vehicle has infinite physical TTC</td></tr>
+<tr><td><b>Planned</b></td><td>"Along the trajectory I actually chose, what happens?"</td><td>Behaviour FSM — is the current plan clear?</td></tr>
+</tbody></table></div>
+
+<p>From the distance series <code>d(t)</code> the engine derives: whether it ever falls inside the
+safety margin; the <strong>TTC</strong> — the first time it does <em>while still closing</em>; a
+collision probability <code>p(t)</code> from <code>d(t)</code> and prediction uncertainty
+<code>σ(t)</code>; and a <strong>risk score</strong>
+<code>w_type × max<sub>t</sub>[ p(t)·exp(−t/τ) ]</code> with τ = 2.0 s, so near-term threats dominate
+and a pedestrian outweighs a truck.</p>
+
+<div class="tw"><table>
+<thead><tr><th>Level</th><th class="num">Trigger</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td><span class="pill p-ok">NONE</span></td><td class="num">score &lt; 0.05</td><td>Cruise</td></tr>
+<tr><td><span class="pill p-ok">LOW</span></td><td class="num">score ≥ 0.05</td><td>Cruise or follow</td></tr>
+<tr><td><span class="pill p-warn">MEDIUM</span></td><td class="num">score ≥ 0.20</td><td>→ CAUTION, speed capped to 60%</td></tr>
+<tr><td><span class="pill p-warn">HIGH</span></td><td class="num">score ≥ 0.45 or route TTC &lt; 3.0 s</td><td>→ AVOID, lateral avoidance prioritised</td></tr>
+<tr><td><span class="pill p-bad">CRITICAL</span></td><td class="num">physical TTC &lt; 1.2 s</td><td>→ EMERGENCY_BRAKE</td></tr>
+</tbody></table></div>
+
+<div class="note key">
+  <div class="hd">A deliberate ceiling</div>
+  <p>The risk-score ladder tops out at HIGH. <code>CRITICAL</code> can only be raised by the
+  <em>physical</em> view. That is why a stopped vehicle facing an obstacle is HIGH, not an emergency —
+  it is not moving, so it is not about to hit anything.</p>
+</div>
+</section>
+
+<section id="s10">
+<h2><span class="num">10</span> Behaviour / decision</h2>
+<p class="kicker">Seven states, fourteen transitions, all in one readable table.</p>
+
+<div class="tw"><table>
+<thead><tr><th>State</th><th>When</th><th>Planner / control effect</th></tr></thead>
+<tbody>
+<tr><td><span class="pill p-ok">CRUISE</span></td><td>No elevated risk</td><td>Target = desired speed, free lateral choice</td></tr>
+<tr><td><span class="pill p-ok">FOLLOW</span></td><td>Slower lead in the lateral band, low other risk</td><td>Speed matched to lead with a 1.5 s time gap</td></tr>
+<tr><td><span class="pill p-warn">CAUTION</span></td><td>MEDIUM risk</td><td>Speed capped to 60% of desired</td></tr>
+<tr><td><span class="pill p-warn">AVOID</span></td><td>HIGH risk with predicted intersection</td><td>Speed capped to 70%, lateral avoidance prioritised</td></tr>
+<tr><td><span class="pill p-bad">EMERGENCY_BRAKE</span></td><td>CRITICAL physical TTC <em>while moving</em>, or no feasible plan</td><td>Only stop trajectories; full braking</td></tr>
+<tr><td><span class="pill p-frozen">STOPPED</span></td><td>From EMERGENCY_BRAKE once stationary, or 1.0 s planner standstill</td><td>Planner keeps searching at caution speed</td></tr>
+<tr><td><span class="pill p-frozen">REVERSING</span></td><td>STOPPED ≥ 3.0 s with no forward candidate</td><td>Reverse candidates generated; forward stays allowed</td></tr>
+</tbody></table></div>
+
+<figure>
+<svg viewBox="0 0 720 320" width="720" role="img" aria-label="Behaviour state machine">
+<defs><marker id="ah3" markerWidth="8" markerHeight="8" refX="6.5" refY="2.9" orient="auto">
+<path d="M0,0 L6.5,2.9 L0,5.8 Z" fill="#8fa0b3"/></marker></defs>
+<g stroke="#8fa0b3" stroke-width="1.5" fill="none" marker-end="url(#ah3)">
+<path d="M78 58 L78 100"/><path d="M96 100 L96 62" stroke-dasharray="3 3"/>
+<path d="M142 34 L216 66"/><path d="M142 122 L216 90"/>
+<path d="M278 100 L278 154"/><path d="M296 154 L296 104" stroke-dasharray="3 3"/>
+<path d="M340 70 L418 40"/><path d="M340 168 L432 48"/>
+<path d="M500 56 L500 134"/>
+<path d="M482 136 L400 102 L342 86" stroke-dasharray="3 3"/>
+<path d="M500 174 L500 240"/>
+<path d="M438 262 L360 206 L342 192" stroke-dasharray="3 3"/>
+<path d="M436 156 L342 174" stroke-dasharray="3 3"/>
+</g>
+<g text-anchor="middle" font-family="-apple-system,Segoe UI,Roboto,sans-serif" font-size="11" font-weight="600">
+<rect x="20" y="20" width="116" height="38" rx="19" fill="#e2f6ec" stroke="#0f7b47" stroke-width="1.6"/><text x="78" y="44" fill="#0b5c35">CRUISE</text>
+<rect x="20" y="102" width="116" height="38" rx="19" fill="#e2f6ec" stroke="#0f7b47" stroke-width="1.6"/><text x="78" y="126" fill="#0b5c35">FOLLOW</text>
+<rect x="220" y="60" width="116" height="38" rx="19" fill="#fdf0dc" stroke="#b45309" stroke-width="1.6"/><text x="278" y="84" fill="#8a3f07">CAUTION</text>
+<rect x="220" y="156" width="116" height="38" rx="19" fill="#fdf0dc" stroke="#b45309" stroke-width="1.6"/><text x="278" y="180" fill="#8a3f07">AVOID</text>
+<rect x="420" y="18" width="160" height="38" rx="19" fill="#fdeae8" stroke="#b42318" stroke-width="1.9"/><text x="500" y="42" fill="#8c1b12">EMERGENCY_BRAKE</text>
+<rect x="436" y="136" width="128" height="38" rx="19" fill="#eef2f7" stroke="#64748b" stroke-width="1.6"/><text x="500" y="160" fill="#334155">STOPPED</text>
+<rect x="436" y="242" width="128" height="38" rx="19" fill="#f0e9fe" stroke="#6d28d9" stroke-width="1.6"/><text x="500" y="266" fill="#54209e">REVERSING</text>
+</g>
+<g font-family="ui-monospace,Menlo,monospace" font-size="8.5" font-weight="600" fill="#8fa0b3" text-anchor="middle">
+<text x="58" y="84">lead</text><text x="120" y="84">clear</text>
+<text x="176" y="40">MEDIUM</text><text x="172" y="118">MEDIUM</text>
+<text x="246" y="128">HIGH</text><text x="318" y="128">clear</text>
+<text x="382" y="42">CRITICAL</text><text x="374" y="120">no plan</text>
+<text x="524" y="100">halted</text><text x="404" y="74">released</text>
+<text x="528" y="212">boxed in 3 s</text><text x="368" y="228">plan found</text>
+<text x="388" y="158">risk clear</text>
+</g>
+</svg>
+<figcaption>Solid arrows escalate (immediate). Dashed arrows de-escalate — they need a 0.3 s dwell
+<em>and</em> a lower exit threshold than the entry threshold.</figcaption>
+</figure>
+
+<div class="note">
+  <div class="hd">Two hysteresis mechanisms</div>
+  <p>Escalation to a more severe state is <strong>immediate</strong> — safety must not be delayed.
+  De-escalation requires a minimum dwell of 0.3 s <em>and</em> must clear a <strong>lower</strong>
+  exit threshold than the entry threshold (<code>caution_exit_score</code> 0.10 against entry 0.20;
+  <code>avoid_exit_score</code> 0.25 against entry 0.45). Together these stop the machine
+  chattering.</p>
+</div>
+</section>
+
+<section id="s11">
+<h2><span class="num">11</span> Adaptive path planning</h2>
+<p class="kicker">The heart of the project — and the reason it works without lane markings.</p>
+
+<h3>The corridor frame</h3>
+<p>The road is a <strong>drivable corridor</strong>: a left boundary, a right boundary, and a reference
+polyline giving the direction of travel toward the goal. The reference is <em>not</em> a lane line — it
+is a direction. Width may vary along the road and need not be symmetric.</p>
+<p>Positions are expressed in corridor (Frenet) coordinates: <code>s</code> = distance along the
+reference, <code>d</code> = lateral offset (+ left). Planning in <code>(s, d)</code> rather than
+<code>(x, y)</code> is exactly what makes the approach lane-independent — <em>"move 1.5 m right of my
+current line"</em> is one number, on a straight road or a curve.</p>
+
+<h3>The planning cycle</h3>
+<figure>
+<svg viewBox="0 0 640 300" width="640" role="img" aria-label="Planning funnel">
+<defs><marker id="ah4" markerWidth="8" markerHeight="8" refX="6.5" refY="2.9" orient="auto">
+<path d="M0,0 L6.5,2.9 L0,5.8 Z" fill="#94a3b8"/></marker></defs>
+<g text-anchor="middle" font-family="-apple-system,Segoe UI,Roboto,sans-serif" font-size="12" font-weight="600">
+<rect x="90" y="8" width="460" height="34" rx="7" fill="#eef2f7" stroke="#64748b" stroke-width="1.4"/>
+<text x="320" y="30" fill="#334155">CURRENT STATE — ego pose, speed, corridor frame</text>
+<rect x="110" y="56" width="420" height="34" rx="7" fill="#f0e9fe" stroke="#6d28d9" stroke-width="1.4"/>
+<text x="320" y="78" fill="#54209e">CANDIDATE GENERATION — offsets × terminal speeds</text>
+<rect x="150" y="104" width="340" height="34" rx="7" fill="#e0f5fa" stroke="#0e7490" stroke-width="1.4"/>
+<text x="320" y="126" fill="#0b5566">FEASIBILITY FILTER — curvature, accel, bounds</text>
+<rect x="190" y="152" width="260" height="34" rx="7" fill="#fdeae8" stroke="#b42318" stroke-width="1.4"/>
+<text x="320" y="174" fill="#8c1b12">COLLISION CHECK — swept footprints</text>
+<rect x="225" y="200" width="190" height="34" rx="7" fill="#fdf0dc" stroke="#b45309" stroke-width="1.4"/>
+<text x="320" y="222" fill="#8a3f07">COST — 13 components</text>
+<rect x="248" y="248" width="144" height="38" rx="9" fill="#e2f6ec" stroke="#0f7b47" stroke-width="2"/>
+<text x="320" y="266" fill="#0b5c35" font-weight="700">BEST TRAJECTORY</text>
+<text x="320" y="279" font-size="9" fill="#0b5c35" font-family="ui-monospace,monospace">to the controller</text>
+</g>
+<text x="566" y="79" font-size="12" font-weight="700" fill="#6d28d9" font-family="ui-monospace,monospace">50–90</text>
+<g stroke="#94a3b8" stroke-width="1.5" fill="none" marker-end="url(#ah4)">
+<line x1="320" y1="42" x2="320" y2="51"/><line x1="320" y1="90" x2="320" y2="99"/>
+<line x1="320" y1="138" x2="320" y2="147"/><line x1="320" y1="186" x2="320" y2="195"/>
+<line x1="320" y1="234" x2="320" y2="243"/></g>
+<path d="M244 267 C120 267, 82 180, 82 46" stroke="#0f7b47" stroke-width="1.5" fill="none"
+  marker-end="url(#ah4)" stroke-dasharray="4 3"/>
+<text x="52" y="158" font-size="9.5" font-weight="600" fill="#0f7b47" font-family="ui-monospace,monospace"
+  transform="rotate(-90 52 158)" text-anchor="middle">every 100 ms, from scratch</text>
+</svg>
+<figcaption>The funnel narrows: many candidates in, exactly one out — and the whole thing runs again
+100 ms later from the vehicle's actual new pose.</figcaption>
+</figure>
+
+<h3>How a candidate is built</h3>
+<div class="grid g2">
+<div class="card"><h4>Lateral — quintic polynomial</h4><p>In arc length <code>σ</code>, matching the
+ego's current offset, heading <em>and curvature</em> at <code>σ&nbsp;=&nbsp;0</code>, reaching
+<code>d_end</code> with zero slope and zero curvature at <code>σ&nbsp;=&nbsp;S</code>. Quintic because
+six boundary conditions need six coefficients; matching curvature at both ends is what makes the path
+steerable without a jerk at the join. <code>S</code> is chosen so peak curvature stays inside the
+steering limit — so a wide shift from a crawl is generated <em>feasibly</em> rather than generated too
+sharp and thrown away.</p></div>
+<div class="card"><h4>Longitudinal — jerk-limited S-curve</h4><p>Seeded from the ego's <em>current</em>
+acceleration, so re-planning at 10 Hz does not repeatedly restart from zero acceleration and pin the
+vehicle near zero for ever. A hard stop keeps the instantaneous full-braking ramp: safety beats
+comfort.</p></div>
+</div>
+
+<h3>Feasibility filter — hard rejections</h3>
+<div class="tw"><table>
+<thead><tr><th>Reason</th><th>Test</th></tr></thead>
+<tbody>
+<tr><td><code>CURVATURE_LIMIT</code></td><td>|κ| &gt; tan(δ_max)/L — the wheel does not turn that far</td></tr>
+<tr><td><code>LATERAL_ACCELERATION_LIMIT</code></td><td>v²|κ| &gt; a_lat_max — comfort and grip</td></tr>
+<tr><td><code>OUTSIDE_DRIVABLE_SPACE</code></td><td>Any footprint corner leaves the corridor at any time</td></tr>
+<tr><td><code>PREDICTED_COLLISION</code></td><td>Footprint enters the safety margin of a predicted object</td></tr>
+<tr><td><code>TERMINAL_STATE_EXPOSED</code></td><td>Continuing from the <em>end</em> pose gets hit beyond the horizon</td></tr>
+</tbody></table></div>
+<p>That last rejection matters more than it sounds. It rules out both <em>"stop exactly where you will
+be run into"</em> and <em>"creep toward a route that is already blocked"</em> — the two ways a myopic
+planner makes a locally reasonable, globally fatal choice.</p>
+
+<h3>Scoring — 13 weighted components</h3>
+<div class="grid g3">
+<div class="card"><h4>collision</h4><p>Soft risk, probability-weighted and time-discounted. Non-zero even for candidates that <em>pass</em> the hard check — so the planner prefers routes clear of uncertain predictions.</p></div>
+<div class="card"><h4>clearance · boundary</h4><p>Distance to the nearest predicted object footprint, and to the road edge.</p></div>
+<div class="card"><h4>progress</h4><p>How far along the corridor it gets. Its weight is <b>multiplied</b> the longer the ego stands still, so a feasible bypass eventually beats freezing.</p></div>
+<div class="card"><h4>smoothness · curvature · jerk</h4><p>Ride quality and steering effort.</p></div>
+<div class="card"><h4>consistency</h4><p>Deviation from the <em>previously selected</em> offset. With noisy perception the cheapest side flips every cycle; committing beats dithering.</p></div>
+<div class="card"><h4>front_pass · blocked</h4><p>Penalties for cutting in front of a crossing object, and for a continuation that meets an object beyond the horizon.</p></div>
+</div>
+
+<div class="note good">
+  <div class="hd">The planner never returns nothing</div>
+  <p>Cheapest feasible candidate that makes progress wins. If nothing is fully feasible there is a
+  graded fallback: collision-free candidates violating only the boundary <em>margin</em> are selected
+  and flagged <code>degraded</code>. Only if none exist does it return a hard-stop flagged
+  <code>fallback</code> — which the behaviour layer and safety supervisor both treat as an
+  emergency.</p>
+</div>
+
+<div class="stats">
+<div class="stat"><b>10 Hz</b><span>re-plan rate</span></div>
+<div class="stat"><b>4.0 s</b><span>horizon</span></div>
+<div class="stat"><b>41</b><span>steps per trajectory</span></div>
+<div class="stat"><b>5,601</b><span>cycles in validation</span></div>
+</div>
+</section>
+
+<section id="s12">
+<h2><span class="num">12</span> Collision checking</h2>
+<p class="kicker">The vehicle is a rectangle, not a point — and that changes everything.</p>
+
+<p>Our ego is <strong>4.20 m long and 1.80 m wide</strong>, on a 2.60 m wheelbase. A trajectory whose
+centreline clears an obstacle by 0.5 m may still put a corner through it, especially while turning:
+the footprint sweeps a wider band than the path itself.</p>
+
+<div class="grid g2">
+<div class="card"><h4>Oriented-box footprints</h4><p>Ego and every predicted object are rotated
+rectangles at all 41 time steps of the horizon.</p></div>
+<div class="card"><h4>Separating-axis distance</h4><p>True minimum distance between two oriented
+rectangles — not a centre-to-centre approximation.</p></div>
+<div class="card"><h4>Swept in time</h4><p>Ego footprint at time <em>t</em> against each object's
+predicted footprint at <em>the same t</em>. Comparing against current positions would miss every
+moving threat.</p></div>
+<div class="card"><h4>Clearance, not just a boolean</h4><p>The checker returns the minimum distance
+achieved, which feeds the scorer — so among several safe candidates the planner prefers the one that
+keeps more room.</p></div>
+</div>
+
+<p>Two refinements stop the planner freezing for bad reasons. Within a short grace window the current
+pose is not a violation — the ego's present position was not the planner's choice. Beyond that,
+sitting inside the margin counts as a hit only while the gap is still <em>shrinking</em>: sliding past
+a parked truck at the clearance you already have is allowed. Actual overlap never is.</p>
+
+<div class="note key">
+  <div class="hd">Geometrically valid ≠ behaviourally desirable</div>
+  <p>The checker only answers "does this hit anything?" A candidate that swerves violently into the
+  oncoming side, clears everything by 2 cm and ends facing a blocked route is geometrically valid and
+  behaviourally terrible. That is what the scorer is for. Keeping the two separate means
+  <strong>safety is a hard constraint and quality is a soft preference — they never trade against each
+  other.</strong></p>
+</div>
+</section>
+
+<section id="s13">
+<h2><span class="num">13</span> Controller and vehicle model</h2>
+<p class="kicker">Planner proposes. Physics disposes.</p>
+
+<h3>Stanley lateral control</h3>
+<pre><code>δ = heading_gain · θ_e + atan( k · e / (k_soft + v) ) + atan(L · κ_path)</code></pre>
+<ul>
+<li><code>θ_e</code> — heading error against the path at a look-ahead point</li>
+<li><code>e</code> — cross-track error of the <strong>front axle</strong></li>
+<li>The third term is a <strong>curvature feed-forward</strong>: the steering the path's curvature
+requires anyway, so feedback only has to correct error rather than generate the whole turn</li>
+</ul>
+
+<h3>PID longitudinal control</h3>
+<pre><code>u = a_ff + kp·e + ki·∫e + kd·de/dt        e = v_ref − v
+acceleration = max(u, 0)      brake = max(−u, 0)</code></pre>
+<p>With trajectory acceleration as feed-forward and <strong>anti-windup</strong> — the integral is
+clamped and is not accumulated while the output is already saturated in the direction of the error.</p>
+
+<h3>Actuator limits and vehicle model</h3>
+<div class="grid g2">
+<div class="card"><h4>Actuator saturation</h4>
+<pre style="margin:0;font-size:.78rem">δ_target = clip(δ_cmd, ±δ_max)
+δ[k+1] = δ[k] + clip(Δ, ±rate·dt)
+a_net  = clip(a − b, −a_brk, +a_acc)</pre>
+<p>Rate limit 0.785 rad/s. The planner never gets instantaneous steering.</p></div>
+<div class="card"><h4>Kinematic bicycle</h4>
+<pre style="margin:0;font-size:.78rem">β = atan( lr/L · tan δ )
+ẋ = v·cos(ψ+β)   ẏ = v·sin(ψ+β)
+ψ̇ = v·cos β·tan δ / L   v̇ = a_net</pre>
+<p>Integrated at 50 Hz. Speed is <b>signed</b> — negative is reverse — so reversing falls out of the
+same equations.</p></div>
+</div>
+
+<div class="note bad">
+  <div class="hd">Planned path ≠ actual vehicle motion</div>
+  <p>The vehicle cannot turn instantly, cannot brake instantly, and its steering has a rate limit. If
+  we teleported the ego along the planned trajectory, every result would be meaningless — we would be
+  measuring the planner's imagination. Because the vehicle <em>lags</em> the plan, and the next plan
+  starts from where the vehicle actually is, the loop is closed and the numbers mean something.
+  Measured worst-case tracking error across all 22 runs: <strong>0.303 m</strong>.</p>
+</div>
+</section>
+
+<section id="s14">
+<h2><span class="num">14</span> Safety supervisor</h2>
+<p class="kicker">A simple guard that does not trust the complicated part.</p>
+
+<p>The planner is the most complex component in the system. If its cost weights are wrong, if the
+corridor is wrong, or if it simply finds nothing, nothing <em>downstream of the planner</em> is in a
+position to notice — the controller faithfully follows whatever it is handed.</p>
+
+<figure>
+<svg viewBox="0 0 660 175" width="660" role="img" aria-label="Safety override path">
+<defs><marker id="ah5" markerWidth="9" markerHeight="9" refX="7" refY="3.2" orient="auto">
+<path d="M0,0 L7,3.2 L0,6.4 Z" fill="#b42318"/></marker></defs>
+<g stroke="#b42318" stroke-width="1.5" fill="none" marker-end="url(#ah5)">
+<path d="M194 31 L222 31 L222 68 L250 68"/><path d="M194 75 L250 75"/>
+<path d="M194 119 L222 119 L222 82 L250 82"/>
+<path d="M408 66 L436 66 L436 36 L460 36"/><path d="M408 75 L460 75"/>
+<path d="M408 84 L436 84 L436 114 L460 114"/></g>
+<g text-anchor="middle" font-family="-apple-system,Segoe UI,Roboto,sans-serif" font-size="11" font-weight="600">
+<rect x="8" y="14" width="184" height="34" rx="7" fill="#fdeae8" stroke="#b42318" stroke-width="1.4"/>
+<text x="100" y="35" fill="#8c1b12">No feasible trajectory</text>
+<rect x="8" y="58" width="184" height="34" rx="7" fill="#fdeae8" stroke="#b42318" stroke-width="1.4"/>
+<text x="100" y="79" fill="#8c1b12">Physical TTC &lt; 1.0 s</text>
+<rect x="8" y="102" width="184" height="34" rx="7" fill="#fdeae8" stroke="#b42318" stroke-width="1.4"/>
+<text x="100" y="123" fill="#8c1b12">Risk = CRITICAL</text>
+<rect x="256" y="52" width="150" height="46" rx="9" fill="#b42318" stroke="#8c1b12" stroke-width="1.6"/>
+<text x="331" y="72" fill="#ffffff" font-size="12.5" font-weight="700">SAFETY OVERRIDE</text>
+<text x="331" y="88" fill="#ffd9d4" font-size="9" font-family="ui-monospace,monospace">held at least 0.5 s</text>
+<rect x="464" y="20" width="188" height="32" rx="7" fill="#eef2f7" stroke="#64748b" stroke-width="1.3"/>
+<text x="558" y="40" fill="#334155">acceleration := 0</text>
+<rect x="464" y="59" width="188" height="32" rx="7" fill="#eef2f7" stroke="#64748b" stroke-width="1.3"/>
+<text x="558" y="79" fill="#334155">brake := 8.0 m/s²</text>
+<rect x="464" y="98" width="188" height="32" rx="7" fill="#e2f6ec" stroke="#0f7b47" stroke-width="1.3"/>
+<text x="558" y="118" fill="#0b5c35">steering kept from controller</text>
+</g>
+<text x="100" y="158" font-size="9.5" font-weight="600" fill="#8fa0b3" text-anchor="middle" font-family="ui-monospace,monospace">ANY of these</text>
+</svg>
+<figcaption>Steering is deliberately <em>not</em> overridden — steering while braking is allowed, and
+is often what saves the situation.</figcaption>
+</figure>
+
+<p>The supervisor runs <strong>every dynamics step</strong>, after the controller and before the
+vehicle model, and deliberately does <strong>not</strong> read the planner's reasoning. Its TTC
+threshold (1.0 s) differs from the risk engine's CRITICAL threshold (1.2 s) on purpose: they are
+independent checks with independent thresholds. Every activation is recorded with its time and
+reason.</p>
+</section>
+
+<section id="s15">
+<h2><span class="num">15</span> Reverse recovery</h2>
+<p class="kicker">Sometimes the only way forward is backwards.</p>
+
+<p>On a narrow Indian road a vehicle can end up with a parked car ahead, a road edge on one side and
+an obstacle on the other. A forward-only planner has exactly one legal action there: stop and wait
+forever. Reversing a few metres to gain the room a lateral shift needs is the real solution — and it
+is a manoeuvre human drivers on such roads perform constantly.</p>
+
+<div class="grid g2">
+<div class="card"><h4>The planner side</h4><p>After 3.0 s STOPPED with no feasible forward candidate,
+the FSM enters REVERSING and permits reverse candidates. The planner generates <strong>curved</strong>
+reverse trajectories using the same quintic machinery as forward planning, evaluated against distance
+travelled backwards. It commits to a leg and re-plans within it.</p></div>
+<div class="card"><h4>The controller side</h4><p>The reverse branch originally steered on heading error
+alone — and on a straight reverse path that error is already zero, so the wheel never turned. It now
+also takes a cross-track term measured at the <strong>rear axle</strong> (the end that leads while
+reversing), clamped hard, because reversing is non-minimum-phase and an unbounded command will
+fishtail.</p></div>
+</div>
+
+<div class="tw"><table>
+<thead><tr><th>Mode</th><th>Outcome</th><th class="num">Collisions</th><th class="num">Manoeuvres</th><th class="num">Distance</th><th class="num">Min clearance</th></tr></thead>
+<tbody>
+<tr><td>Ground truth</td><td><span class="pill p-ok">Goal reached</span></td><td class="num">0</td><td class="num">1</td><td class="num">6.5 m</td><td class="num">0.51 m</td></tr>
+<tr><td>Sensors</td><td><span class="pill p-ok">Goal reached</span></td><td class="num">0</td><td class="num">1</td><td class="num">3.1 m</td><td class="num">0.66 m</td></tr>
+</tbody></table></div>
+
+<div class="note good">
+  <div class="hd">Proven necessary by ablation</div>
+  <p>With reverse candidate generation disabled and <em>nothing else changed</em>, <strong>both modes
+  time out without reaching the goal.</strong> Nothing about the manoeuvre is scripted — it emerges
+  from the planner reporting no feasible forward candidate and the behaviour layer reacting to the
+  standstill.</p>
+</div>
+
+<div class="note warn">
+  <div class="hd">Limitation</div>
+  <p>Reverse is a single committed leg. The vehicle cannot yet shuffle back and forth in a multi-point
+  turn.</p>
+</div>
+</section>
+
+<section id="s16">
+<h2><span class="num">16</span> Learned perception experiment</h2>
+<p class="kicker">A COCO detector cannot see an auto-rickshaw. We fixed that, and measured the cost.</p>
+
+<figure>
+<svg viewBox="0 0 660 96" width="660" role="img" aria-label="Detector experiment progression">
+<defs><marker id="ah6" markerWidth="9" markerHeight="9" refX="7" refY="3.2" orient="auto">
+<path d="M0,0 L7,3.2 L0,6.4 Z" fill="#94a3b8"/></marker></defs>
+<g stroke="#94a3b8" stroke-width="1.6" fill="none" marker-end="url(#ah6)">
+<line x1="196" y1="48" x2="231" y2="48"/><line x1="424" y1="48" x2="459" y2="48"/></g>
+<g text-anchor="middle" font-family="-apple-system,Segoe UI,Roboto,sans-serif">
+<rect x="8" y="18" width="186" height="60" rx="10" fill="#eef2f7" stroke="#64748b" stroke-width="1.5"/>
+<text x="101" y="40" font-size="12" font-weight="700" fill="#334155">COCO PRETRAINED</text>
+<text x="101" y="56" font-size="9.5" fill="#5b6b7d" font-family="ui-monospace,monospace">Faster R-CNN MobileNetV3</text>
+<text x="101" y="70" font-size="11" font-weight="700" fill="#b42318" font-family="ui-monospace,monospace">mAP 0.238</text>
+<rect x="236" y="18" width="186" height="60" rx="10" fill="#f0e9fe" stroke="#6d28d9" stroke-width="1.5"/>
+<text x="329" y="40" font-size="12" font-weight="700" fill="#54209e">FINE-TUNE ON UVH-26</text>
+<text x="329" y="56" font-size="9.5" fill="#54209e" font-family="ui-monospace,monospace">500 train · 3 epochs · CPU</text>
+<text x="329" y="70" font-size="9.5" fill="#54209e" font-family="ui-monospace,monospace">backbone frozen · 21.7 min</text>
+<rect x="464" y="18" width="186" height="60" rx="10" fill="#e2f6ec" stroke="#0f7b47" stroke-width="1.9"/>
+<text x="557" y="40" font-size="12" font-weight="700" fill="#0b5c35">A/B ON HELD-OUT SET</text>
+<text x="557" y="56" font-size="9.5" fill="#0b5c35" font-family="ui-monospace,monospace">150 images · IoU 0.5</text>
+<text x="557" y="70" font-size="11" font-weight="700" fill="#0f7b47" font-family="ui-monospace,monospace">mAP 0.325</text>
+</g>
+</svg>
+</figure>
+
+<p><strong>Setup.</strong> UVH-26 (AIM @ IISc, CC BY 4.0, human-verified consensus labels). A
+750-image subset from a tracked manifest (seed 20260907): 500 train / 100 validation / 150 test,
+disjoint. Backbone frozen — with 500 images, unfreezing a feature extractor trained on 118,000 is the
+fastest route to overfitting. Only the box predictor head was replaced, from COCO's 91 outputs to
+our 7.</p>
+
+<div class="tw"><table>
+<thead><tr><th>Metric</th><th class="num">A — COCO baseline</th><th class="num">B — UVH-26 fine-tuned</th><th class="num">C — Oversampled</th></tr></thead>
+<tbody>
+<tr><td>Precision</td><td class="num">0.536</td><td class="num"><b>0.621</b></td><td class="num">0.630</td></tr>
+<tr><td>Recall</td><td class="num">0.226</td><td class="num"><b>0.379</b></td><td class="num">0.370</td></tr>
+<tr><td><b>mAP @ 0.5</b></td><td class="num">0.238</td><td class="num up">0.325</td><td class="num">0.282</td></tr>
+<tr><td>Latency</td><td class="num">255 ms</td><td class="num">287 ms</td><td class="num">270 ms</td></tr>
+</tbody></table></div>
+<p><strong>Arm B ships.</strong> Arm C tested whether class-aware oversampling could rescue the bicycle
+class. It could not, and it cost 0.043 mAP — recorded as a negative result, not the deliverable.</p>
+
+<h3>Per-class recall — where it actually helped</h3>
+<div class="bars">
+  <div class="bar-row"><div class="bar-top"><b>Motorcycle</b><em>754 boxes &middot; +0.228</em></div>
+    <div class="track"><div class="fill f-old" style="width:25.2%"></div></div>
+    <div class="track"><div class="fill f-new" style="width:63.2%"></div></div></div>
+  <div class="bar-row"><div class="bar-top"><b>Auto-rickshaw</b><em>222 boxes &middot; +0.347 &middot; newly detectable</em></div>
+    <div class="track"></div>
+    <div class="track"><div class="fill f-new" style="width:57.8%"></div></div></div>
+  <div class="bar-row"><div class="bar-top"><b>Car</b><em>325 boxes &middot; +0.043</em></div>
+    <div class="track"><div class="fill f-old" style="width:80%"></div></div>
+    <div class="track"><div class="fill f-new" style="width:87.2%"></div></div></div>
+  <div class="bar-row"><div class="bar-top"><b>Bus</b><em>76 boxes &middot; −0.092 &middot; regressed</em></div>
+    <div class="track"><div class="fill f-old" style="width:74.5%"></div></div>
+    <div class="track"><div class="fill f-new neg" style="width:59.2%"></div></div></div>
+  <div class="bar-row"><div class="bar-top"><b>Truck</b><em>151 boxes &middot; −0.099 &middot; regressed</em></div>
+    <div class="track"><div class="fill f-old" style="width:50.8%"></div></div>
+    <div class="track"><div class="fill f-new neg" style="width:34.2%"></div></div></div>
+  <div class="bar-row"><div class="bar-top"><b>Bicycle</b><em>32 boxes &middot; −0.094 &middot; collapsed</em></div>
+    <div class="track"><div class="fill f-old" style="width:15.7%"></div></div>
+    <div class="track"></div></div>
+  <div class="legend">
+    <span><i style="background:var(--slate);opacity:.5"></i>COCO baseline</span>
+    <span><i style="background:var(--brand)"></i>Fine-tuned — improved</span>
+    <span><i style="background:var(--red)"></i>Fine-tuned — regressed</span>
+  </div>
+</div>
+
+<div class="tw"><table>
+<thead><tr><th>Class</th><th class="num">GT</th><th class="num">COCO</th><th class="num">Fine-tuned</th><th class="num">Δ</th><th>Verdict</th></tr></thead>
+<tbody>
+<tr><td><b>Motorcycle</b></td><td class="num">754</td><td class="num">0.151</td><td class="num"><b>0.379</b></td><td class="num up">+0.228</td><td>Improved</td></tr>
+<tr><td><b>Auto-rickshaw</b></td><td class="num">222</td><td class="num">0.000</td><td class="num"><b>0.347</b></td><td class="num up">+0.347</td><td>Newly detectable</td></tr>
+<tr><td>Car</td><td class="num">325</td><td class="num">0.480</td><td class="num">0.523</td><td class="num up">+0.043</td><td>Improved</td></tr>
+<tr><td>Bus</td><td class="num">76</td><td class="num">0.447</td><td class="num">0.355</td><td class="num down">−0.092</td><td><b>Regressed</b></td></tr>
+<tr><td>Truck</td><td class="num">151</td><td class="num">0.305</td><td class="num">0.205</td><td class="num down">−0.099</td><td><b>Regressed</b></td></tr>
+<tr><td><b>Bicycle</b></td><td class="num">32</td><td class="num">0.094</td><td class="num">0.000</td><td class="num down">−0.094</td><td><b>Collapsed</b></td></tr>
+</tbody></table></div>
+
+<ul>
+<li><strong>Motorcycle recall more than doubled.</strong> On an Indian road that is the single most valuable class.</li>
+<li><strong>Auto-rickshaw went from impossible to detectable.</strong> COCO has no such class, so the baseline's 0.000 is structural, not a tuning failure.</li>
+<li><strong>Bicycle collapsed and stayed collapsed.</strong> 32 test boxes against 106 training boxes. We explicitly tested whether oversampling could fix it (arm C: 0.0625) and it could not.</li>
+<li><strong>Bus and truck regressed.</strong> Fine-tuning on a small dataset shifts the head toward what that dataset contains. Not a uniform improvement, and we do not present it as one.</li>
+<li><strong>Pedestrians and animals are untouched.</strong> UVH-26 contains neither class.</li>
+</ul>
+
+<div class="note warn">
+  <div class="hd">UVH-26 is CCTV, not dashcam</div>
+  <p>It is elevated fixed-camera imagery, and the held-out test split is CCTV too. So
+  <strong>CCTV-to-dashcam transfer remains entirely unvalidated.</strong> These numbers say the model
+  learned Indian traffic participants from a fixed elevated camera. They do not say it will work from
+  a vehicle windscreen.</p>
+</div>
+
+<div class="note bad">
+  <div class="hd">Two validations that must not be blurred</div>
+  <p>The detector was evaluated <strong>independently on held-out imagery</strong>. It does
+  <strong>not</strong> consume rendered camera pixels in the Phase 8 closed-loop simulator — the
+  simulator renders no image frames, so there are no pixels for it to consume. "Sensors mode" in the
+  closed-loop runs means the simulated camera/LiDAR/radar <em>models</em> feeding the same
+  <code>Detection</code> contract into the same tracker. This project does <strong>not</strong> claim
+  end-to-end learned camera perception in closed loop.</p>
+  <p>What <em>was</em> verified is the <strong>output contract</strong>: the detector's
+  <code>Detection</code> objects were fed to the unmodified tracker and shown to be consumed
+  correctly. That is an integration proof, not a closed-loop performance claim.</p>
+</div>
+</section>
+
+<section id="s17">
+<h2><span class="num">17</span> Datasets</h2>
+<p class="kicker">Three datasets, each answering exactly one question it is able to answer.</p>
+
+<div class="grid g3">
+<div class="card" style="border-top:3px solid var(--cyan)"><h4>IDD-Lite <span class="pill p-frozen">42 MB</span></h4>
+<p><b>Drivable-space segmentation.</b> The only openly available Indian-road semantic dataset with a
+drivable/non-drivable split at a size trainable on CPU.</p></div>
+<div class="card" style="border-top:3px solid var(--violet)"><h4>nuScenes mini <span class="pill p-frozen">5.1 GB</span></h4>
+<p><b>Multimodal fusion validation.</b> The only accessible dataset carrying synchronised camera +
+LiDAR + <b>radar with range-rate</b>, real calibration and real timestamps.</p></div>
+<div class="card" style="border-top:3px solid var(--green)"><h4>UVH-26 subset <span class="pill p-frozen">2.5 GB</span></h4>
+<p><b>Indian-scene detection fine-tuning.</b> Human-verified consensus labels (not machine
+pseudo-labels), CC BY 4.0, and it contains auto-rickshaws.</p></div>
+</div>
+
+<div class="note">
+  <div class="hd">Why not one giant dataset</div>
+  <p>No single available dataset answers all three questions. nuScenes has real multimodal sensor
+  timing but is Boston and Singapore — no auto-rickshaws, and only 911 distinct physical objects, far
+  too few to train a detector. IDD-Lite has Indian roads but its instance labels are unusable for
+  detection (they repeat the semantic ids). UVH-26 has Indian traffic participants with trustworthy
+  labels but is fixed CCTV, so it cannot validate a dashcam pipeline and carries no LiDAR or radar.
+  Each was chosen for one question, and we state the limits of each rather than over-claiming from
+  any.</p>
+</div>
+
+<div class="note good">
+  <div class="hd">None of them is needed to run the project</div>
+  <p>The simulator, every scenario and the final validation need <strong>no datasets at all</strong>.
+  Both trained checkpoints ship inside the repository. All dataset files are gitignored and must never
+  be committed. Download links and setup steps: <code>docs/SETUP_GUIDE.md</code>.</p>
+</div>
+</section>
+
+<section id="s18">
+<h2><span class="num">18</span> Final validation</h2>
+<p class="kicker">Generated by <code>scripts/final_validation.py</code> against the frozen stack.</p>
+
+<div class="stats">
+<div class="stat ok"><b>22 / 22</b><span>runs completed</span></div>
+<div class="stat ok"><b>0</b><span>collisions</span></div>
+<div class="stat ok"><b>348</b><span>tests passed</span></div>
+<div class="stat"><b>0.51 m</b><span>worst clearance</span></div>
+<div class="stat"><b>55.0 ms</b><span>worst p95 re-plan</span></div>
+<div class="stat"><b>5,601</b><span>re-planning cycles</span></div>
+</div>
+
+<div class="tw"><table>
+<thead><tr><th>Metric</th><th>Result</th></tr></thead>
+<tbody>
+<tr><td>Scenarios × perception modes</td><td class="num">11 × 2 = 22 runs</td></tr>
+<tr><td>Completed</td><td><span class="pill p-ok">22 / 22</span></td></tr>
+<tr><td>Collisions</td><td><span class="pill p-ok">0</span></td></tr>
+<tr><td>Tests</td><td class="num">348 passed &middot; 0 failed &middot; 0 skipped</td></tr>
+<tr><td>Worst minimum clearance</td><td class="num">0.51 m — <code>NARROW_LANE_REVERSE_RECOVERY</code>, ground truth</td></tr>
+<tr><td>Worst p95 re-planning latency</td><td class="num">55.0 ms against a 100 ms budget</td></tr>
+<tr><td>Worst <em>single</em> re-plan</td><td class="num">189.2 ms — <code>NARROW_LANE_BOXED_IN</code>, sensors</td></tr>
+<tr><td>Emergency brakes</td><td class="num">7 in sensors mode &middot; <b>0</b> in ground truth</td></tr>
+<tr><td>Worst tracking position error</td><td class="num">0.635 m</td></tr>
+<tr><td>Worst fusion latency</td><td class="num">62.3 ms</td></tr>
+</tbody></table></div>
+
+<div class="grid g2">
+<div class="card"><h4>On the 189.2 ms outlier</h4><p>One cycle out of 5,601 exceeded the 100 ms budget.
+The <em>p95</em> figure — the number the budget is actually written against — is 55.0 ms, comfortably
+inside. We report the outlier rather than only the percentile.</p></div>
+<div class="card"><h4>Why the emergency brakes occurred</h4><p>All 7 are in sensors mode: dense market
+3, reverse recovery 3, pedestrian dart 1. They are absent from ground-truth mode, which identifies the
+cause as <b>perception noise</b>, not a planning defect — a briefly noisy track can produce a
+momentarily critical physical TTC.</p></div>
+</div>
+
+<div class="note warn">
+  <div class="hd">A correction worth stating</div>
+  <p>It would be neat to say all 7 fired because zero trajectories were feasible, but the recorded
+  evidence does not support that. The captured pedestrian-dart activation shows the trigger was
+  <em>physical TTC 1.00 s at 9.2 m/s</em>, with 1 of 2 candidates still feasible. The supervisor has
+  three independent triggers and different events fired different ones.</p>
+</div>
+
+<div class="note good">
+  <div class="hd">Emergency braking is correct behaviour, not a defect</div>
+  <p>A Phase 5 audit examined every activation individually and deliberately changed nothing.
+  Reducing the brake count by weakening a safety threshold would have made the system less safe while
+  making the table look better.</p>
+</div>
+
+<h3>Automated wiring checks</h3>
+<p>Verified at runtime on every run, rather than asserted in prose.</p>
+<div class="tw"><table>
+<thead><tr><th>Check</th><th>Result</th></tr></thead>
+<tbody>
+<tr><td>No collisions in any scenario or mode</td><td><span class="pill p-ok">Pass</span></td></tr>
+<tr><td>Every scenario reached its goal</td><td><span class="pill p-ok">Pass</span></td></tr>
+<tr><td>Sensors mode uses fusion as the object provider</td><td><span class="pill p-ok">Pass</span></td></tr>
+<tr><td>Ground-truth mode uses the world provider</td><td><span class="pill p-ok">Pass</span></td></tr>
+<tr><td>Planner consumes the scenario road</td><td><span class="pill p-ok">Pass</span></td></tr>
+<tr><td>Re-planning actually changes the trajectory</td><td><span class="pill p-ok">Pass</span></td></tr>
+<tr><td>Emergency braking fires where required</td><td><span class="pill p-ok">Pass</span></td></tr>
+<tr><td>Reverse recovery fires where required</td><td><span class="pill p-ok">Pass</span></td></tr>
+</tbody></table></div>
+</section>
+
+<section id="s19">
+<h2><span class="num">19</span> Scenarios</h2>
+<p class="kicker">Eleven situations, each run twice — perfect knowledge and simulated sensors.</p>
+
+<div class="scn">
+<article><h4>UNMARKED_VILLAGE_ROAD</h4>
+<p>The core claim. A road with <code>lane_markings: NONE</code> and mixed slow traffic. The planner
+works entirely from the corridor, spending 29.5 s in FOLLOW behind slower traffic.</p>
+<div class="m"><span class="g">0 collisions</span><span>0.91 m</span><span>3,884 detections</span></div></article>
+
+<article><h4>UNSIGNALIZED_INTERSECTION</h4>
+<p>Crossing traffic with no signal and no right-of-way rule. Risk and prediction must resolve it
+without any priority convention to lean on.</p>
+<div class="m"><span class="g">0 collisions</span><span>1.81 m</span><span>5 transitions</span></div></article>
+
+<article><h4>HIGHWAY_MERGE_SLOW_VEHICLES</h4>
+<p>Informal merging at speed — 20 m/s desired with slower vehicles ahead. 328 m covered and 59
+behaviour transitions as it works through the traffic.</p>
+<div class="m"><span class="g">0 collisions</span><span>1.40 m</span><span>328 m</span></div></article>
+
+<article><h4>DENSE_MARKET_MIXED_TRAFFIC</h4>
+<p>The stress case. Many mixed-class agents in a confined space — 10,686 detections, 9.27 mean tracks,
+224 plan changes, and it still gets through cleanly.</p>
+<div class="m"><span class="g">0 collisions</span><span>0.84 m</span><span class="a">3 brakes</span></div></article>
+
+<article><h4>SUDDEN_CATTLE_CROSSING</h4>
+<p>Cattle begins crossing when the ego is 30 m away, creating a genuine future collision. The ego
+shifts 1.75 m laterally and sheds 3.7 m/s — <b>avoided by planning, not panic</b>.</p>
+<div class="m"><span class="g">0 collisions</span><span>1.29 m</span><span class="g">0 brakes</span></div></article>
+
+<article><h4>SUDDEN_PEDESTRIAN_DART</h4>
+<p>A pedestrian darts in at short range. Physical TTC drops to 0.7 s, the supervisor overrides and the
+vehicle stops. This is the case emergency braking exists for.</p>
+<div class="m"><span class="g">0 collisions</span><span>1.59 m</span><span class="a">1 brake</span></div></article>
+
+<article><h4>NARROW_LANE_REVERSE_RECOVERY</h4>
+<p>Boxed in with no forward path. The ego stops, waits, reverses 3.1 m along a curve, then drives out.
+<b>Times out entirely if reverse is disabled.</b></p>
+<div class="m"><span class="g">0 collisions</span><span>0.51 m — worst in suite</span><span class="a">3 brakes</span></div></article>
+
+<article><h4>NARROW_LANE_BOXED_IN</h4>
+<p>The same class of problem with different geometry — verifies the boxed-in detection is not tuned to
+one scenario.</p>
+<div class="m"><span class="g">0 collisions</span><span>0.69 m</span></div></article>
+
+<article><h4>NARROW_LANE_MUTUAL_YIELD</h4>
+<p>An oncoming vehicle in a lane too narrow for both. Neither has priority; both must give way.</p>
+<div class="m"><span class="g">0 collisions</span><span>1.01 m</span></div></article>
+
+<article><h4>UNPROTECTED_TURN</h4>
+<p>Turning across traffic with no protection — 11.1 s spent in AVOID while it finds the gap.</p>
+<div class="m"><span class="g">0 collisions</span><span>0.87 m</span></div></article>
+
+<article><h4>MIXED_TRAFFIC_CURVE</h4>
+<p>Curved corridor with mixed traffic — verifies corridor-frame planning works where <code>s</code> and
+<code>d</code> are not <code>x</code> and <code>y</code>.</p>
+<div class="m"><span class="g">0 collisions</span><span>2.07 m</span></div></article>
+</div>
+</section>
+
+<section id="s20">
+<h2><span class="num">20</span> What makes our approach different</h2>
+<p class="kicker">Engineering decisions, stated without exaggeration.</p>
+
+<div class="grid g2">
+<div class="card"><h4>1 &middot; Lane-independent corridor planning</h4><p><code>lane_markings</code>
+exists in the road model as an informational field that <em>nothing reads</em>. Remove it and the
+system is unaffected — which is the entire point of the problem statement.</p></div>
+<div class="card"><h4>2 &middot; Prediction before planning</h4><p>Every candidate is checked against
+where objects <em>will be</em>, not where they are.</p></div>
+<div class="card"><h4>3 &middot; Explicit collision geometry</h4><p>Oriented rectangles and
+separating-axis distance, swept over the whole horizon — not point-to-point distance.</p></div>
+<div class="card"><h4>4 &middot; Continuous re-planning from scratch</h4><p>10 Hz from the ego's actual
+pose, with no committed plan to go stale. 5,601 cycles across validation.</p></div>
+<div class="card"><h4>5 &middot; Independent safety override</h4><p>The supervisor does not read the
+planner's reasoning. If the most complex component is wrong, something simpler still catches it.</p></div>
+<div class="card"><h4>6 &middot; Fusion with honest covariance</h4><p>Real 2×2 covariances flow through
+prediction into planning, so an uncertain object is treated as more dangerous rather than rounded to a
+point.</p></div>
+<div class="card"><h4>7 &middot; Reverse recovery</h4><p>Curved reverse trajectories with a matching
+rear-axle controller term. Proven necessary by ablation, not assumed.</p></div>
+<div class="card"><h4>8 &middot; Closed-loop vehicle dynamics</h4><p>Actuator saturation and a bicycle
+model between plan and motion, so the numbers describe a vehicle rather than a planner's
+imagination.</p></div>
+<div class="card"><h4>9 &middot; Indian-scene perception adaptation</h4><p>A detector fine-tuned on
+human-verified Indian imagery that can see auto-rickshaws — with its limitations measured and
+published rather than omitted.</p></div>
+</div>
+</section>
+
+<section id="s21">
+<h2><span class="num">21</span> What is actually proven</h2>
+<p class="kicker">Deliberately blunt. The credibility of everything above depends on this section.</p>
+
+<div class="pv">
+<div class="box yes"><h3>Proven</h3><ul>
+<li><b>Closed-loop autonomy in simulation</b> — 22/22 completed, 0 collisions</li>
+<li><b>Multimodal sensor pipeline</b> — 11 sensors-mode runs, wiring verified at runtime</li>
+<li><b>Tracking</b> — recall 0.865–0.997, position error ≤ 0.635 m</li>
+<li><b>Prediction</b> — error ≤ 0.939 m over the horizon</li>
+<li><b>Risk / TTC</b> — drives every behaviour transition, recorded per cycle</li>
+<li><b>Adaptive trajectory generation</b> — 5,601 cycles, 50–90 candidates each</li>
+<li><b>Collision avoidance</b> — 0 collisions, worst clearance 0.51 m</li>
+<li><b>Emergency braking</b> — 7 activations, each instrumented with trigger and reason</li>
+<li><b>Reverse recovery</b> — completes with reverse, times out without it</li>
+<li><b>Indian-scene detector improvement</b> — mAP 0.238 → 0.325 on held-out imagery</li>
+<li><b>Fusion accepts real sensor data</b> — validated against real nuScenes</li>
+</ul></div>
+
+<div class="box no"><h3>Not proven</h3><ul>
+<li><b>Real-world road deployment</b> — never run on a vehicle; simulated sensors, not recorded ones</li>
+<li><b>Dashcam detector validation</b> — UVH-26 is elevated CCTV; transfer is entirely unvalidated</li>
+<li><b>Real-time neural detection</b> — 287 ms per image; a vehicle needs roughly 50</li>
+<li><b>Pedestrian / animal improvement</b> — UVH-26 contains neither class</li>
+<li><b>Bicycle detection</b> — collapsed to 0.000; oversampling was tested and did not fix it</li>
+<li><b>Uniform detection improvement</b> — bus and truck recall regressed</li>
+<li><b>Generality across all Indian traffic</b> — 11 scenarios is a sample, not a proof</li>
+<li><b>Learned camera perception in closed loop</b> — the simulator renders no images</li>
+<li><b>MATLAB / Simulink export</b> — generated but never run in MATLAB</li>
+</ul></div>
+</div>
+</section>
+
+<section id="s22">
+<h2><span class="num">22</span> One-page summary</h2>
+<p class="kicker">If you read only this section, you have the whole project.</p>
+
+<div class="note bad"><div class="hd">Problem</div>
+<p>Indian roads have no reliable lane markings, mixed traffic of wildly different sizes and speeds,
+pedestrians and cattle entering without warning, informal merging, and lanes too narrow to pass.
+Lane-following autonomy has no valid input here, and fails ungracefully when its one input
+disappears.</p></div>
+
+<div class="note good"><div class="hd">Our idea</div>
+<p>Do not look for a lane. Understand the <strong>drivable corridor</strong>, predict what everything
+nearby will do, evaluate collision risk against those predictions, generate many candidate
+trajectories inside the corridor, and continuously select the safest one that makes progress.</p></div>
+
+<div class="note key"><div class="hd">Architecture</div>
+<pre style="margin:8px 0 0"><code>World → Sensors → Perception → Fusion → Tracking → Prediction → Risk/TTC
+      → Behaviour FSM → Adaptive Planner → Collision Check
+      → Controller → Safety Supervisor → Vehicle Dynamics → World ↺</code></pre>
+<p style="margin-top:10px">A closed loop: 10 Hz planning, 50 Hz control.</p></div>
+
+<div class="note"><div class="hd">Key technologies</div>
+<p>Kalman filter with EKF radar update and Mahalanobis gating &middot; constant-acceleration prediction
+with intent priors and uncertainty growth &middot; corridor-frame (Frenet) lattice planning with
+quintic lateral profiles and jerk-limited speed profiles &middot; oriented-box separating-axis
+collision checking &middot; 7-state behaviour FSM with dual hysteresis &middot; Stanley + PID with
+actuator saturation &middot; kinematic bicycle model with signed speed for reverse &middot; independent
+safety supervisor &middot; Fast-SCNN drivable-space segmentation &middot; Faster R-CNN MobileNetV3
+detector fine-tuned on Indian imagery.</p></div>
+
+<div class="note"><div class="hd">Validation</div>
+<p>11 scenarios × 2 perception modes = 22 runs, each verified at runtime for correct wiring and no
+ground-truth leakage. Learned perception validated separately and offline on real Indian imagery.</p></div>
+
+<h3>Results</h3>
+<div class="stats">
+<div class="stat ok"><b>22 / 22</b><span>completion</span></div>
+<div class="stat ok"><b>0</b><span>collisions</span></div>
+<div class="stat"><b>0.51 m</b><span>worst clearance</span></div>
+<div class="stat"><b>55 ms</b><span>p95 re-plan · budget 100</span></div>
+<div class="stat ok"><b>348</b><span>tests passed</span></div>
+<div class="stat"><b>0.325</b><span>detector mAP · from 0.238</span></div>
+<div class="stat"><b>0.347</b><span>auto-rickshaw recall · from 0</span></div>
+<div class="stat"><b>0.877</b><span>drivable-space IoU</span></div>
+</div>
+
+<div class="note warn"><div class="hd">Limitations</div>
+<p>Simulated sensors, not a real vehicle. The learned detector runs offline at 287 ms and consumed no
+pixels in any closed-loop run. UVH-26 is CCTV, so dashcam performance is unvalidated. Bicycle
+detection collapsed and more data is the only fix. Bus and truck regressed. Temporal fusion ships
+disabled because enabling it requires re-tuning the planner. Reverse is a single leg, not a
+multi-point turn. MATLAB export has never been run.</p></div>
+</section>
+
+</main>
+</div>
+
+<footer><div class="in">
+Autonomy implementation frozen at <code>2ccd232</code> &middot; evidence package <code>f3f8eef</code>.
+Do not modify <code>autonomy/</code>, <code>simulation/scenarios/</code>, <code>tests/</code> or
+<code>config/</code> without lead approval — see <code>docs/TEAM_HANDOFF.md</code> section 11.<br>
+All figures are inline SVG; the page is fully self-contained and works offline.
+</div></footer>
+
+</body>
+</html>
