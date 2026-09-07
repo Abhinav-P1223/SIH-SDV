@@ -64,15 +64,18 @@ def app():
 # --------------------------------------------------------------------------- assets
 def test_required_local_assets_exist():
     static = ROOT / "ui" / "static"
-    for name in ("console.html", "console.css", "console.js"):
-        assert (static / name).exists(), f"missing {name}"
-        assert (static / name).stat().st_size > 500
+    for name in ("console.html", "styles.css", "src/main.js", "src/scene.js",
+                 "src/replay.js", "src/panels.js", "src/reports.js",
+                 "vendor/three.module.min.js", "vendor/OrbitControls.js"):
+        f = static / name
+        assert f.exists(), f"missing {name}"
+        assert f.stat().st_size > 500
 
 
 def test_page_references_only_local_assets():
     html = (ROOT / "ui" / "static" / "console.html").read_text(encoding="utf-8")
-    assert 'href="/static/console.css"' in html
-    assert 'src="/static/console.js"' in html
+    assert 'href="/static/styles.css"' in html
+    assert 'src="/static/src/main.js"' in html
     assert "http://" not in html and "https://" not in html, "no external asset may be required"
 
 
@@ -95,7 +98,7 @@ def test_app_starts_and_serves_the_page(app):
 
 
 def test_static_files_serve(app):
-    for path, token in (("/static/console.css", b"--accent"), ("/static/console.js", b"drawSelected")):
+    for path, token in (("/static/styles.css", b"--acc"), ("/static/src/main.js", b"Scene3D")):
         code, body = get(path)
         assert code == 200 and token in body
 
@@ -114,11 +117,37 @@ def test_scenario_list_loads(app):
     assert d["modes"] == ["ground_truth", "sensors"]
 
 
+def _nan_to_none(o):
+    if isinstance(o, float):
+        return None if o != o else o          # NaN is the only float that is not equal to itself
+    if isinstance(o, dict):
+        return {k: _nan_to_none(v) for k, v in o.items()}
+    if isinstance(o, list):
+        return [_nan_to_none(v) for v in o]
+    return o
+
+
 def test_validation_results_load_and_match_the_json(app):
+    """Served results must equal the file, value for value.
+
+    Not byte-for-byte: the file carries 4 bare `NaN` literals that JSON.parse rejects, so the
+    server re-serialises them as null. Nothing else may differ.
+    """
     code, body = get("/api/results")
     served = json.loads(body)
     on_disk = json.loads((ROOT / "docs" / "FINAL_SYSTEM_RESULTS.json").read_text(encoding="utf-8"))
-    assert code == 200 and served == on_disk, "results must be served verbatim, never recomputed"
+    assert code == 200
+    assert served == _nan_to_none(on_disk), "results must be served as-is, never recomputed"
+
+
+def test_served_results_are_strict_json(app):
+    """A bare NaN would break the browser at startup — this is what caught it."""
+    _, body = get("/api/results")
+    assert b"NaN" not in body and b"Infinity" not in body
+    json.loads(body)                                     # strict parse, no special constants
+    parsed = json.loads(body, parse_constant=lambda c: (_ for _ in ()).throw(
+        AssertionError(f"non-strict JSON constant: {c}")))
+    assert parsed["headline"]["completion"] == "22/22"
 
 
 def test_perception_results_present_in_payload(app):
@@ -179,3 +208,85 @@ def test_ui_imports_no_autonomy_mutation():
     src = (ROOT / "ui" / "server.py").read_text(encoding="utf-8")
     for banned in ("vehicle.step", "planner.plan", "risk_engine.evaluate", "sim.step("):
         assert banned not in src, f"UI must not call {banned}"
+
+
+# --------------------------------------------------------------------------- replay
+def test_replay_index_lists_recorded_runs(app):
+    code, body = get("/api/replays")
+    d = json.loads(body)
+    assert code == 200
+    assert d["replays"], "no replays recorded; run  python -m ui.capture"
+    for r in d["replays"]:
+        assert (ROOT / "ui" / "replay" / r["file"]).exists()
+        assert r["frame_count"] > 0 and r["duration_s"] > 0
+        assert r["summary"]["termination"] in ("GOAL_REACHED", "TIMEOUT", "COLLISION")
+
+
+def test_replay_frames_carry_every_field_the_scene_draws(app):
+    import gzip
+    idx = json.loads(get("/api/replays")[1])["replays"]
+    meta = idx[0]
+    raw = urllib.request.urlopen(BASE + "/api/replay/" + meta["file"], timeout=30).read()
+    doc = json.loads(gzip.decompress(raw))
+
+    assert doc["scenario"] and doc["mode"] in ("sensors", "ground_truth")
+    for k in ("reference", "left_boundary", "right_boundary"):
+        assert k in doc["road"], f"road missing {k}"
+    for k in ("length", "width", "footprint_center_offset"):
+        assert k in doc["vehicle"]
+
+    planned = [f for f in doc["frames"] if f.get("plan")]
+    assert planned, "no planning cycle recorded"
+    f = planned[len(planned) // 2]
+    assert {"x", "y", "yaw", "longitudinal_velocity", "steering_angle"} <= set(f["ego"])
+    assert {"candidates", "selected", "feasible_count", "candidate_count"} <= set(f["plan"])
+    assert "x" in f["plan"]["selected"], "selected trajectory geometry must be present"
+    if f["plan"]["candidates"]:
+        assert {"x", "y", "feasible"} <= set(f["plan"]["candidates"][0])
+    if f["objects"]:
+        assert {"id", "type", "x", "y", "vx", "vy", "heading"} <= set(f["objects"][0])
+
+
+def test_replay_summary_matches_the_validation_results(app):
+    """A replay is a real run of the frozen stack, so its outcome must match the evidence file."""
+    idx = json.loads(get("/api/replays")[1])["replays"]
+    results = json.loads(get("/api/results")[1])["scenarios"]
+    for r in idx:
+        row = next((x for x in results
+                    if x["scenario"] == r["scenario"] and x["mode"] == r["mode"]), None)
+        if row is None:
+            continue
+        assert r["summary"]["termination"] == row["termination"], r["scenario"]
+        assert r["summary"]["collisions"] == row["collisions"], r["scenario"]
+
+
+def test_unknown_replay_is_refused(app):
+    code, d = post("/api/nope")
+    assert code == 404
+    with pytest.raises(urllib.error.HTTPError):
+        get("/api/replay/does_not_exist")
+    with pytest.raises(urllib.error.HTTPError):
+        get("/api/replay/..%2F..%2Fserver.py")
+
+
+def test_frontend_modules_and_vendored_three_are_present(app):
+    for path, token in (
+        ("/static/src/main.js", b"Scene3D"),
+        ("/static/src/scene.js", b"TubeGeometry"),
+        ("/static/src/replay.js", b"plansUpTo"),
+        ("/static/src/panels.js", b"NOT AVAILABLE"),
+        ("/static/src/reports.js", b"renderValidation"),
+        ("/static/vendor/three.module.min.js", b"THREE"),
+        ("/static/vendor/OrbitControls.js", b"OrbitControls"),
+    ):
+        code, body = get(path)
+        assert code == 200 and token in body, path
+
+
+def test_no_external_assets_are_required(app):
+    """The demo must work with no network. Nothing may point at a CDN."""
+    static = ROOT / "ui" / "static"
+    for f in list(static.glob("*.html")) + list(static.glob("*.css")) + list(static.glob("src/*.js")):
+        text = f.read_text(encoding="utf-8")
+        for bad in ("http://", "https://", "cdn.", "unpkg", "jsdelivr"):
+            assert bad not in text, f"{f.name} references {bad}"

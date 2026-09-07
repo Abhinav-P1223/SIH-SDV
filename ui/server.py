@@ -51,6 +51,7 @@ from scripts.run_scenario import run_with_sinks                               # 
 STATIC = Path(__file__).resolve().parent / "static"
 SCENARIO_DIR = ROOT / "simulation" / "scenarios"
 RESULTS = ROOT / "docs" / "FINAL_SYSTEM_RESULTS.json"
+REPLAY = Path(__file__).resolve().parent / "replay"
 
 QUEUE_DEPTH = 64
 KEEPALIVE_S = 1.0
@@ -293,10 +294,12 @@ class Handler(BaseHTTPRequestHandler):
             self._file(STATIC / "console.html", "text/html; charset=utf-8")
         elif path.startswith("/static/"):
             name = path[len("/static/"):]
-            if "/" in name or "\\" in name or name.startswith("."):
+            # Allow nested module folders (src/, vendor/) but never escape STATIC.
+            f = (STATIC / name).resolve()
+            if ".." in name or not str(f).startswith(str(STATIC.resolve())):
                 self._json({"error": "bad path"}, 400); return
-            f = STATIC / name
             types = {".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8",
+                     ".mjs": "text/javascript; charset=utf-8",
                      ".svg": "image/svg+xml", ".json": "application/json"}
             self._file(f, types.get(f.suffix, "application/octet-stream"))
         elif path == "/api/scenarios":
@@ -309,7 +312,24 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/api/results":
             if not RESULTS.exists():
                 self._json({"error": "docs/FINAL_SYSTEM_RESULTS.json not found"}, 404); return
-            self._file(RESULTS, "application/json; charset=utf-8")
+            # The file carries 4 bare `NaN` literals, which Python writes happily and JSON.parse
+            # rejects outright (they are the AP/precision of a class with zero predictions). The
+            # evidence file is frozen, so the fix belongs here: re-serialise NaN as null and let
+            # the UI render it as NOT AVAILABLE. No value changes.
+            self._json(_json_safe(json.loads(RESULTS.read_text(encoding="utf-8"))))
+        elif path == "/api/replays":
+            idx = REPLAY / "index.json"
+            if not idx.exists():
+                self._json({"replays": [], "hint": "run:  python -m ui.capture"}); return
+            self._file(idx, "application/json; charset=utf-8")
+        elif path.startswith("/api/replay/"):
+            self._replay(path[len("/api/replay/"):])
+        elif path == "/favicon.ico":
+            # 1x1 transparent gif, so the console log stays clean
+            import base64
+            self._send(200, base64.b64decode(
+                "R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"),
+                "image/gif", "public, max-age=86400")
         elif path == "/api/stream":
             self._stream()
         else:
@@ -332,6 +352,26 @@ class Handler(BaseHTTPRequestHandler):
             self._json({"ok": True, "state": self.app.state()})
         else:
             self._json({"error": "not found"}, 404)
+
+    def _replay(self, name: str) -> None:
+        """Serve a recorded run. The files are gzipped on disk and shipped as-is: the browser
+        inflates them, so a 2 MB replay costs one 2 MB transfer rather than 20 MB of JSON."""
+        if "/" in name or "\\" in name or name.startswith("."):
+            self._json({"error": "bad path"}, 400); return
+        f = REPLAY / (name if name.endswith(".json.gz") else name + ".json.gz")
+        if not f.exists():
+            self._json({"error": f"no replay {name!r}; run  python -m ui.capture"}, 404); return
+        body = f.read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Encoding", "gzip")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "public, max-age=3600")
+        self.end_headers()
+        try:
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
 
     def _file(self, f: Path, ctype: str) -> None:
         if not f.exists():
