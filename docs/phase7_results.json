@@ -1,0 +1,163 @@
+{
+  "test_images": 150,
+  "iou": 0.5,
+  "score_threshold": 0.35,
+  "checkpoint_epoch": 3,
+  "git_commit": "31987a068c3a9262abc7b57d408c2d360f74d078",
+  "A_coco_baseline": {
+    "images": 150,
+    "tp": 353,
+    "fp": 305,
+    "fn": 1207,
+    "precision": 0.5364741641337386,
+    "recall": 0.22628205128205128,
+    "mAP": 0.23798323478400268,
+    "per_class": {
+      "MOTORCYCLE": {
+        "gt": 754,
+        "predictions": 164,
+        "tp": 114,
+        "fp": 50,
+        "fn": 640,
+        "precision": 0.6951219512195121,
+        "recall": 0.15119363395225463,
+        "ap": 0.13084670872028245
+      },
+      "AUTO_RICKSHAW": {
+        "gt": 222,
+        "predictions": 0,
+        "tp": 0,
+        "fp": 0,
+        "fn": 222,
+        "precision": NaN,
+        "recall": 0.0,
+        "ap": NaN
+      },
+      "CAR": {
+        "gt": 325,
+        "predictions": 284,
+        "tp": 156,
+        "fp": 128,
+        "fn": 169,
+        "precision": 0.5492957746478874,
+        "recall": 0.48,
+        "ap": 0.43127148306347346
+      },
+      "BUS": {
+        "gt": 76,
+        "predictions": 74,
+        "tp": 34,
+        "fp": 40,
+        "fn": 42,
+        "precision": 0.4594594594594595,
+        "recall": 0.4473684210526316,
+        "ap": 0.3904449034520355
+      },
+      "TRUCK": {
+        "gt": 151,
+        "predictions": 126,
+        "tp": 46,
+        "fp": 80,
+        "fn": 105,
+        "precision": 0.36507936507936506,
+        "recall": 0.304635761589404,
+        "ap": 0.20434977835418916
+      },
+      "BICYCLE": {
+        "gt": 32,
+        "predictions": 10,
+        "tp": 3,
+        "fp": 7,
+        "fn": 29,
+        "precision": 0.3,
+        "recall": 0.09375,
+        "ap": 0.033003300330033
+      }
+    },
+    "latency_ms_mean": 238.25881200066456,
+    "latency_ms_p95": 264.5107200049097,
+    "iou_threshold": 0.5,
+    "score_threshold": 0.35
+  },
+  "B_uvh26_finetuned": {
+    "images": 150,
+    "tp": 591,
+    "fp": 361,
+    "fn": 969,
+    "precision": 0.6207983193277311,
+    "recall": 0.37884615384615383,
+    "mAP": 0.3246519184087149,
+    "per_class": {
+      "MOTORCYCLE": {
+        "gt": 754,
+        "predictions": 454,
+        "tp": 286,
+        "fp": 168,
+        "fn": 468,
+        "precision": 0.6299559471365639,
+        "recall": 0.3793103448275862,
+        "ap": 0.33506984317986577
+      },
+      "AUTO_RICKSHAW": {
+        "gt": 222,
+        "predictions": 136,
+        "tp": 77,
+        "fp": 59,
+        "fn": 145,
+        "precision": 0.5661764705882353,
+        "recall": 0.34684684684684686,
+        "ap": 0.2890292480463854
+      },
+      "CAR": {
+        "gt": 325,
+        "predictions": 253,
+        "tp": 170,
+        "fp": 83,
+        "fn": 155,
+        "precision": 0.6719367588932806,
+        "recall": 0.5230769230769231,
+        "ap": 0.48725798652504443
+      },
+      "BUS": {
+        "gt": 76,
+        "predictions": 45,
+        "tp": 27,
+        "fp": 18,
+        "fn": 49,
+        "precision": 0.6,
+        "recall": 0.35526315789473684,
+        "ap": 0.33293893299104343
+      },
+      "TRUCK": {
+        "gt": 151,
+        "predictions": 64,
+        "tp": 31,
+        "fp": 33,
+        "fn": 120,
+        "precision": 0.484375,
+        "recall": 0.2052980132450331,
+        "ap": 0.17896358130123535
+      },
+      "BICYCLE": {
+        "gt": 32,
+        "predictions": 0,
+        "tp": 0,
+        "fp": 0,
+        "fn": 32,
+        "precision": NaN,
+        "recall": 0.0,
+        "ap": NaN
+      }
+    },
+    "latency_ms_mean": 250.41381266744187,
+    "latency_ms_p95": 299.3676099955335,
+    "iou_threshold": 0.5,
+    "score_threshold": 0.35
+  },
+  "caveats": [
+    "UVH-26 is elevated fixed-camera CCTV imagery, not vehicle-mounted dashcam imagery.",
+    "The held-out test split is also CCTV, so CCTV-to-dashcam transfer is unvalidated.",
+    "COCO has no auto-rickshaw class, so arm A's recall there is zero by construction.",
+    "UVH-26 has no person and no animal class; neither Phase 6 failure is addressed."
+  ]
+}

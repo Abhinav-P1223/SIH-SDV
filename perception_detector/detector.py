@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Optional
 
 import numpy as np
@@ -74,6 +75,10 @@ class DetectorConfig:
     min_box_px: int = 8                # a box smaller than this cannot be localised usefully
     device: str = "cpu"
     model_name: str = "fasterrcnn_mobilenet_v3_large_320_fpn"
+    # Phase 7C: when set, load a checkpoint whose head predicts OUR classes directly instead of
+    # COCO's 91. Leaving it None keeps the Phase 6 behaviour byte for byte, which is what the A/B
+    # baseline arm relies on.
+    finetuned_checkpoint: "Path | str | None" = None
 
 
 @dataclass
@@ -125,9 +130,28 @@ class CameraObjectDetector:
         if name not in _WEIGHTS_ENUM:
             raise ValueError(f"unsupported detector {name!r}; expected one of {sorted(_WEIGHTS_ENUM)}")
         w = getattr(getattr(tvdet, _WEIGHTS_ENUM[name]), weights)
-        self.model = getattr(tvdet, name)(weights=w).eval().to(self.device)
-        self.categories = list(w.meta["categories"])
-        self.coco_map = float(w.meta.get("_metrics", {}).get("COCO-val2017", {}).get("box_map", float("nan")))
+        self.finetuned = self.cfg.finetuned_checkpoint is not None
+        if self.finetuned:
+            # Our own head: labels are already ObjectTypes, so no COCO translation happens.
+            from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
+            from .uvh26 import ID_TO_OBJECT_TYPE, NUM_CLASSES
+            state = torch.load(Path(self.cfg.finetuned_checkpoint), map_location=self.device,
+                               weights_only=False)
+            m = getattr(tvdet, name)(weights=None, weights_backbone=None)
+            in_f = m.roi_heads.box_predictor.cls_score.in_features
+            m.roi_heads.box_predictor = FastRCNNPredictor(in_f, NUM_CLASSES)
+            m.load_state_dict(state["model"])
+            self.model = m.eval().to(self.device)
+            self.categories = list(state.get("class_names", []))
+            self.label_map = dict(ID_TO_OBJECT_TYPE)
+            self.checkpoint_meta = {k: state.get(k) for k in ("epoch", "git_commit", "config")}
+            self.coco_map = float("nan")
+        else:
+            self.model = getattr(tvdet, name)(weights=w).eval().to(self.device)
+            self.categories = list(w.meta["categories"])
+            self.label_map = dict(COCO_TO_OBJECT_TYPE)
+            self.checkpoint_meta = {}
+            self.coco_map = float(w.meta.get("_metrics", {}).get("COCO-val2017", {}).get("box_map", float("nan")))
         self.last_inference_ms = 0.0
 
     # ------------------------------------------------------------------ #
@@ -152,7 +176,7 @@ class CameraObjectDetector:
         for (x0, y0, x1, y1), s, lab in zip(boxes, scores, labels):
             if s < self.cfg.score_threshold:
                 continue
-            otype = COCO_TO_OBJECT_TYPE.get(int(lab))
+            otype = self.label_map.get(int(lab))
             if otype is None:
                 continue
             if (x1 - x0) < self.cfg.min_box_px or (y1 - y0) < self.cfg.min_box_px:

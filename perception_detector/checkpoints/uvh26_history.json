@@ -1,0 +1,76 @@
+{
+  "config": {
+    "epochs": 3,
+    "batch_size": 4,
+    "lr": 0.002,
+    "momentum": 0.9,
+    "weight_decay": 0.0005,
+    "trainable_backbone_layers": 0,
+    "seed": 20260907,
+    "score_threshold": 0.35,
+    "iou_threshold": 0.5,
+    "augment_hflip": true,
+    "model_name": "fasterrcnn_mobilenet_v3_large_320_fpn"
+  },
+  "git_commit": "31987a068c3a9262abc7b57d408c2d360f74d078",
+  "class_names": [
+    "__background__",
+    "MOTORCYCLE",
+    "AUTO_RICKSHAW",
+    "CAR",
+    "BUS",
+    "TRUCK",
+    "BICYCLE"
+  ],
+  "history": [
+    {
+      "epoch": 1,
+      "train_loss": 1.0644236023426057,
+      "train_seconds": 434.24973340000724,
+      "val_mAP": 0.19006648082257868,
+      "val_precision": 0.6116910229645094,
+      "val_recall": 0.2702952029520295,
+      "val_per_class_recall": {
+        "MOTORCYCLE": 0.2892561983471074,
+        "AUTO_RICKSHAW": 0.03636363636363636,
+        "CAR": 0.46564885496183206,
+        "BUS": 0.07272727272727272,
+        "TRUCK": 0.22580645161290322,
+        "BICYCLE": 0.0
+      }
+    },
+    {
+      "epoch": 2,
+      "train_loss": 0.8682621397972107,
+      "train_seconds": 399.53235330001917,
+      "val_mAP": 0.2531045844061778,
+      "val_precision": 0.6468330134357005,
+      "val_recall": 0.31088560885608857,
+      "val_per_class_recall": {
+        "MOTORCYCLE": 0.2975206611570248,
+        "AUTO_RICKSHAW": 0.1696969696969697,
+        "CAR": 0.46564885496183206,
+        "BUS": 0.14545454545454545,
+        "TRUCK": 0.3763440860215054,
+        "BICYCLE": 0.0
+      }
+    },
+    {
+      "epoch": 3,
+      "train_loss": 0.8356658136844635,
+      "train_seconds": 391.4497735000332,
+      "val_mAP": 0.2808799063097536,
+      "val_precision": 0.6146179401993356,
+      "val_recall": 0.3413284132841328,
+      "val_per_class_recall": {
+        "MOTORCYCLE": 0.3285123966942149,
+        "AUTO_RICKSHAW": 0.26666666666666666,
+        "CAR": 0.48091603053435117,
+        "BUS": 0.21818181818181817,
+        "TRUCK": 0.3118279569892473,
+        "BICYCLE": 0.0
+      }
+    }
+  ],
+  "total_minutes": 21.714477906667163
+}
