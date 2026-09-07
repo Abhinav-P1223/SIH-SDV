@@ -1,0 +1,106 @@
+{
+  "model": "fasterrcnn_mobilenet_v3_large_320_fpn",
+  "coco_map": 22.8,
+  "score_threshold": 0.35,
+  "iou": 0.5,
+  "nuscenes": {
+    "images": 404,
+    "tp": 844,
+    "fp": 988,
+    "fn": 2119,
+    "precision": 0.4606986899563319,
+    "recall": 0.28484643941950727,
+    "mAP": 0.14810102369313682,
+    "per_class": {
+      "CAR": {
+        "gt": 1685,
+        "predictions": 1342,
+        "tp": 629,
+        "precision": 0.46870342771982115,
+        "recall": 0.37329376854599405,
+        "ap": 0.3140157467967546
+      },
+      "PEDESTRIAN": {
+        "gt": 801,
+        "predictions": 249,
+        "tp": 129,
+        "precision": 0.5180722891566265,
+        "recall": 0.16104868913857678,
+        "ap": 0.13461262963272908
+      },
+      "BUS": {
+        "gt": 174,
+        "predictions": 76,
+        "tp": 38,
+        "precision": 0.5,
+        "recall": 0.21839080459770116,
+        "ap": 0.17814977870748286
+      },
+      "TRUCK": {
+        "gt": 134,
+        "predictions": 142,
+        "tp": 44,
+        "precision": 0.30985915492957744,
+        "recall": 0.3283582089552239,
+        "ap": 0.23234503872702486
+      },
+      "MOTORCYCLE": {
+        "gt": 107,
+        "predictions": 13,
+        "tp": 2,
+        "precision": 0.15384615384615385,
+        "recall": 0.018691588785046728,
+        "ap": 0.005280528052805281
+      },
+      "BICYCLE": {
+        "gt": 62,
+        "predictions": 10,
+        "tp": 2,
+        "precision": 0.2,
+        "recall": 0.03225806451612903,
+        "ap": 0.024202420242024205
+      }
+    },
+    "range_recall": {
+      "0-15 m": 0.5796344647519582,
+      "15-30 m": 0.4224137931034483,
+      "30-50 m": 0.18407960199004975,
+      "50-inf m": 0.045081967213114756
+    },
+    "range_gt": {
+      "0-15 m": 383,
+      "15-30 m": 1044,
+      "30-50 m": 804,
+      "50-inf m": 732
+    },
+    "latency_ms_mean": 172.7407995048371,
+    "latency_ms_p95": 228.46620002819688
+  },
+  "tracker_integration": {
+    "frames": 50,
+    "detections_total": 227,
+    "detections_per_frame": 4.54,
+    "confirmed_tracks_final": 7,
+    "confirmed_tracks_mean": 3.14,
+    "box_to_detection_ms_mean": 0.3944599989335984,
+    "wall_s": 11.541445499984547
+  },
+  "idd_lite_qualitative": {
+    "images": 100,
+    "detections_per_image": 4.07,
+    "images_with_no_detection": 17,
+    "by_class": {
+      "CAR": 151,
+      "PEDESTRIAN": 112,
+      "MOTORCYCLE": 65,
+      "TRUCK": 46,
+      "BUS": 29,
+      "BICYCLE": 4
+    },
+    "latency_ms_mean": 162.19611499691382
+  },
+  "undetectable_types": [
+    "AUTO_RICKSHAW",
+    "PUSHCART"
+  ]
+}
