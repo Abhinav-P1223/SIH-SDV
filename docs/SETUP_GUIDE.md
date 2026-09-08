@@ -68,13 +68,25 @@ python scripts/run_scenario.py SUDDEN_CATTLE_CROSSING --quiet
 Takes about 20 seconds and writes `logs/sudden_cattle_crossing.jsonl` and a summary CSV. Any of the
 eleven scenario names works; see [CODEBASE_MAP.md](CODEBASE_MAP.md).
 
-## 6. Run the tests
+## 6. Open the console
 
 ```bash
-python -m pytest tests/ -q
+python -m ui.server
 ```
 
-**Expect 348 passed with the datasets present.** Without them you will see roughly 35 skips
+Opens <http://127.0.0.1:8770/>. Press **Start demo** for a narrated five-scenario walkthrough built
+from recorded telemetry. **No extra dependency** — the server is Python standard library only and
+Three.js is vendored into `ui/static/vendor/`, so it works offline with no build step. Full detail
+in [../ui/README.md](../ui/README.md).
+
+## 7. Run the tests
+
+```bash
+python -m pytest tests/ -q        # the frozen autonomy suite
+python -m pytest ui/tests -q      # the console suite, about 60 s
+```
+
+**Expect 348 passed with the datasets present**, plus 25 in the UI suite. Without them you will see roughly 35 skips
 instead, which is correct and not a failure. Takes 15 to 25 minutes on a laptop CPU.
 
 For a faster smoke check, the unit tests alone take **about 3 minutes** (measured, 292 tests):
@@ -83,7 +95,7 @@ For a faster smoke check, the unit tests alone take **about 3 minutes** (measure
 python -m pytest tests/unit -q -m "not slow"
 ```
 
-## 7. Reproduce the final validation
+## 8. Reproduce the final validation
 
 ```bash
 python scripts/final_validation.py

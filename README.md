@@ -160,6 +160,17 @@ python -m pytest tests/ -q
 python scripts/final_validation.py
 ```
 
+**Open the console** — a Three.js operations view of recorded runs:
+
+```bash
+python -m ui.server
+```
+
+Then press **Start demo**. It plays five scenarios in order, each narrated from its own recorded
+telemetry: object detected, risk rising, decision, emergency brake, reverse recovery, safe passage.
+A Tests tab shows the real pytest cases covering whichever scenario is on screen. No extra
+dependency, no build step, works offline. Details in [ui/README.md](ui/README.md).
+
 **Demo:** follow [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md), a timed five-minute flow with a
 "do not say" list so nothing unsupported is claimed on stage.
 
@@ -185,6 +196,9 @@ is CC BY 4.0. Step-by-step instructions in [docs/SETUP_GUIDE.md](docs/SETUP_GUID
 
 | Document | For |
 |---|---|
+| [CLAUDE.md](CLAUDE.md) | **Start here.** Project status, frozen areas, conventions, commands |
+| [docs/PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md) | The whole project in 10–15 minutes |
+| [ui/README.md](ui/README.md) | The Three.js console |
 | [docs/SETUP_GUIDE.md](docs/SETUP_GUIDE.md) | Get it running in ten minutes |
 | [docs/TEAM_HANDOFF.md](docs/TEAM_HANDOFF.md) | Everything: architecture, commands, frozen areas, workflow |
 | [docs/CODEBASE_MAP.md](docs/CODEBASE_MAP.md) | Where everything lives |
