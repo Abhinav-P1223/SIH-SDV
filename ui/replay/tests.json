@@ -1,0 +1,899 @@
+{
+ "generated_wall_s": 693.0,
+ "command": "pytest tests/scenarios tests/unit/test_reverse_recovery.py tests/unit/test_reverse.py tests/unit/test_interactive_traffic.py --junitxml=C:\\Users\\RLE2016\\AppData\\Local\\Temp\\tmpyu7kg52t\\report.xml --tb=no -p no:cacheprovider",
+ "exit_code": 0,
+ "total": 96,
+ "counts": {
+  "PASSED": 96
+ },
+ "by_scenario": {
+  "MIXED_TRAFFIC_CURVE": [
+   {
+    "file": "tests/scenarios/test_mixed_traffic_curve.py",
+    "name": "test_no_collision_completed_and_margin",
+    "scenario": "MIXED_TRAFFIC_CURVE",
+    "outcome": "PASSED",
+    "seconds": 21.77,
+    "title": "No collision completed and margin",
+    "doc": ""
+   },
+   {
+    "file": "tests/scenarios/test_mixed_traffic_curve.py",
+    "name": "test_ego_followed_the_curve_and_stayed_on_road",
+    "scenario": "MIXED_TRAFFIC_CURVE",
+    "outcome": "PASSED",
+    "seconds": 0.54,
+    "title": "Ego followed the curve and stayed on road",
+    "doc": ""
+   },
+   {
+    "file": "tests/scenarios/test_mixed_traffic_curve.py",
+    "name": "test_merging_agent_merged_and_followed_road",
+    "scenario": "MIXED_TRAFFIC_CURVE",
+    "outcome": "PASSED",
+    "seconds": 0.0,
+    "title": "Merging agent merged and followed road",
+    "doc": ""
+   },
+   {
+    "file": "tests/scenarios/test_mixed_traffic_curve.py",
+    "name": "test_erratic_agent_moved_deterministically",
+    "scenario": "MIXED_TRAFFIC_CURVE",
+    "outcome": "PASSED",
+    "seconds": 23.71,
+    "title": "Erratic agent moved deterministically",
+    "doc": ""
+   },
+   {
+    "file": "tests/scenarios/test_mixed_traffic_curve.py",
+    "name": "test_follow_state_was_used_and_no_chatter",
+    "scenario": "MIXED_TRAFFIC_CURVE",
+    "outcome": "PASSED",
+    "seconds": 0.0,
+    "title": "Follow state was used and no chatter",
+    "doc": ""
+   },
+   {
+    "file": "tests/scenarios/test_mixed_traffic_curve.py",
+    "name": "test_planner_latency_budget_on_curve",
+    "scenario": "MIXED_TRAFFIC_CURVE",
+    "outcome": "PASSED",
+    "seconds": 0.06,
+    "title": "Planner latency budget on curve",
+    "doc": "Planner cost per cycle, measured as wall clock."
+   }
+  ],
+  "NARROW_LANE_BOXED_IN": [
+   {
+    "file": "tests/scenarios/test_narrow_lane_boxed_in.py",
+    "name": "test_reaches_the_goal_without_collision[sensors]",
+    "scenario": "NARROW_LANE_BOXED_IN",
+    "outcome": "PASSED",
+    "seconds": 17.47,
+    "title": "Reaches the goal without collision",
+    "doc": ""
+   },
+   {
+    "file": "tests/scenarios/test_narrow_lane_boxed_in.py",
+    "name": "test_it_actually_reversed_to_get_out[sensors]",
+    "scenario": "NARROW_LANE_BOXED_IN",
+    "outcome": "PASSED",
+    "seconds": 0.01,
+    "title": "It actually reversed to get out",
+    "doc": "The point of the scenario: a real reversing leg, not a lucky forward squeeze."
+   },
+   {
+    "file": "tests/scenarios/test_narrow_lane_boxed_in.py",
+    "name": "test_reversing_is_bounded_and_ends_in_forward_progress[sensors]",
+    "scenario": "NARROW_LANE_BOXED_IN",
+    "outcome": "PASSED",
+    "seconds": 0.0,
+    "title": "Reversing is bounded and ends in forward progress",
+    "doc": "Reversing is a recovery, not a habit: few legs, and the ego ends up past the blocker."
+   },
+   {
+    "file": "tests/scenarios/test_narrow_lane_boxed_in.py",
+    "name": "test_it_passed_on_the_free_side_of_the_cart[sensors]",
+    "scenario": "NARROW_LANE_BOXED_IN",
+    "outcome": "PASSED",
+    "seconds": 0.0,
+    "title": "It passed on the free side of the cart",
+    "doc": "The cart occupies the left half; the ego must have gone round it on the right."
+   },
+   {
+    "file": "tests/scenarios/test_narrow_lane_boxed_in.py",
+    "name": "test_no_emergency_braking_in_the_deadlock[sensors]",
+    "scenario": "NARROW_LANE_BOXED_IN",
+    "outcome": "PASSED",
+    "seconds": 0.0,
+    "title": "No emergency braking in the deadlock",
+    "doc": "Being stuck is not an emergency: the ego holds position and reverses, it does not panic-brake."
+   },
+   {
+    "file": "tests/scenarios/test_narrow_lane_boxed_in.py",
+    "name": "test_reaches_the_goal_without_collision[ground_truth]",
+    "scenario": "NARROW_LANE_BOXED_IN",
+    "outcome": "PASSED",
+    "seconds": 19.73,
+    "title": "Reaches the goal without collision",
+    "doc": ""
+   },
+   {
+    "file": "tests/scenarios/test_narrow_lane_boxed_in.py",
+    "name": "test_it_actually_reversed_to_get_out[ground_truth]",
+    "scenario": "NARROW_LANE_BOXED_IN",
+    "outcome": "PASSED",
+    "seconds": 0.0,
+    "title": "It actually reversed to get out",
+    "doc": "The point of the scenario: a real reversing leg, not a lucky forward squeeze."
+   },
+   {
+    "file": "tests/scenarios/test_narrow_lane_boxed_in.py",
+    "name": "test_reversing_is_bounded_and_ends_in_forward_progress[ground_truth]",
+    "scenario": "NARROW_LANE_BOXED_IN",
+    "outcome": "PASSED",
+    "seconds": 0.0,
+    "title": "Reversing is bounded and ends in forward progress",
+    "doc": "Reversing is a recovery, not a habit: few legs, and the ego ends up past the blocker."
+   },
+   {
+    "file": "tests/scenarios/test_narrow_lane_boxed_in.py",
+    "name": "test_it_passed_on_the_free_side_of_the_cart[ground_truth]",
+    "scenario": "NARROW_LANE_BOXED_IN",
+    "outcome": "PASSED",
+    "seconds": 0.01,
+    "title": "It passed on the free side of the cart",
+    "doc": "The cart occupies the left half; the ego must have gone round it on the right."
+   },
+   {
+    "file": "tests/scenarios/test_narrow_lane_boxed_in.py",
+    "name": "test_no_emergency_braking_in_the_deadlock[ground_truth]",
+    "scenario": "NARROW_LANE_BOXED_IN",
+    "outcome": "PASSED",
+    "seconds": 0.0,
+    "title": "No emergency braking in the deadlock",
+    "doc": "Being stuck is not an emergency: the ego holds position and reverses, it does not panic-brake."
+   },
+   {
+    "file": "tests/unit/test_reverse.py",
+    "name": "test_reverse_gear_moves_backwards_and_is_speed_limited",
+    "scenario": "NARROW_LANE_BOXED_IN",
+    "outcome": "PASSED",
+    "seconds": 0.02,
+    "title": "Reverse gear moves backwards and is speed limited",
+    "doc": ""
+   },
+   {
+    "file": "tests/unit/test_reverse.py",
+    "name": "test_reverse_gear_is_not_engaged_while_rolling_forward",
+    "scenario": "NARROW_LANE_BOXED_IN",
+    "outcome": "PASSED",
+    "seconds": 0.0,
+    "title": "Reverse gear is not engaged while rolling forward",
+    "doc": ""
+   },
+   {
+    "file": "tests/unit/test_reverse.py",
+    "name": "test_reverse_candidates_only_when_allowed_and_stationary",
+    "scenario": "NARROW_LANE_BOXED_IN",
+    "outcome": "PASSED",
+    "seconds": 0.14,
+    "title": "Reverse candidates only when allowed and stationary",
+    "doc": ""
+   },
+   {
+    "file": "tests/unit/test_reverse.py",
+    "name": "test_fsm_reverses_when_boxed_in_then_returns",
+    "scenario": "NARROW_LANE_BOXED_IN",
+    "outcome": "PASSED",
+    "seconds": 0.0,
+    "title": "Fsm reverses when boxed in then returns",
+    "doc": ""
+   }
+  ],
+  "SUDDEN_CATTLE_CROSSING": [
+   {
+    "file": "tests/scenarios/test_parameter_sweep.py",
+    "name": "test_grid_is_non_trivial",
+    "scenario": "SUDDEN_CATTLE_CROSSING",
+    "outcome": "PASSED",
+    "seconds": 59.32,
+    "title": "Grid is non trivial",
+    "doc": ""
+   },
+   {
+    "file": "tests/scenarios/test_parameter_sweep.py",
+    "name": "test_every_cell_is_collision_free_and_completes",
+    "scenario": "SUDDEN_CATTLE_CROSSING",
+    "outcome": "PASSED",
+    "seconds": 0.0,
+    "title": "Every cell is collision free and completes",
+    "doc": ""
+   },
+   {
+    "file": "tests/scenarios/test_parameter_sweep.py",
+    "name": "test_clearance_margin_holds_across_grid",
+    "scenario": "SUDDEN_CATTLE_CROSSING",
+    "outcome": "PASSED",
+    "seconds": 0.02,
+    "title": "Clearance margin holds across grid",
+    "doc": ""
+   },
+   {
+    "file": "tests/scenarios/test_parameter_sweep.py",
+    "name": "test_faster_crossing_is_recognised_as_more_urgent",
+    "scenario": "SUDDEN_CATTLE_CROSSING",
+    "outcome": "PASSED",
+    "seconds": 0.0,
+    "title": "Faster crossing is recognised as more urgent",
+    "doc": "Same trigger distance: a faster cow gives a shorter minimum TTC or an EB, never a silent pass."
+   },
+   {
+    "file": "tests/scenarios/test_required_scenarios.py",
+    "name": "test_scenarios_are_genuinely_different",
+    "scenario": "SUDDEN_CATTLE_CROSSING",
+    "outcome": "PASSED",
+    "seconds": 0.28,
+    "title": "Scenarios are genuinely different",
+    "doc": "Guard against 'five screenshots of the same scenario': agent sets and roads differ."
+   },
+   {
+    "file": "tests/scenarios/test_sudden_cattle_crossing.py",
+    "name": "test_no_collision_and_completed",
+    "scenario": "SUDDEN_CATTLE_CROSSING",
+    "outcome": "PASSED",
+    "seconds": 13.97,
+    "title": "No collision and completed",
+    "doc": ""
+   },
+   {
+    "file": "tests/scenarios/test_sudden_cattle_crossing.py",
+    "name": "test_minimum_clearance_respects_safety_margin",
+    "scenario": "SUDDEN_CATTLE_CROSSING",
+    "outcome": "PASSED",
+    "seconds": 0.02,
+    "title": "Minimum clearance respects safety margin",
+    "doc": ""
+   },
+   {
+    "file": "tests/scenarios/test_sudden_cattle_crossing.py",
+    "name": "test_cattle_actually_crossed_the_ego_path",
+    "scenario": "SUDDEN_CATTLE_CROSSING",
+    "outcome": "PASSED",
+    "seconds": 0.0,
+    "title": "Cattle actually crossed the ego path",
+    "doc": "The threat must be real: the cattle footprint must have entered the ego's route band."
+   },
+   {
+    "file": "tests/scenarios/test_sudden_cattle_crossing.py",
+    "name": "test_behavior_escalated_and_recovered",
+    "scenario": "SUDDEN_CATTLE_CROSSING",
+    "outcome": "PASSED",
+    "seconds": 0.0,
+    "title": "Behavior escalated and recovered",
+    "doc": ""
+   },
+   {
+    "file": "tests/scenarios/test_sudden_cattle_crossing.py",
+    "name": "test_risk_and_ttc_were_computed",
+    "scenario": "SUDDEN_CATTLE_CROSSING",
+    "outcome": "PASSED",
+    "seconds": 0.0,
+    "title": "Risk and ttc were computed",
+    "doc": ""
+   },
+   {
+    "file": "tests/scenarios/test_sudden_cattle_crossing.py",
+    "name": "test_planner_rejected_and_scored_candidates",
+    "scenario": "SUDDEN_CATTLE_CROSSING",
+    "outcome": "PASSED",
+    "seconds": 0.0,
+    "title": "Planner rejected and scored candidates",
+    "doc": ""
+   },
+   {
+    "file": "tests/scenarios/test_sudden_cattle_crossing.py",
+    "name": "test_vehicle_was_controlled_not_teleported",
+    "scenario": "SUDDEN_CATTLE_CROSSING",
+    "outcome": "PASSED",
+    "seconds": 0.01,
+    "title": "Vehicle was controlled not teleported",
+    "doc": ""
+   },
+   {
+    "file": "tests/scenarios/test_sudden_cattle_crossing.py",
+    "name": "test_returned_to_route_and_boundaries_respected",
+    "scenario": "SUDDEN_CATTLE_CROSSING",
+    "outcome": "PASSED",
+    "seconds": 0.0,
+    "title": "Returned to route and boundaries respected",
+    "doc": ""
+   },
+   {
+    "file": "tests/scenarios/test_sudden_cattle_crossing.py",
+    "name": "test_planner_latency_budget",
+    "scenario": "SUDDEN_CATTLE_CROSSING",
+    "outcome": "PASSED",
+    "seconds": 0.0,
+    "title": "Planner latency budget",
+    "doc": "Planner cost per cycle, measured as wall clock."
+   },
+   {
+    "file": "tests/scenarios/test_sudden_cattle_crossing.py",
+    "name": "test_decisions_are_explained_and_logged",
+    "scenario": "SUDDEN_CATTLE_CROSSING",
+    "outcome": "PASSED",
+    "seconds": 0.0,
+    "title": "Decisions are explained and logged",
+    "doc": ""
+   }
+  ],
+  "UNMARKED_VILLAGE_ROAD": [
+   {
+    "file": "tests/scenarios/test_required_scenarios.py",
+    "name": "test_completed_without_collision[UNMARKED_VILLAGE_ROAD]",
+    "scenario": "UNMARKED_VILLAGE_ROAD",
+    "outcome": "PASSED",
+    "seconds": 29.58,
+    "title": "Completed without collision",
+    "doc": ""
+   },
+   {
+    "file": "tests/scenarios/test_required_scenarios.py",
+    "name": "test_perception_was_actually_in_the_loop[UNMARKED_VILLAGE_ROAD]",
+    "scenario": "UNMARKED_VILLAGE_ROAD",
+    "outcome": "PASSED",
+    "seconds": 0.01,
+    "title": "Perception was actually in the loop",
+    "doc": ""
+   },
+   {
+    "file": "tests/scenarios/test_required_scenarios.py",
+    "name": "test_actuator_limits_and_no_teleport[UNMARKED_VILLAGE_ROAD]",
+    "scenario": "UNMARKED_VILLAGE_ROAD",
+    "outcome": "PASSED",
+    "seconds": 0.03,
+    "title": "Actuator limits and no teleport",
+    "doc": ""
+   },
+   {
+    "file": "tests/scenarios/test_required_scenarios.py",
+    "name": "test_ego_stayed_inside_the_corridor[UNMARKED_VILLAGE_ROAD]",
+    "scenario": "UNMARKED_VILLAGE_ROAD",
+    "outcome": "PASSED",
+    "seconds": 0.07,
+    "title": "Ego stayed inside the corridor",
+    "doc": ""
+   },
+   {
+    "file": "tests/scenarios/test_required_scenarios.py",
+    "name": "test_planner_replanned_and_explained[UNMARKED_VILLAGE_ROAD]",
+    "scenario": "UNMARKED_VILLAGE_ROAD",
+    "outcome": "PASSED",
+    "seconds": 0.04,
+    "title": "Planner replanned and explained",
+    "doc": ""
+   }
+  ],
+  "UNSIGNALIZED_INTERSECTION": [
+   {
+    "file": "tests/scenarios/test_required_scenarios.py",
+    "name": "test_completed_without_collision[UNSIGNALIZED_INTERSECTION]",
+    "scenario": "UNSIGNALIZED_INTERSECTION",
+    "outcome": "PASSED",
+    "seconds": 18.09,
+    "title": "Completed without collision",
+    "doc": ""
+   },
+   {
+    "file": "tests/scenarios/test_required_scenarios.py",
+    "name": "test_perception_was_actually_in_the_loop[UNSIGNALIZED_INTERSECTION]",
+    "scenario": "UNSIGNALIZED_INTERSECTION",
+    "outcome": "PASSED",
+    "seconds": 0.0,
+    "title": "Perception was actually in the loop",
+    "doc": ""
+   },
+   {
+    "file": "tests/scenarios/test_required_scenarios.py",
+    "name": "test_actuator_limits_and_no_teleport[UNSIGNALIZED_INTERSECTION]",
+    "scenario": "UNSIGNALIZED_INTERSECTION",
+    "outcome": "PASSED",
+    "seconds": 0.06,
+    "title": "Actuator limits and no teleport",
+    "doc": ""
+   },
+   {
+    "file": "tests/scenarios/test_required_scenarios.py",
+    "name": "test_ego_stayed_inside_the_corridor[UNSIGNALIZED_INTERSECTION]",
+    "scenario": "UNSIGNALIZED_INTERSECTION",
+    "outcome": "PASSED",
+    "seconds": 0.02,
+    "title": "Ego stayed inside the corridor",
+    "doc": ""
+   },
+   {
+    "file": "tests/scenarios/test_required_scenarios.py",
+    "name": "test_planner_replanned_and_explained[UNSIGNALIZED_INTERSECTION]",
+    "scenario": "UNSIGNALIZED_INTERSECTION",
+    "outcome": "PASSED",
+    "seconds": 0.02,
+    "title": "Planner replanned and explained",
+    "doc": ""
+   }
+  ],
+  "HIGHWAY_MERGE_SLOW_VEHICLES": [
+   {
+    "file": "tests/scenarios/test_required_scenarios.py",
+    "name": "test_completed_without_collision[HIGHWAY_MERGE_SLOW_VEHICLES]",
+    "scenario": "HIGHWAY_MERGE_SLOW_VEHICLES",
+    "outcome": "PASSED",
+    "seconds": 44.07,
+    "title": "Completed without collision",
+    "doc": ""
+   },
+   {
+    "file": "tests/scenarios/test_required_scenarios.py",
+    "name": "test_perception_was_actually_in_the_loop[HIGHWAY_MERGE_SLOW_VEHICLES]",
+    "scenario": "HIGHWAY_MERGE_SLOW_VEHICLES",
+    "outcome": "PASSED",
+    "seconds": 0.01,
+    "title": "Perception was actually in the loop",
+    "doc": ""
+   },
+   {
+    "file": "tests/scenarios/test_required_scenarios.py",
+    "name": "test_actuator_limits_and_no_teleport[HIGHWAY_MERGE_SLOW_VEHICLES]",
+    "scenario": "HIGHWAY_MERGE_SLOW_VEHICLES",
+    "outcome": "PASSED",
+    "seconds": 0.04,
+    "title": "Actuator limits and no teleport",
+    "doc": ""
+   },
+   {
+    "file": "tests/scenarios/test_required_scenarios.py",
+    "name": "test_ego_stayed_inside_the_corridor[HIGHWAY_MERGE_SLOW_VEHICLES]",
+    "scenario": "HIGHWAY_MERGE_SLOW_VEHICLES",
+    "outcome": "PASSED",
+    "seconds": 0.06,
+    "title": "Ego stayed inside the corridor",
+    "doc": ""
+   },
+   {
+    "file": "tests/scenarios/test_required_scenarios.py",
+    "name": "test_planner_replanned_and_explained[HIGHWAY_MERGE_SLOW_VEHICLES]",
+    "scenario": "HIGHWAY_MERGE_SLOW_VEHICLES",
+    "outcome": "PASSED",
+    "seconds": 0.02,
+    "title": "Planner replanned and explained",
+    "doc": ""
+   }
+  ],
+  "DENSE_MARKET_MIXED_TRAFFIC": [
+   {
+    "file": "tests/scenarios/test_required_scenarios.py",
+    "name": "test_completed_without_collision[DENSE_MARKET_MIXED_TRAFFIC]",
+    "scenario": "DENSE_MARKET_MIXED_TRAFFIC",
+    "outcome": "PASSED",
+    "seconds": 75.84,
+    "title": "Completed without collision",
+    "doc": ""
+   },
+   {
+    "file": "tests/scenarios/test_required_scenarios.py",
+    "name": "test_perception_was_actually_in_the_loop[DENSE_MARKET_MIXED_TRAFFIC]",
+    "scenario": "DENSE_MARKET_MIXED_TRAFFIC",
+    "outcome": "PASSED",
+    "seconds": 0.01,
+    "title": "Perception was actually in the loop",
+    "doc": ""
+   },
+   {
+    "file": "tests/scenarios/test_required_scenarios.py",
+    "name": "test_actuator_limits_and_no_teleport[DENSE_MARKET_MIXED_TRAFFIC]",
+    "scenario": "DENSE_MARKET_MIXED_TRAFFIC",
+    "outcome": "PASSED",
+    "seconds": 0.05,
+    "title": "Actuator limits and no teleport",
+    "doc": ""
+   },
+   {
+    "file": "tests/scenarios/test_required_scenarios.py",
+    "name": "test_ego_stayed_inside_the_corridor[DENSE_MARKET_MIXED_TRAFFIC]",
+    "scenario": "DENSE_MARKET_MIXED_TRAFFIC",
+    "outcome": "PASSED",
+    "seconds": 0.09,
+    "title": "Ego stayed inside the corridor",
+    "doc": ""
+   },
+   {
+    "file": "tests/scenarios/test_required_scenarios.py",
+    "name": "test_planner_replanned_and_explained[DENSE_MARKET_MIXED_TRAFFIC]",
+    "scenario": "DENSE_MARKET_MIXED_TRAFFIC",
+    "outcome": "PASSED",
+    "seconds": 0.05,
+    "title": "Planner replanned and explained",
+    "doc": ""
+   }
+  ],
+  "SUDDEN_PEDESTRIAN_DART": [
+   {
+    "file": "tests/scenarios/test_sudden_pedestrian_dart.py",
+    "name": "test_no_collision_and_completed",
+    "scenario": "SUDDEN_PEDESTRIAN_DART",
+    "outcome": "PASSED",
+    "seconds": 10.2,
+    "title": "No collision and completed",
+    "doc": ""
+   },
+   {
+    "file": "tests/scenarios/test_sudden_pedestrian_dart.py",
+    "name": "test_safety_override_actually_fired_and_was_recorded",
+    "scenario": "SUDDEN_PEDESTRIAN_DART",
+    "outcome": "PASSED",
+    "seconds": 0.0,
+    "title": "Safety override actually fired and was recorded",
+    "doc": ""
+   },
+   {
+    "file": "tests/scenarios/test_sudden_pedestrian_dart.py",
+    "name": "test_emergency_brake_state_visited_and_recovered",
+    "scenario": "SUDDEN_PEDESTRIAN_DART",
+    "outcome": "PASSED",
+    "seconds": 0.01,
+    "title": "Emergency brake state visited and recovered",
+    "doc": ""
+   },
+   {
+    "file": "tests/scenarios/test_sudden_pedestrian_dart.py",
+    "name": "test_pedestrian_really_crossed_the_path",
+    "scenario": "SUDDEN_PEDESTRIAN_DART",
+    "outcome": "PASSED",
+    "seconds": 0.0,
+    "title": "Pedestrian really crossed the path",
+    "doc": ""
+   }
+  ],
+  "NARROW_LANE_REVERSE_RECOVERY": [
+   {
+    "file": "tests/unit/test_reverse_recovery.py",
+    "name": "test_reverse_candidates_now_span_several_lateral_offsets",
+    "scenario": "NARROW_LANE_REVERSE_RECOVERY",
+    "outcome": "PASSED",
+    "seconds": 0.06,
+    "title": "Reverse candidates now span several lateral offsets",
+    "doc": "Before Phase 5 every reverse candidate ended at the CURRENT offset: straight back, always."
+   },
+   {
+    "file": "tests/unit/test_reverse_recovery.py",
+    "name": "test_a_curved_reverse_actually_moves_sideways",
+    "scenario": "NARROW_LANE_REVERSE_RECOVERY",
+    "outcome": "PASSED",
+    "seconds": 0.02,
+    "title": "A curved reverse actually moves sideways",
+    "doc": ""
+   },
+   {
+    "file": "tests/unit/test_reverse_recovery.py",
+    "name": "test_the_reverse_body_yaw_leans_the_opposite_way_to_a_forward_shift",
+    "scenario": "NARROW_LANE_REVERSE_RECOVERY",
+    "outcome": "PASSED",
+    "seconds": 0.0,
+    "title": "The reverse body yaw leans the opposite way to a forward shift",
+    "doc": "Reversing does not turn the car around, so the yaw offset has the opposite sign."
+   },
+   {
+    "file": "tests/unit/test_reverse_recovery.py",
+    "name": "test_reverse_speed_stays_inside_the_configured_bound",
+    "scenario": "NARROW_LANE_REVERSE_RECOVERY",
+    "outcome": "PASSED",
+    "seconds": 0.02,
+    "title": "Reverse speed stays inside the configured bound",
+    "doc": ""
+   },
+   {
+    "file": "tests/unit/test_reverse_recovery.py",
+    "name": "test_reverse_acceleration_stays_inside_the_configured_bound",
+    "scenario": "NARROW_LANE_REVERSE_RECOVERY",
+    "outcome": "PASSED",
+    "seconds": 0.02,
+    "title": "Reverse acceleration stays inside the configured bound",
+    "doc": ""
+   },
+   {
+    "file": "tests/unit/test_reverse_recovery.py",
+    "name": "test_curved_reverse_curvature_respects_the_steering_limit",
+    "scenario": "NARROW_LANE_REVERSE_RECOVERY",
+    "outcome": "PASSED",
+    "seconds": 0.03,
+    "title": "Curved reverse curvature respects the steering limit",
+    "doc": "tan(delta) = L * kappa holds in reverse exactly as it does forwards, so the same bound applies."
+   },
+   {
+    "file": "tests/unit/test_reverse_recovery.py",
+    "name": "test_the_reverse_cross_track_contribution_is_clamped",
+    "scenario": "NARROW_LANE_REVERSE_RECOVERY",
+    "outcome": "PASSED",
+    "seconds": 0.0,
+    "title": "The reverse cross track contribution is clamped",
+    "doc": "A huge lateral error must not produce an unbounded steering command while reversing."
+   },
+   {
+    "file": "tests/unit/test_reverse_recovery.py",
+    "name": "test_the_steering_rate_limit_still_binds_while_reversing",
+    "scenario": "NARROW_LANE_REVERSE_RECOVERY",
+    "outcome": "PASSED",
+    "seconds": 0.0,
+    "title": "The steering rate limit still binds while reversing",
+    "doc": ""
+   },
+   {
+    "file": "tests/unit/test_reverse_recovery.py",
+    "name": "test_a_reverse_leg_into_an_obstacle_is_rejected",
+    "scenario": "NARROW_LANE_REVERSE_RECOVERY",
+    "outcome": "PASSED",
+    "seconds": 0.04,
+    "title": "A reverse leg into an obstacle is rejected",
+    "doc": "Reverse candidates go through the SAME swept-footprint check as forward ones."
+   },
+   {
+    "file": "tests/unit/test_reverse_recovery.py",
+    "name": "test_a_clear_reverse_leg_survives_the_check",
+    "scenario": "NARROW_LANE_REVERSE_RECOVERY",
+    "outcome": "PASSED",
+    "seconds": 0.04,
+    "title": "A clear reverse leg survives the check",
+    "doc": ""
+   },
+   {
+    "file": "tests/unit/test_reverse_recovery.py",
+    "name": "test_no_reverse_leg_crosses_an_obstacle_without_being_seen",
+    "scenario": "NARROW_LANE_REVERSE_RECOVERY",
+    "outcome": "PASSED",
+    "seconds": 0.03,
+    "title": "No reverse leg crosses an obstacle without being seen",
+    "doc": "Sample the footprint along every ACCEPTED reverse leg and confirm it never overlaps."
+   },
+   {
+    "file": "tests/unit/test_reverse_recovery.py",
+    "name": "test_the_vehicle_model_actually_reverses_and_curves",
+    "scenario": "NARROW_LANE_REVERSE_RECOVERY",
+    "outcome": "PASSED",
+    "seconds": 0.0,
+    "title": "The vehicle model actually reverses and curves",
+    "doc": "Motion must come from the shipped bicycle model, with yaw rate following signed speed."
+   },
+   {
+    "file": "tests/unit/test_reverse_recovery.py",
+    "name": "test_reverse_to_forward_transition_passes_through_zero",
+    "scenario": "NARROW_LANE_REVERSE_RECOVERY",
+    "outcome": "PASSED",
+    "seconds": 0.0,
+    "title": "Reverse to forward transition passes through zero",
+    "doc": "No teleport and no sign jump: the vehicle must decelerate through rest to go forward again."
+   },
+   {
+    "file": "tests/unit/test_reverse_recovery.py",
+    "name": "test_forward_to_reverse_needs_a_near_standstill",
+    "scenario": "NARROW_LANE_REVERSE_RECOVERY",
+    "outcome": "PASSED",
+    "seconds": 0.02,
+    "title": "Forward to reverse needs a near standstill",
+    "doc": "Reverse candidates are not offered while the ego is still rolling forward."
+   },
+   {
+    "file": "tests/unit/test_reverse_recovery.py",
+    "name": "test_boxed_in_recovery_reverses_and_still_reaches_the_goal[ground_truth]",
+    "scenario": "NARROW_LANE_REVERSE_RECOVERY",
+    "outcome": "PASSED",
+    "seconds": 27.56,
+    "title": "Boxed in recovery reverses and still reaches the goal",
+    "doc": "The whole point of Phase 5's scenario: reverse is REQUIRED in both perception modes."
+   },
+   {
+    "file": "tests/unit/test_reverse_recovery.py",
+    "name": "test_boxed_in_recovery_reverses_and_still_reaches_the_goal[sensors]",
+    "scenario": "NARROW_LANE_REVERSE_RECOVERY",
+    "outcome": "PASSED",
+    "seconds": 27.22,
+    "title": "Boxed in recovery reverses and still reaches the goal",
+    "doc": "The whole point of Phase 5's scenario: reverse is REQUIRED in both perception modes."
+   },
+   {
+    "file": "tests/unit/test_reverse_recovery.py",
+    "name": "test_a_genuine_emergency_still_brakes",
+    "scenario": "NARROW_LANE_REVERSE_RECOVERY",
+    "outcome": "PASSED",
+    "seconds": 9.66,
+    "title": "A genuine emergency still brakes",
+    "doc": "The pedestrian dart fires the override at 0.7 s time-to-collision with zero feasible plans."
+   },
+   {
+    "file": "tests/unit/test_reverse_recovery.py",
+    "name": "test_the_safety_supervisor_outranks_the_tracker",
+    "scenario": "NARROW_LANE_REVERSE_RECOVERY",
+    "outcome": "PASSED",
+    "seconds": 70.02,
+    "title": "The safety supervisor outranks the tracker",
+    "doc": "Whenever the override is active, the command the vehicle receives is the supervisor's."
+   },
+   {
+    "file": "tests/unit/test_reverse_recovery.py",
+    "name": "test_braking_does_not_oscillate_under_sensor_noise",
+    "scenario": "NARROW_LANE_REVERSE_RECOVERY",
+    "outcome": "PASSED",
+    "seconds": 79.57,
+    "title": "Braking does not oscillate under sensor noise",
+    "doc": "The audit found no chattering; this fails if a future change introduces some."
+   },
+   {
+    "file": "tests/unit/test_reverse_recovery.py",
+    "name": "test_the_brake_is_released_once_the_hazard_clears",
+    "scenario": "NARROW_LANE_REVERSE_RECOVERY",
+    "outcome": "PASSED",
+    "seconds": 9.19,
+    "title": "The brake is released once the hazard clears",
+    "doc": "A brake that never releases is as much a failure as one that never fires."
+   },
+   {
+    "file": "tests/unit/test_reverse_recovery.py",
+    "name": "test_noisy_perception_does_not_make_the_quiet_scenarios_brake",
+    "scenario": "NARROW_LANE_REVERSE_RECOVERY",
+    "outcome": "PASSED",
+    "seconds": 54.75,
+    "title": "Noisy perception does not make the quiet scenarios brake",
+    "doc": "Sensor noise alone must not manufacture emergencies where there is no hazard."
+   }
+  ],
+  "UNPROTECTED_TURN": [
+   {
+    "file": "tests/unit/test_interactive_traffic.py",
+    "name": "test_interaction_scenarios_complete_safely[UNPROTECTED_TURN]",
+    "scenario": "UNPROTECTED_TURN",
+    "outcome": "PASSED",
+    "seconds": 15.77,
+    "title": "Interaction scenarios complete safely",
+    "doc": ""
+   },
+   {
+    "file": "tests/unit/test_interactive_traffic.py",
+    "name": "test_interactive_flag_changes_agent_behaviour",
+    "scenario": "UNPROTECTED_TURN",
+    "outcome": "PASSED",
+    "seconds": 14.96,
+    "title": "Interactive flag changes agent behaviour",
+    "doc": "With the flag off the agent cannot see the ego's speed, so it commits regardless. With it on"
+   },
+   {
+    "file": "tests/unit/test_interactive_traffic.py",
+    "name": "test_agent_commits_when_the_ego_is_slow_enough",
+    "scenario": "UNPROTECTED_TURN",
+    "outcome": "PASSED",
+    "seconds": 22.67,
+    "title": "Agent commits when the ego is slow enough",
+    "doc": "The mirror of the test above: a slow ego leaves a gap worth taking."
+   }
+  ],
+  "NARROW_LANE_MUTUAL_YIELD": [
+   {
+    "file": "tests/unit/test_interactive_traffic.py",
+    "name": "test_interaction_scenarios_complete_safely[NARROW_LANE_MUTUAL_YIELD]",
+    "scenario": "NARROW_LANE_MUTUAL_YIELD",
+    "outcome": "PASSED",
+    "seconds": 11.63,
+    "title": "Interaction scenarios complete safely",
+    "doc": ""
+   },
+   {
+    "file": "tests/unit/test_interactive_traffic.py",
+    "name": "test_narrow_lane_does_not_deadlock",
+    "scenario": "NARROW_LANE_MUTUAL_YIELD",
+    "outcome": "PASSED",
+    "seconds": 12.11,
+    "title": "Narrow lane does not deadlock",
+    "doc": "Two vehicles meet where only one fits. Neither is scripted; the pair must still resolve it."
+   }
+  ]
+ },
+ "ungrouped": [
+  {
+   "file": "tests/unit/test_interactive_traffic.py",
+   "name": "test_agent_receives_ego_position_speed_and_heading",
+   "scenario": null,
+   "outcome": "PASSED",
+   "seconds": 0.0,
+   "title": "Agent receives ego position speed and heading",
+   "doc": "EgoView carries what a road user can see, and still indexes as (x, y) so every pre-existing"
+  },
+  {
+   "file": "tests/unit/test_interactive_traffic.py",
+   "name": "test_small_gap_yields_and_large_gap_commits",
+   "scenario": null,
+   "outcome": "PASSED",
+   "seconds": 0.0,
+   "title": "Small gap yields and large gap commits",
+   "doc": ""
+  },
+  {
+   "file": "tests/unit/test_interactive_traffic.py",
+   "name": "test_ego_speed_alone_flips_the_decision",
+   "scenario": null,
+   "outcome": "PASSED",
+   "seconds": 0.0,
+   "title": "Ego speed alone flips the decision",
+   "doc": "Identical geometry, different ego speed: the agent must reach the opposite conclusion."
+  },
+  {
+   "file": "tests/unit/test_interactive_traffic.py",
+   "name": "test_ego_heading_affects_conflict_assessment",
+   "scenario": null,
+   "outcome": "PASSED",
+   "seconds": 0.0,
+   "title": "Ego heading affects conflict assessment",
+   "doc": "An ego driving away from the conflict point never arrives, so there is nothing to yield to."
+  },
+  {
+   "file": "tests/unit/test_interactive_traffic.py",
+   "name": "test_commitment_does_not_oscillate",
+   "scenario": null,
+   "outcome": "PASSED",
+   "seconds": 0.0,
+   "title": "Commitment does not oscillate",
+   "doc": "Once committed the agent stays committed, even as the gap collapses. That is what a human"
+  },
+  {
+   "file": "tests/unit/test_interactive_traffic.py",
+   "name": "test_reaction_delay_is_respected",
+   "scenario": null,
+   "outcome": "PASSED",
+   "seconds": 0.0,
+   "title": "Reaction delay is respected",
+   "doc": "The agent acts on an ego state as old as its reaction time, so it cannot respond instantly."
+  },
+  {
+   "file": "tests/unit/test_interactive_traffic.py",
+   "name": "test_idm_accelerates_when_the_gap_is_large",
+   "scenario": null,
+   "outcome": "PASSED",
+   "seconds": 0.0,
+   "title": "Idm accelerates when the gap is large",
+   "doc": ""
+  },
+  {
+   "file": "tests/unit/test_interactive_traffic.py",
+   "name": "test_idm_brakes_when_the_gap_is_small",
+   "scenario": null,
+   "outcome": "PASSED",
+   "seconds": 0.0,
+   "title": "Idm brakes when the gap is small",
+   "doc": ""
+  },
+  {
+   "file": "tests/unit/test_interactive_traffic.py",
+   "name": "test_idm_converges_to_the_desired_headway",
+   "scenario": null,
+   "outcome": "PASSED",
+   "seconds": 0.02,
+   "title": "Idm converges to the desired headway",
+   "doc": "Following a lead at constant speed, the gap settles near s0 + v*T rather than drifting."
+  },
+  {
+   "file": "tests/unit/test_interactive_traffic.py",
+   "name": "test_idm_never_produces_runaway_commands",
+   "scenario": null,
+   "outcome": "PASSED",
+   "seconds": 0.0,
+   "title": "Idm never produces runaway commands",
+   "doc": ""
+  },
+  {
+   "file": "tests/unit/test_interactive_traffic.py",
+   "name": "test_interactive_agent_stops_at_the_road_edge",
+   "scenario": null,
+   "outcome": "PASSED",
+   "seconds": 0.33,
+   "title": "Interactive agent stops at the road edge",
+   "doc": "Containment is a motion command, not a position clamp: the agent brakes and stops on the"
+  }
+ ]
+}

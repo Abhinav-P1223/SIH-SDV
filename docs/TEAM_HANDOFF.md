@@ -155,6 +155,26 @@ Everything below is **gitignored on purpose**. Nothing here may ever be committe
 | `perception_detector/checkpoints/*oversampled*.pt` | Phase 7E experiment | No | 4 x 76 MB | Regenerate, or ask the lead | Yes, as a release artefact |
 | `~/.cache/torch/hub/checkpoints/` | COCO pretrained weights | Auto-downloaded on first use | 88 MB | torchvision downloads it | Yes |
 
+### The console (`ui/`)
+
+Added after the freeze, and deliberately isolated. It is a **read-only** Three.js operations view:
+it computes no plan, no risk and no control command, and never writes to the simulation. It runs
+scenarios through the existing `scripts.run_scenario.run_with_sinks` with one extra `TelemetrySink`
+attached — the documented extension point — and its frames are built by the unchanged
+`autonomy.telemetry.dashboard.compact_frame`.
+
+```bash
+python -m ui.server            # http://127.0.0.1:8770/
+python -m ui.capture --all     # re-record the replays  (~40 min)
+python -m ui.collect_tests     # re-record per-scenario test outcomes  (~11 min)
+python -m pytest ui/tests -q   # 25 tests, kept OUTSIDE tests/ so the frozen count stays 348
+```
+
+**It adds no dependency.** The server is Python standard library only; Three.js r160 and
+OrbitControls are vendored into `ui/static/vendor/`, so it works offline with no build step.
+`ui/replay/` holds ~19 MB of recorded runs — real telemetry from the frozen stack, regenerable at
+any time. Full detail in [../ui/README.md](../ui/README.md).
+
 **Tracked in git:** code, config, docs, scripts, the reproducibility manifests
 (`docs/uvh26_manifest.json`), the machine-readable results, and two model checkpoints.
 
@@ -209,6 +229,9 @@ Run every command from the repository root.
 | `python scripts/eval_segmentation.py --root Datasets/idd-lite/idd20k_lite` | Segmentation metrics and figures | about 6 min | **IDD-Lite** |
 | `python scripts/validate_nuscenes_fusion.py` | Fusion interface against real nuScenes | several min | **nuScenes** |
 | `python scripts/select_uvh26_subset.py --download` | Fetches the 750-image subset, 2.5 GB | 20 to 40 min | network |
+| `python -m ui.server` | The Three.js console | instant | none |
+| `python -m ui.capture --all` | Re-record every UI replay | about 40 min | none |
+| `python -m ui.collect_tests` | Re-record per-scenario test outcomes | about 11 min | none |
 
 Scenario names: `UNMARKED_VILLAGE_ROAD`, `UNSIGNALIZED_INTERSECTION`,
 `HIGHWAY_MERGE_SLOW_VEHICLES`, `DENSE_MARKET_MIXED_TRAFFIC`, `SUDDEN_CATTLE_CROSSING`,

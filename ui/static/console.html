@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SIH26037 — Autonomous Vehicle Console</title>
+<link rel="stylesheet" href="/static/styles.css">
+</head>
+<body data-risk="NONE">
+
+<!-- ═══════════ intro ═══════════ -->
+<div class="intro" id="intro">
+  <div class="intro-in">
+    <div class="intro-tag">Smart India Hackathon · SIH26037</div>
+    <h1>Adaptive Autonomous Navigation</h1>
+    <h2>Unstructured Indian Roads</h2>
+    <div class="intro-stats">
+      <div><b>22/22</b><span>runs completed</span></div>
+      <div><b>0</b><span>collisions</span></div>
+      <div><b>348</b><span>tests passing</span></div>
+    </div>
+    <div class="intro-go">
+      <button class="btn primary lg" id="intro-demo">Start demo</button>
+      <button class="btn lg" id="intro-skip">Open console</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ top bar ═══════════ -->
+<header class="top">
+  <div class="brand"><span class="mk"></span>
+    <div><b>SIH26037</b><small>Autonomous Vehicle Console</small></div>
+  </div>
+
+  <nav class="tabs">
+    <button class="tab on" data-tab="drive">Drive</button>
+    <button class="tab" data-tab="scenarios">Scenarios</button>
+    <button class="tab" data-tab="validation">Validation</button>
+    <button class="tab" data-tab="perception">Perception</button>
+  </nav>
+
+  <div class="top-ctl" id="top-ctl">
+    <div class="src" id="src-chip"><i></i><span>REPLAY</span></div>
+    <select id="sel-replay" class="inp"></select>
+    <div class="cams">
+      <button class="cam on" data-cam="follow">Follow</button>
+      <button class="cam" data-cam="chase">Chase</button>
+      <button class="cam" data-cam="top">Top</button>
+      <button class="cam" data-cam="orbit">Orbit</button>
+    </div>
+  </div>
+</header>
+
+<!-- ═══════════ DRIVE ═══════════ -->
+<main class="screen on" id="s-drive">
+  <div class="stage">
+    <canvas id="gl"></canvas>
+
+    <!-- scenario title, top-left over the scene -->
+    <div class="ov ov-title">
+      <div class="ov-name" id="ov-name">—</div>
+      <div class="ov-desc" id="ov-desc"></div>
+      <div class="ov-mode"><span id="ov-mode">—</span> · <span id="ov-frames">—</span></div>
+    </div>
+
+    <!-- story caption -->
+    <div class="caption" id="caption">
+      <div class="cap-title"></div>
+      <div class="cap-text"></div>
+    </div>
+
+    <!-- emergency banner -->
+    <div class="eb" id="eb">EMERGENCY BRAKE · SAFETY OVERRIDE</div>
+
+    <!-- clock -->
+    <div class="ov ov-clock"><b id="clock">0.000</b><small>s</small></div>
+
+    <!-- legend -->
+    <div class="ov ov-legend">
+      <span class="lg sel">selected path</span>
+      <span class="lg fea">feasible</span>
+      <span class="lg rej">rejected</span>
+      <span class="lg prd">prediction</span>
+      <span class="lg hst">travelled</span>
+    </div>
+
+    <!-- object inspector -->
+    <div class="inspect" id="inspect" hidden>
+      <button class="x" id="inspect-x">✕</button>
+      <div class="ins-hd"><b id="ins-title">—</b><span id="ins-risk"></span></div>
+      <div class="ins-grid" id="ins-grid"></div>
+    </div>
+  </div>
+
+  <!-- right rail -->
+  <aside class="rail">
+    <section class="card beh" id="beh-card">
+      <div class="card-hd"><span>Behaviour</span><b id="risk-chip">NONE</b></div>
+      <div class="beh-state" id="beh-state">—</div>
+      <div class="beh-why" id="beh-why">—</div>
+      <div class="sgrid">
+        <div class="s" id="s-coll"><span>Collision</span><b>NONE</b></div>
+        <div class="s" id="s-eb"><span>Emergency brake</span><b>INACTIVE</b></div>
+        <div class="s" id="s-rev"><span>Reverse gear</span><b>NO</b></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-hd"><span>Situation</span></div>
+      <div class="mrow"><label>TTC physical</label><b id="m-ttc">—</b><i>s</i></div>
+      <div class="mrow"><label>Risk score</label><b id="m-score">—</b><i></i></div>
+      <div class="mrow"><label>Min clearance</label><b id="m-clear">—</b><i>m</i></div>
+      <div class="mrow"><label>Worst object</label><b id="m-worst" class="txt">—</b><i></i></div>
+    </section>
+
+    <section class="card">
+      <div class="card-hd"><span>Vehicle</span></div>
+      <div class="mrow"><label>Speed</label><b id="m-speed">—</b><i>m/s</i></div>
+      <div class="mrow"><label>Steering</label><b id="m-steer">—</b><i>deg</i></div>
+      <div class="mrow"><label>Acceleration</label><b id="m-acc">—</b><i>m/s²</i></div>
+      <div class="mrow"><label>Brake</label><b id="m-brake">—</b><i>m/s²</i></div>
+    </section>
+
+    <section class="card">
+      <div class="card-hd"><span>Perception &amp; planning</span></div>
+      <div class="mrow"><label>Tracks / truth agents</label><b id="m-tracks">—</b><i></i></div>
+      <div class="mrow"><label>Candidates</label><b id="m-cand">—</b><i></i></div>
+      <div class="mrow"><label>Feasible</label><b id="m-feas">—</b><i></i></div>
+      <div class="mrow"><label>Replans</label><b id="m-replans">—</b><i></i></div>
+      <div class="mrow"><label>Plan latency</label><b id="m-lat">—</b><i>ms</i></div>
+    </section>
+
+  </aside>
+
+  <!-- why panel -->
+  <section class="why card" id="why">
+    <div class="card-hd"><span>Why did we replan?</span><em id="why-time"></em></div>
+    <div class="why-cause" id="why-cause">Waiting for a decision change…</div>
+    <div class="why-row" id="why-row"></div>
+    <p class="why-note">Derived from telemetry. The stack exposes no causal reason field — cause is
+    the behaviour FSM's own reason string plus the highest-risk track; every number is measured.</p>
+  </section>
+
+  <!-- transport + timeline -->
+  <section class="transport card">
+    <div class="tp-btns">
+      <button class="btn ic" id="tp-back" title="Back 2 s">◀◀</button>
+      <button class="btn ic primary" id="tp-play" title="Play / pause">▶</button>
+      <button class="btn ic" id="tp-fwd" title="Forward 2 s">▶▶</button>
+      <button class="btn ic" id="tp-reset" title="Restart">↻</button>
+      <select id="tp-speed" class="inp sm">
+        <option value="0.25">0.25×</option>
+        <option value="0.5">0.5×</option>
+        <option value="1" selected>1×</option>
+        <option value="2">2×</option>
+        <option value="4">4×</option>
+      </select>
+    </div>
+    <div class="tp-track">
+      <input type="range" id="tp-slider" min="0" max="1000" value="0" step="1">
+      <div class="tp-marks" id="tp-marks"></div>
+    </div>
+    <div class="tp-time"><span>sim time</span><b id="tp-now">0.00</b><span>s</span>
+      <i id="tp-dur" hidden></i></div>
+    <div class="tp-demo">
+      <button class="btn sm" id="tp-demo">Demo</button>
+      <button class="btn sm" id="tp-prev">Prev</button>
+      <button class="btn sm demo" id="tp-story">Story</button>
+      <button class="btn sm" id="tp-next">Next</button>
+    </div>
+  </section>
+
+  <!-- bottom strip: story / events / tests -->
+  <section class="events card">
+    <div class="card-hd strip-hd">
+      <div class="subtabs">
+        <button class="sub on" data-sub="story">Story</button>
+        <button class="sub" data-sub="events">Events</button>
+        <button class="sub" data-sub="tests">Tests <b id="test-badge"></b></button>
+      </div>
+      <em id="strip-note">click a chapter to jump there</em>
+    </div>
+    <div class="sub-pane on" id="pane-story"><div class="story-list" id="story-list"></div></div>
+    <div class="sub-pane" id="pane-events"><div class="ev-wrap" id="events"></div></div>
+    <div class="sub-pane" id="pane-tests"><div class="test-list" id="test-list"></div></div>
+  </section>
+</main>
+
+<!-- ═══════════ SCENARIOS ═══════════ -->
+<main class="screen pad" id="s-scenarios">
+  <div class="phead">
+    <h2>Scenarios</h2>
+    <p>The eleven scenario definitions in <code>simulation/scenarios/</code>. Result figures come
+    from <code>docs/FINAL_SYSTEM_RESULTS.json</code>; recorded replays are marked.</p>
+  </div>
+  <div class="scn-grid" id="scn-grid"></div>
+</main>
+
+<!-- ═══════════ VALIDATION ═══════════ -->
+<main class="screen pad" id="s-validation">
+  <div class="phead">
+    <h2>Final validation</h2>
+    <p>Closed-loop simulation validation of the frozen stack at <code>2ccd232</code>. Served verbatim
+    from <code>docs/FINAL_SYSTEM_RESULTS.json</code> — this screen computes nothing.</p>
+  </div>
+  <div class="hero" id="v-hero"></div>
+  <div class="two">
+    <section class="card pad2"><h3>Minimum clearance by run<small>metres · higher is safer</small></h3><div id="ch-clear" class="chart"></div></section>
+    <section class="card pad2"><h3>p95 re-planning latency<small>ms · budget 100</small></h3><div id="ch-lat" class="chart"></div></section>
+  </div>
+  <section class="card pad2"><h3>Ground truth vs sensor mode</h3><div class="tw"><table class="data" id="v-modes"></table></div></section>
+  <section class="card pad2"><h3>All 22 runs</h3><div class="tw"><table class="data" id="v-table"></table></div></section>
+  <section class="card pad2 ok-card"><h3>Automated wiring checks</h3><div class="checks" id="v-checks"></div></section>
+</main>
+
+<!-- ═══════════ PERCEPTION ═══════════ -->
+<main class="screen pad" id="s-perception">
+  <div class="phead">
+    <h2>Learned camera detector</h2>
+    <div class="claimbar">
+      <div class="cb a"><b>Independent held-out UVH-26 evaluation</b>
+        <span>150 held-out images · IoU 0.5 · score threshold 0.35. UVH-26 is elevated CCTV
+        imagery, so CCTV-to-dashcam transfer is unvalidated.</span></div>
+      <div class="cb b"><b>Not used as camera input in Phase 8</b>
+        <span>The simulator renders no image frames, so no detector consumed camera pixels in any
+        closed-loop run. These are two separate validations.</span></div>
+    </div>
+  </div>
+  <div class="hero" id="p-hero"></div>
+  <section class="card pad2"><h3>Per-class recall<small>COCO baseline against UVH-26 fine-tuned</small></h3><div id="p-bars" class="pbars"></div></section>
+  <section class="card pad2"><h3>Full A/B</h3><div class="tw"><table class="data" id="p-table"></table></div></section>
+  <section class="card pad2 warn-card"><h3>Stated limitations</h3><ul id="p-limits"></ul></section>
+</main>
+
+<div class="toast" id="toast"></div>
+<div class="boot" id="boot"><div class="sp"></div><span id="boot-msg">Loading replay…</span></div>
+
+<script type="module" src="/static/src/main.js"></script>
+</body>
+</html>
