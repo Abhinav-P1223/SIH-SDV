@@ -63,9 +63,6 @@
       <div class="ov-mode"><span id="ov-mode">—</span> · <span id="ov-frames">—</span></div>
     </div>
 
-    <!-- storytelling beat -->
-    <div class="beat" id="beat"><i></i><span></span></div>
-
     <!-- story caption -->
     <div class="caption" id="caption">
       <div class="cap-title"></div>
@@ -163,7 +160,8 @@
       <input type="range" id="tp-slider" min="0" max="1000" value="0" step="1">
       <div class="tp-marks" id="tp-marks"></div>
     </div>
-    <div class="tp-time"><b id="tp-now">0.00</b> / <span id="tp-dur">0.00</span> s</div>
+    <div class="tp-time"><span>sim time</span><b id="tp-now">0.00</b><span>s</span>
+      <i id="tp-dur" hidden></i></div>
     <div class="tp-demo">
       <button class="btn sm" id="tp-demo">Demo</button>
       <button class="btn sm" id="tp-prev">Prev</button>

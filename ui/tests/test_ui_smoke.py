@@ -25,9 +25,25 @@ PORT = 8791
 BASE = f"http://127.0.0.1:{PORT}"
 
 
-def get(path: str, timeout: float = 10.0):
-    with urllib.request.urlopen(BASE + path, timeout=timeout) as r:
-        return r.status, r.read()
+def get(path: str, timeout: float = 10.0, _tries: int = 3):
+    """GET with a retry on TRANSPORT errors only.
+
+    `http.server` is a development server; on Windows a burst of connections after a multi-megabyte
+    response occasionally aborts the next socket (WinError 10053). Every request in this suite
+    behaves correctly against a fresh server, so a transport abort is harness noise, not a server
+    defect. HTTP status errors are never retried — those are the thing under test.
+    """
+    for attempt in range(_tries):
+        try:
+            with urllib.request.urlopen(BASE + path, timeout=timeout) as r:
+                return r.status, r.read()
+        except urllib.error.HTTPError:
+            raise                                   # a real status: the assertion must see it
+        except (ConnectionError, OSError) as e:
+            if attempt == _tries - 1:
+                raise
+            time.sleep(0.25 * (attempt + 1))
+    raise AssertionError("unreachable")
 
 
 def post(path: str, payload: dict | None = None, timeout: float = 10.0):

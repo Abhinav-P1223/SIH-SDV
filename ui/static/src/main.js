@@ -5,7 +5,7 @@ import { Scene3D } from "./scene.js";
 import { Clock, Replay, loadReplay } from "./replay.js";
 import {
   $, toast, updatePanels, findWhy, renderWhy, renderEvents, highlightEvent,
-  renderMarks, updateBeat, showInspector,
+  renderMarks, showInspector,
 } from "./panels.js";
 import { renderValidation, renderPerception, renderScenarios } from "./reports.js";
 import { buildStory, renderStory, highlightChapter, showCaption } from "./story.js";
@@ -83,7 +83,7 @@ async function open(meta, autoplay) {
   $("ov-desc").textContent = r.doc.description || "";
   $("ov-mode").textContent = r.mode === "sensors" ? "SENSOR MODE" : "GROUND TRUTH";
   $("ov-frames").textContent = `${r.doc.frame_count} recorded frames`;
-  $("tp-dur").textContent = r.duration.toFixed(2);
+  $("tp-dur").textContent = r.duration.toFixed(2);   // hidden; used by nothing user-facing
 
   A.clock.duration = r.duration;
   A.clock.t = 0;
@@ -121,9 +121,8 @@ function onTick(t) {
   A.scene.update(f, pf);
 
   updatePanels(f, pf, r);
-  renderWhy(findWhy(r, abs), r);
+  renderWhy(findWhy(r, abs), r, f);
   highlightEvent(r, abs);
-  updateBeat(r, abs);
   if (A.selected) {
     const live = (f.objects || []).find((o) => o.id === A.selected.id);
     if (live) { A.selected = live; showInspector(live, f); }

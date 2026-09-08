@@ -367,7 +367,9 @@ export class Scene3D {
   }
 
   _camera(e) {
-    const p = W2T(e.x, e.y, 0);
+    // aim a little ahead of the vehicle: the interesting half of the scene is the road it is
+    // driving into, not the road behind it
+    const p = W2T(e.x + Math.cos(e.yaw) * 4.5, e.y + Math.sin(e.yaw) * 4.5, 0.8);
     // A scrub can move the ego tens of metres in one tick. Smoothing across that leaves the camera
     // stranded (the lerp only advances on a telemetry tick, and a paused seek delivers exactly one),
     // so snap on a big jump and smooth only during continuous playback.
@@ -379,12 +381,12 @@ export class Scene3D {
     const yaw = e.yaw;
     let want;
     if (this.mode === "follow") {
-      want = new THREE.Vector3(e.x - Math.cos(yaw) * 12 - Math.sin(yaw) * 2.5, 6.6,
-        -(e.y - Math.sin(yaw) * 12 + Math.cos(yaw) * 2.5));
+      want = new THREE.Vector3(e.x - Math.cos(yaw) * 8.4 - Math.sin(yaw) * 1.8, 4.3,
+        -(e.y - Math.sin(yaw) * 8.4 + Math.cos(yaw) * 1.8));
     } else if (this.mode === "chase") {
-      want = new THREE.Vector3(e.x - Math.cos(yaw) * 7.5, 3.1, -(e.y - Math.sin(yaw) * 7.5));
+      want = new THREE.Vector3(e.x - Math.cos(yaw) * 5.6, 2.5, -(e.y - Math.sin(yaw) * 5.6));
     } else { // top
-      want = new THREE.Vector3(e.x + 4, 46, -e.y);
+      want = new THREE.Vector3(e.x + 3, 34, -e.y);
     }
     if (jump) this.camPos.copy(want); else this.camPos.lerp(want, this.mode === "top" ? 0.1 : 0.13);
     this.camera.position.copy(this.camPos);

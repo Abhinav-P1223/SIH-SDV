@@ -77,39 +77,48 @@ export function findWhy(replay, t) {
 
 let _whyKey = null;
 
-export function renderWhy(hit, replay) {
-  const key = hit ? hit.i : "none";
-  if (key === _whyKey) return;          // the panel only changes on a transition, not every frame
-  _whyKey = key;
+export function renderWhy(hit, replay, nowFrame) {
+  // Before the first decision change the panel would sit empty and tall. Show the CURRENT planner
+  // state instead, plainly labelled — an empty box reads as broken, and this is all measured.
   if (!hit) {
-    $("why-cause").textContent = "No decision change yet in this run.";
-    $("why-row").innerHTML = "";
-    $("why-time").textContent = "";
+    if (_whyKey === "none") return;
+    _whyKey = "none";
+    $("why-cause").textContent =
+      "No decision change yet — the vehicle is still in its opening behaviour state. " +
+      "Showing the current planner state.";
+    $("why-time").textContent = nowFrame ? `t = ${nowFrame.t.toFixed(2)} s` : "";
+    $("why-row").innerHTML = nowFrame ? cells(nowFrame, replay, null) : "";
     return;
   }
+  const key = hit.i;
+  if (key === _whyKey) return;          // the panel only changes on a transition, not every frame
+  _whyKey = key;
   const f = hit.f;
-  const b = f.behavior, r = f.risk || {}, c = f.control || {};
-  // planner state at that instant, or the most recent planning cycle before it
-  let plan = f.plan;
-  for (let i = hit.i; i >= 0 && !plan; i--) plan = replay.frames[i].plan;
+  const b = f.behavior, r = f.risk || {};
   const worst = (f.objects || []).find((o) => o.id === r.worst_object_id);
 
   $("why-time").textContent = `t = ${f.t.toFixed(2)} s`;
   $("why-cause").textContent =
     (worst ? `${SHORT[worst.type] || worst.type} ${worst.id} — ` : "") + (b.reason || "—");
 
-  const cells = [
+  $("why-row").innerHTML = cells(f, replay, hit.from);
+}
+
+/** The measured row shared by both states of the panel. `from` is null when no transition yet. */
+function cells(f, replay, from) {
+  const b = f.behavior || {}, r = f.risk || {}, c = f.control || {};
+  let plan = f.plan;
+  if (!plan && replay) { const pf = replay.planFrameAt(f.t); plan = pf ? pf.plan : null; }
+  return [
     ["TTC physical", r.min_ttc_current_speed == null ? "∞" : fmt(r.min_ttc_current_speed, 2) + " s"],
     ["Feasible paths", plan ? `${plan.feasible_count} / ${plan.candidate_count}` : NA],
-    ["Transition", `${hit.from} → ${b.state}`],
+    [from ? "Transition" : "Behaviour", from ? `${from} → ${b.state}` : (b.state || NA)],
     ["Target speed", b.force_stop ? "STOP" : fmt(b.target_speed, 1) + " m/s"],
     ["Response", fmt((c.acceleration || 0) - (c.brake || 0), 2) + " m/s²"],
     ["Clearance", plan && plan.selected && plan.selected.min_clearance != null
       ? fmt(plan.selected.min_clearance, 2) + " m" : NA],
     ["Selected", plan ? plan.selected_id : NA],
-  ];
-  $("why-row").innerHTML = cells
-    .map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join("");
+  ].map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join("");
 }
 
 /* ── event timeline ── */
@@ -163,35 +172,6 @@ export function renderMarks(replay, onSeek) {
     i.onclick = () => onSeek(e.t - replay.t0);
     box.appendChild(i);
   });
-}
-
-/* ── storytelling beat ──────────────────────────────────────────────────
-   One short line naming the measured state change that just happened. */
-const BEAT = {
-  track: "OBJECT DETECTED · TRACK CONFIRMED",
-  risk: "RISK LEVEL CHANGED",
-  state: "BEHAVIOUR CHANGED · RE-PLANNING",
-  eb: "EMERGENCY BRAKE · SAFETY OVERRIDE",
-  rev: "REVERSE RECOVERY ENGAGED",
-  goal: "GOAL REACHED · SAFE PASSAGE",
-  plan: "TRAJECTORY RESELECTED",
-};
-let beatUntil = 0, beatKey = "";
-
-export function updateBeat(replay, t) {
-  let ev = null;
-  for (const e of replay.events) {
-    if (e.t > t) break;
-    if (t - e.t < 2.0 && BEAT[e.kind]) ev = e;
-  }
-  const el = $("beat");
-  if (!ev) { el.classList.remove("on"); beatKey = ""; return; }
-  const key = ev.t + ev.kind;
-  if (key !== beatKey) {
-    beatKey = key;
-    el.querySelector("span").textContent = BEAT[ev.kind];
-  }
-  el.classList.add("on");
 }
 
 /* ── object inspector ── */
